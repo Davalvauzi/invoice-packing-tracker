@@ -1,9 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { 
   Package, 
-  Upload, 
   CheckCircle, 
-  Image as ImageIcon, 
   X, 
   PlusCircle, 
   AlertCircle,
@@ -32,12 +30,9 @@ export default function PackingListModal({ isOpen, onClose, openPrintTab, onSucc
     width: '',
     height: '',
     unit_note: 'mm',
-    notes: '',
-    image_url: ''
+    notes: ''
   });
 
-  const [selectedFile, setSelectedFile] = useState(null);
-  const [previewUrl, setPreviewUrl] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submittedDoc, setSubmittedDoc] = useState(null);
 
@@ -125,26 +120,8 @@ export default function PackingListModal({ isOpen, onClose, openPrintTab, onSucc
       part_name: inv.part_name || '',
       terms_of_delivery: inv.terms_of_delivery || '',
       box_qty: inv.no_of_box || '',
-      pallet_qty: inv.no_of_pallet || '',
-      image_url: inv.image_url || ''
+      pallet_qty: inv.no_of_pallet || ''
     }));
-    if (inv.image_url) {
-      setPreviewUrl(inv.image_url);
-    }
-  };
-
-  const handleFileChange = (e) => {
-    const file = e.target.files[0];
-    if (file) {
-      setSelectedFile(file);
-      setPreviewUrl(URL.createObjectURL(file));
-    }
-  };
-
-  const removeImage = () => {
-    setSelectedFile(null);
-    setPreviewUrl('');
-    setFormData(prev => ({ ...prev, image_url: '' }));
   };
 
   const handleSubmit = async (e) => {
@@ -160,28 +137,10 @@ export default function PackingListModal({ isOpen, onClose, openPrintTab, onSucc
 
     setIsSubmitting(true);
     try {
-      let finalImageUrl = formData.image_url;
-
-      if (selectedFile) {
-        const uploadData = new FormData();
-        uploadData.append('drawing', selectedFile);
-        const upRes = await fetch('/api/upload', {
-          method: 'POST',
-          body: uploadData
-        });
-        if (upRes.ok) {
-          const upJson = await upRes.json();
-          finalImageUrl = upJson.url;
-        }
-      }
-
       const postRes = await fetch('/api/packing-lists', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          ...formData,
-          image_url: finalImageUrl
-        })
+        body: JSON.stringify(formData)
       });
 
       if (!postRes.ok) {
@@ -212,8 +171,6 @@ export default function PackingListModal({ isOpen, onClose, openPrintTab, onSucc
 
   const resetForm = () => {
     setSubmittedDoc(null);
-    setSelectedFile(null);
-    setPreviewUrl('');
     setFormData({
       invoice_number: '',
       invoice_date: new Date().toISOString().slice(0, 10),
@@ -227,8 +184,7 @@ export default function PackingListModal({ isOpen, onClose, openPrintTab, onSucc
       width: '',
       height: '',
       unit_note: 'mm',
-      notes: '',
-      image_url: ''
+      notes: ''
     });
   };
 
@@ -508,35 +464,6 @@ export default function PackingListModal({ isOpen, onClose, openPrintTab, onSucc
                   </select>
                 </div>
               </div>
-            </div>
-
-            {/* Row 7: Add Drawing */}
-            <div className="border border-dashed border-slate-300 rounded-xl p-4 bg-slate-50/50">
-              <div className="flex items-center justify-between">
-                <div>
-                  <span className="text-[11px] font-bold text-slate-700 uppercase block">
-                    Add Drawing / Packaging Photo
-                  </span>
-                  <p className="text-[10px] text-slate-400">Sketsa penataan atau foto part</p>
-                </div>
-                <label className="cursor-pointer inline-flex items-center gap-1.5 px-3 py-1.5 bg-blue-700 hover:bg-blue-800 text-white rounded-lg text-xs font-semibold">
-                  <Upload className="w-3.5 h-3.5" />
-                  <span>Pilih Berkas</span>
-                  <input type="file" accept="image/*" onChange={handleFileChange} className="hidden" />
-                </label>
-              </div>
-
-              {previewUrl && (
-                <div className="mt-3 flex items-center gap-3 bg-white p-2 rounded-lg border border-slate-200">
-                  <img src={previewUrl} alt="Preview" className="w-12 h-12 object-cover rounded" />
-                  <div className="flex-1 truncate text-xs">
-                    <p className="font-semibold text-slate-800 truncate">{selectedFile?.name}</p>
-                  </div>
-                  <button type="button" onClick={removeImage} className="p-1 text-slate-400 hover:text-red-500">
-                    <X className="w-4 h-4" />
-                  </button>
-                </div>
-              )}
             </div>
 
           </form>

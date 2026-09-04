@@ -1,9 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { 
   FileText, 
-  Upload, 
   CheckCircle, 
-  Image as ImageIcon, 
   X, 
   PlusCircle, 
   AlertCircle,
@@ -29,12 +27,9 @@ export default function InvoiceModal({ isOpen, onClose, openPrintTab, onSuccess 
     part_name: '',
     no_of_pallet: '',
     no_of_box: '',
-    notes: '',
-    image_url: ''
+    notes: ''
   });
 
-  const [selectedFile, setSelectedFile] = useState(null);
-  const [previewUrl, setPreviewUrl] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submittedDoc, setSubmittedDoc] = useState(null);
 
@@ -112,20 +107,6 @@ export default function InvoiceModal({ isOpen, onClose, openPrintTab, onSuccess 
     setFormData(prev => ({ ...prev, part_name: val }));
   };
 
-  const handleFileChange = (e) => {
-    const file = e.target.files[0];
-    if (file) {
-      setSelectedFile(file);
-      setPreviewUrl(URL.createObjectURL(file));
-    }
-  };
-
-  const removeImage = () => {
-    setSelectedFile(null);
-    setPreviewUrl('');
-    setFormData(prev => ({ ...prev, image_url: '' }));
-  };
-
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!formData.invoice_number.trim()) {
@@ -139,28 +120,10 @@ export default function InvoiceModal({ isOpen, onClose, openPrintTab, onSuccess 
 
     setIsSubmitting(true);
     try {
-      let finalImageUrl = formData.image_url;
-
-      if (selectedFile) {
-        const uploadData = new FormData();
-        uploadData.append('drawing', selectedFile);
-        const upRes = await fetch('/api/upload', {
-          method: 'POST',
-          body: uploadData
-        });
-        if (upRes.ok) {
-          const upJson = await upRes.json();
-          finalImageUrl = upJson.url;
-        }
-      }
-
       const postRes = await fetch('/api/invoices', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          ...formData,
-          image_url: finalImageUrl
-        })
+        body: JSON.stringify(formData)
       });
 
       if (!postRes.ok) {
@@ -192,8 +155,6 @@ export default function InvoiceModal({ isOpen, onClose, openPrintTab, onSuccess 
 
   const resetForm = () => {
     setSubmittedDoc(null);
-    setSelectedFile(null);
-    setPreviewUrl('');
     setFormData({
       invoice_number: '',
       invoice_date: new Date().toISOString().slice(0, 10),
@@ -205,8 +166,7 @@ export default function InvoiceModal({ isOpen, onClose, openPrintTab, onSuccess 
       part_name: '',
       no_of_pallet: '',
       no_of_box: '',
-      notes: '',
-      image_url: ''
+      notes: ''
     });
   };
 
@@ -439,35 +399,6 @@ export default function InvoiceModal({ isOpen, onClose, openPrintTab, onSuccess 
                   className="w-full px-3 py-2 rounded-xl border border-slate-300 focus:border-emerald-600 font-mono text-xs bg-white"
                 />
               </div>
-            </div>
-
-            {/* Row 6: Add Drawing */}
-            <div className="border border-dashed border-slate-300 rounded-xl p-4 bg-slate-50/50">
-              <div className="flex items-center justify-between">
-                <div>
-                  <span className="text-[11px] font-bold text-slate-700 uppercase block">
-                    Add Drawing / File Image
-                  </span>
-                  <p className="text-[10px] text-slate-400">Format gambar teknis (PNG/JPG)</p>
-                </div>
-                <label className="cursor-pointer inline-flex items-center gap-1.5 px-3 py-1.5 bg-blue-700 hover:bg-blue-800 text-white rounded-lg text-xs font-semibold">
-                  <Upload className="w-3.5 h-3.5" />
-                  <span>Pilih Berkas</span>
-                  <input type="file" accept="image/*" onChange={handleFileChange} className="hidden" />
-                </label>
-              </div>
-
-              {previewUrl && (
-                <div className="mt-3 flex items-center gap-3 bg-white p-2 rounded-lg border border-slate-200">
-                  <img src={previewUrl} alt="Preview" className="w-12 h-12 object-cover rounded" />
-                  <div className="flex-1 truncate text-xs">
-                    <p className="font-semibold text-slate-800 truncate">{selectedFile?.name}</p>
-                  </div>
-                  <button type="button" onClick={removeImage} className="p-1 text-slate-400 hover:text-red-500">
-                    <X className="w-4 h-4" />
-                  </button>
-                </div>
-              )}
             </div>
 
           </form>

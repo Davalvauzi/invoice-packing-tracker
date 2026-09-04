@@ -344,6 +344,73 @@ app.post('/api/invoices', (req, res) => {
   }
 });
 
+app.put('/api/invoices/:id', (req, res) => {
+  try {
+    const {
+      invoice_number,
+      invoice_date,
+      customer_name,
+      customer_id,
+      payment_term,
+      terms_of_delivery,
+      customer_po_no,
+      part_name,
+      no_of_pallet,
+      no_of_box,
+      notes
+    } = req.body;
+
+    db.prepare(`
+      UPDATE invoices
+      SET invoice_number = ?, invoice_date = ?, customer_name = ?, customer_id = ?,
+          payment_term = ?, terms_of_delivery = ?, customer_po_no = ?, part_name = ?,
+          no_of_pallet = ?, no_of_box = ?, notes = ?
+      WHERE id = ?
+    `).run(
+      invoice_number || '',
+      invoice_date || '',
+      customer_name || '',
+      customer_id || '',
+      payment_term || '',
+      terms_of_delivery || '',
+      customer_po_no || '',
+      part_name || '',
+      Number(no_of_pallet) || 0,
+      Number(no_of_box) || 0,
+      notes || '',
+      req.params.id
+    );
+
+    // Sync update to data_logger
+    db.prepare(`
+      UPDATE data_logger
+      SET doc_number = ?, doc_date = ?, customer_name = ?, customer_id = ?,
+          po_no = ?, part_name = ?, box_qty = ?, pallet_qty = ?,
+          terms_of_delivery = ?, payment_term = ?, notes = ?
+      WHERE doc_type = 'INVOICE' AND ref_id = ?
+    `).run(
+      invoice_number || '',
+      invoice_date || '',
+      customer_name || '',
+      customer_id || '',
+      customer_po_no || '',
+      part_name || '',
+      Number(no_of_box) || 0,
+      Number(no_of_pallet) || 0,
+      terms_of_delivery || '',
+      payment_term || '',
+      notes || '',
+      req.params.id
+    );
+
+    const updated = db.prepare('SELECT * FROM invoices WHERE id = ?').get(req.params.id);
+    res.json(updated);
+  } catch (err) {
+    console.error('Invoice update error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // ================= PACKING LIST TRANSACTIONS ================= //
 
 app.get('/api/packing-lists', (req, res) => {
@@ -448,6 +515,80 @@ app.post('/api/packing-lists', (req, res) => {
   }
 });
 
+app.put('/api/packing-lists/:id', (req, res) => {
+  try {
+    const {
+      invoice_number,
+      invoice_date,
+      customer_name,
+      customer_po_no,
+      part_name,
+      terms_of_delivery,
+      box_qty,
+      pallet_qty,
+      length,
+      width,
+      height,
+      unit_note,
+      notes
+    } = req.body;
+
+    db.prepare(`
+      UPDATE packing_lists
+      SET invoice_number = ?, invoice_date = ?, customer_name = ?, customer_po_no = ?,
+          part_name = ?, terms_of_delivery = ?, box_qty = ?, pallet_qty = ?,
+          length = ?, width = ?, height = ?, unit_note = ?, notes = ?
+      WHERE id = ?
+    `).run(
+      invoice_number || '',
+      invoice_date || '',
+      customer_name || '',
+      customer_po_no || '',
+      part_name || '',
+      terms_of_delivery || '',
+      Number(box_qty) || 0,
+      Number(pallet_qty) || 0,
+      Number(length) || 0,
+      Number(width) || 0,
+      Number(height) || 0,
+      unit_note || 'mm',
+      notes || '',
+      req.params.id
+    );
+
+    const dimStr = (Number(length) > 0 || Number(width) > 0 || Number(height) > 0)
+      ? `${length} x ${width} x ${height} ${unit_note || 'mm'}`
+      : null;
+
+    // Sync update to data_logger
+    db.prepare(`
+      UPDATE data_logger
+      SET doc_number = ?, doc_date = ?, customer_name = ?,
+          po_no = ?, part_name = ?, box_qty = ?, pallet_qty = ?,
+          terms_of_delivery = ?, dimensions = ?, notes = ?
+      WHERE doc_type = 'PACKING_LIST' AND ref_id = ?
+    `).run(
+      invoice_number || '',
+      invoice_date || '',
+      customer_name || '',
+      customer_po_no || '',
+      part_name || '',
+      Number(box_qty) || 0,
+      Number(pallet_qty) || 0,
+      terms_of_delivery || '',
+      dimStr,
+      notes || '',
+      req.params.id
+    );
+
+    const updated = db.prepare('SELECT * FROM packing_lists WHERE id = ?').get(req.params.id);
+    res.json(updated);
+  } catch (err) {
+    console.error('Packing list update error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // ================= DATA LOGGER ROUTES ================= //
 
 app.get('/api/data-logger', (req, res) => {
@@ -507,6 +648,103 @@ app.get('/api/data-logger', (req, res) => {
     const rows = db.prepare(query).all(...params);
     res.json(rows);
   } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.put('/api/data-logger/:id', (req, res) => {
+  try {
+    const {
+      doc_number,
+      doc_date,
+      customer_name,
+      customer_id,
+      po_no,
+      part_name,
+      box_qty,
+      pallet_qty,
+      terms_of_delivery,
+      payment_term,
+      dimensions,
+      notes
+    } = req.body;
+
+    const log = db.prepare('SELECT * FROM data_logger WHERE id = ?').get(req.params.id);
+    if (!log) {
+      return res.status(404).json({ error: 'Data log not found' });
+    }
+
+    db.prepare(`
+      UPDATE data_logger
+      SET doc_number = ?, doc_date = ?, customer_name = ?, customer_id = ?,
+          po_no = ?, part_name = ?, box_qty = ?, pallet_qty = ?,
+          terms_of_delivery = ?, payment_term = ?, dimensions = ?, notes = ?
+      WHERE id = ?
+    `).run(
+      doc_number || '',
+      doc_date || '',
+      customer_name || '',
+      customer_id || '',
+      po_no || '',
+      part_name || '',
+      Number(box_qty) || 0,
+      Number(pallet_qty) || 0,
+      terms_of_delivery || '',
+      payment_term || '',
+      dimensions || null,
+      notes || '',
+      req.params.id
+    );
+
+    // Also sync to referenced invoice or packing list if ref_id exists
+    if (log.ref_id) {
+      if (log.doc_type === 'INVOICE') {
+        db.prepare(`
+          UPDATE invoices
+          SET invoice_number = ?, invoice_date = ?, customer_name = ?, customer_id = ?,
+              customer_po_no = ?, part_name = ?, no_of_box = ?, no_of_pallet = ?,
+              terms_of_delivery = ?, payment_term = ?, notes = ?
+          WHERE id = ?
+        `).run(
+          doc_number || '',
+          doc_date || '',
+          customer_name || '',
+          customer_id || '',
+          po_no || '',
+          part_name || '',
+          Number(box_qty) || 0,
+          Number(pallet_qty) || 0,
+          terms_of_delivery || '',
+          payment_term || '',
+          notes || '',
+          log.ref_id
+        );
+      } else if (log.doc_type === 'PACKING_LIST') {
+        db.prepare(`
+          UPDATE packing_lists
+          SET invoice_number = ?, invoice_date = ?, customer_name = ?,
+              customer_po_no = ?, part_name = ?, box_qty = ?, pallet_qty = ?,
+              terms_of_delivery = ?, notes = ?
+          WHERE id = ?
+        `).run(
+          doc_number || '',
+          doc_date || '',
+          customer_name || '',
+          po_no || '',
+          part_name || '',
+          Number(box_qty) || 0,
+          Number(pallet_qty) || 0,
+          terms_of_delivery || '',
+          notes || '',
+          log.ref_id
+        );
+      }
+    }
+
+    const updated = db.prepare('SELECT * FROM data_logger WHERE id = ?').get(req.params.id);
+    res.json(updated);
+  } catch (err) {
+    console.error('Data logger update error:', err);
     res.status(500).json({ error: err.message });
   }
 });

@@ -12,13 +12,12 @@ import {
   ArrowUpDown,
   Calendar,
   Building2,
-  Truck,
   RotateCcw,
   Eye,
   X,
-  Layers,
-  Box,
-  Image as ImageIcon
+  Edit3,
+  Save,
+  Check
 } from 'lucide-react';
 
 export default function DataLogger({ 
@@ -30,12 +29,12 @@ export default function DataLogger({
   const [logs, setLogs] = useState([]);
   const [customers, setCustomers] = useState([]);
   const [deliveryTerms, setDeliveryTerms] = useState([]);
+  const [paymentTerms, setPaymentTerms] = useState([]);
   const [loading, setLoading] = useState(true);
 
   // Filters
   const [typeFilter, setTypeFilter] = useState('ALL');
   const [customerFilter, setCustomerFilter] = useState('ALL');
-  const [deliveryFilter, setDeliveryFilter] = useState('ALL');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
@@ -47,15 +46,24 @@ export default function DataLogger({
   // Detail Modal State
   const [selectedLog, setSelectedLog] = useState(null);
 
-  // Lock body scroll and listen for Escape key on detail modal
+  // Edit Modal State
+  const [editingLog, setEditingLog] = useState(null);
+  const [editForm, setEditForm] = useState({});
+  const [isSavingEdit, setIsSavingEdit] = useState(false);
+
+  // Lock body scroll and listen for Escape key on modals
   useEffect(() => {
-    if (!selectedLog) return;
+    if (!selectedLog && !editingLog) return;
     const prevOverflow = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
 
     const handleKeyDown = (e) => {
       if (e.key === 'Escape') {
-        setSelectedLog(null);
+        if (editingLog) {
+          setEditingLog(null);
+        } else if (selectedLog) {
+          setSelectedLog(null);
+        }
       }
     };
     window.addEventListener('keydown', handleKeyDown);
@@ -64,7 +72,7 @@ export default function DataLogger({
       document.body.style.overflow = prevOverflow;
       window.removeEventListener('keydown', handleKeyDown);
     };
-  }, [selectedLog]);
+  }, [selectedLog, editingLog]);
 
   useEffect(() => {
     fetchFilterOptions();
@@ -72,16 +80,18 @@ export default function DataLogger({
 
   useEffect(() => {
     fetchLogs();
-  }, [typeFilter, customerFilter, deliveryFilter, startDate, endDate, sortBy, sortOrder, refreshTrigger]);
+  }, [typeFilter, customerFilter, startDate, endDate, sortBy, sortOrder, refreshTrigger]);
 
   const fetchFilterOptions = async () => {
     try {
-      const [cRes, dRes] = await Promise.all([
+      const [cRes, dRes, pRes] = await Promise.all([
         fetch('/api/customers'),
-        fetch('/api/delivery-terms')
+        fetch('/api/delivery-terms'),
+        fetch('/api/payment-terms')
       ]);
       setCustomers(await cRes.json());
       setDeliveryTerms(await dRes.json());
+      setPaymentTerms(await pRes.json());
     } catch (err) {
       console.error('Failed to load filter options:', err);
     }
@@ -93,7 +103,6 @@ export default function DataLogger({
       const params = new URLSearchParams();
       if (typeFilter !== 'ALL') params.append('doc_type', typeFilter);
       if (customerFilter !== 'ALL') params.append('customer_name', customerFilter);
-      if (deliveryFilter !== 'ALL') params.append('terms_of_delivery', deliveryFilter);
       if (startDate) params.append('start_date', startDate);
       if (endDate) params.append('end_date', endDate);
       if (searchTerm) params.append('search', searchTerm);
@@ -118,12 +127,71 @@ export default function DataLogger({
   const resetFilters = () => {
     setTypeFilter('ALL');
     setCustomerFilter('ALL');
-    setDeliveryFilter('ALL');
     setStartDate('');
     setEndDate('');
     setSearchTerm('');
     setSortBy('id');
     setSortOrder('DESC');
+  };
+
+  // Edit Handlers
+  const handleOpenEdit = (log) => {
+    setEditingLog(log);
+    setEditForm({
+      doc_number: log.doc_number || '',
+      doc_date: log.doc_date || '',
+      customer_name: log.customer_name || '',
+      customer_id: log.customer_id || '',
+      po_no: log.po_no || '',
+      part_name: log.part_name || '',
+      box_qty: log.box_qty ?? '',
+      pallet_qty: log.pallet_qty ?? '',
+      terms_of_delivery: log.terms_of_delivery || '',
+      payment_term: log.payment_term || '',
+      dimensions: log.dimensions || '',
+      notes: log.notes || ''
+    });
+  };
+
+  const handleSaveEdit = async (e) => {
+    e.preventDefault();
+    if (!editForm.doc_number?.trim()) {
+      alert('Nomor dokumen tidak boleh kosong');
+      return;
+    }
+    if (!editForm.customer_name?.trim()) {
+      alert('Nama customer tidak boleh kosong');
+      return;
+    }
+
+    setIsSavingEdit(true);
+    try {
+      const res = await fetch(`/api/data-logger/${editingLog.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(editForm)
+      });
+
+      if (!res.ok) {
+        throw new Error('Gagal menyimpan perubahan');
+      }
+
+      const updatedLog = await res.json();
+      
+      // Update local logs list
+      setLogs(prev => prev.map(item => item.id === editingLog.id ? updatedLog : item));
+
+      // Also update selectedLog if it's currently open
+      if (selectedLog && selectedLog.id === editingLog.id) {
+        setSelectedLog(updatedLog);
+      }
+
+      setEditingLog(null);
+    } catch (err) {
+      alert('Gagal mengupdate data: ' + err.message);
+    } finally {
+      setIsSavingEdit(false);
+    }
   };
 
   // Quick Date Range Helpers
@@ -199,7 +267,6 @@ export default function DataLogger({
       'Terms of Delivery', 
       'Payment Term', 
       'Dimensi', 
-      'Drawing URL',
       'Catatan',
       'Waktu Input'
     ];
@@ -218,7 +285,6 @@ export default function DataLogger({
       `"${(l.terms_of_delivery || '').replace(/"/g, '""')}"`,
       `"${(l.payment_term || '').replace(/"/g, '""')}"`,
       `"${(l.dimensions || '').replace(/"/g, '""')}"`,
-      `"${(l.image_url || '').replace(/"/g, '""')}"`,
       `"${(l.notes || '').replace(/"/g, '""')}"`,
       l.created_at
     ]);
@@ -291,30 +357,35 @@ export default function DataLogger({
       </div>
 
       {/* Summary KPI Cards (Based on Current Filters) */}
-      <div className="grid grid-cols-2 sm:grid-cols-5 gap-3.5 mb-6">
-        <div className="bg-white p-3.5 rounded-xl border border-slate-200 shadow-xs">
-          <span className="text-[11px] font-semibold text-slate-500 block">Total Dokumen</span>
-          <span className="text-xl font-extrabold text-slate-900">{logs.length}</span>
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
+        <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-xs flex items-center justify-between">
+          <div>
+            <span className="text-xs font-bold text-slate-500 block uppercase tracking-wider">Total Dokumen</span>
+            <span className="text-2xl font-black text-slate-900">{logs.length}</span>
+          </div>
+          <div className="w-10 h-10 rounded-xl bg-slate-100 flex items-center justify-center text-slate-700 font-bold">
+            <Database className="w-5 h-5" />
+          </div>
         </div>
 
-        <div className="bg-white p-3.5 rounded-xl border border-slate-200 shadow-xs">
-          <span className="text-[11px] font-semibold text-emerald-700 block">Invoice</span>
-          <span className="text-xl font-extrabold text-emerald-800">{totalInvoices}</span>
+        <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-xs flex items-center justify-between">
+          <div>
+            <span className="text-xs font-bold text-emerald-700 block uppercase tracking-wider">Total Invoice</span>
+            <span className="text-2xl font-black text-emerald-800">{totalInvoices}</span>
+          </div>
+          <div className="w-10 h-10 rounded-xl bg-emerald-50 flex items-center justify-center text-emerald-700 font-bold">
+            <FileText className="w-5 h-5" />
+          </div>
         </div>
 
-        <div className="bg-white p-3.5 rounded-xl border border-slate-200 shadow-xs">
-          <span className="text-[11px] font-semibold text-teal-700 block">Packing List</span>
-          <span className="text-xl font-extrabold text-teal-800">{totalPackingLists}</span>
-        </div>
-
-        <div className="bg-white p-3.5 rounded-xl border border-slate-200 shadow-xs">
-          <span className="text-[11px] font-semibold text-slate-600 block">Total Box</span>
-          <span className="text-xl font-extrabold text-slate-800 font-mono">{totalBoxes.toLocaleString()}</span>
-        </div>
-
-        <div className="bg-white p-3.5 rounded-xl border border-slate-200 shadow-xs col-span-2 sm:col-span-1">
-          <span className="text-[11px] font-semibold text-slate-600 block">Total Palet</span>
-          <span className="text-xl font-extrabold text-slate-800 font-mono">{totalPallets.toLocaleString()}</span>
+        <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-xs flex items-center justify-between">
+          <div>
+            <span className="text-xs font-bold text-teal-700 block uppercase tracking-wider">Total Packing List</span>
+            <span className="text-2xl font-black text-teal-800">{totalPackingLists}</span>
+          </div>
+          <div className="w-10 h-10 rounded-xl bg-teal-50 flex items-center justify-center text-teal-700 font-bold">
+            <Package className="w-5 h-5" />
+          </div>
         </div>
       </div>
 
@@ -377,8 +448,8 @@ export default function DataLogger({
           </form>
         </div>
 
-        {/* Row 2: Customer, Delivery Terms, Date Range */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 pt-3 border-t border-slate-100 text-xs">
+        {/* Row 2: Customer, Date Range */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-3 border-t border-slate-100 text-xs">
           
           {/* Customer Dropdown Filter */}
           <div>
@@ -393,23 +464,6 @@ export default function DataLogger({
               <option value="ALL">-- Semua Customer --</option>
               {customers.map(c => (
                 <option key={c.id} value={c.customer_name}>{c.customer_name}</option>
-              ))}
-            </select>
-          </div>
-
-          {/* Terms of Delivery Filter */}
-          <div>
-            <label className="block text-[11px] font-bold text-slate-600 mb-1 flex items-center gap-1">
-              <Truck className="w-3.5 h-3.5 text-slate-400" /> Terms of Delivery
-            </label>
-            <select
-              value={deliveryFilter}
-              onChange={(e) => setDeliveryFilter(e.target.value)}
-              className="w-full px-2.5 py-1.5 rounded-lg border border-slate-300 bg-white text-xs font-medium cursor-pointer"
-            >
-              <option value="ALL">-- Semua Delivery Terms --</option>
-              {deliveryTerms.map(d => (
-                <option key={d.id} value={d.name}>{d.name}</option>
               ))}
             </select>
           </div>
@@ -512,21 +566,20 @@ export default function DataLogger({
                 <th className="px-3 py-3.5 text-center cursor-pointer hover:text-slate-800" onClick={() => toggleSort('pallet_qty')}>
                   <div className="flex items-center justify-center gap-1">Pallet <ArrowUpDown className="w-3 h-3" /></div>
                 </th>
-                <th className="px-3 py-3.5 text-center">Lampiran</th>
                 <th className="px-4 py-3.5 text-right">Aksi</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
               {loading ? (
                 <tr>
-                  <td colSpan={12} className="px-6 py-12 text-center text-slate-400">
+                  <td colSpan={11} className="px-6 py-12 text-center text-slate-400">
                     <RefreshCw className="w-6 h-6 animate-spin mx-auto mb-2 text-emerald-700" />
                     Memuat data logger...
                   </td>
                 </tr>
               ) : logs.length === 0 ? (
                 <tr>
-                  <td colSpan={12} className="px-6 py-12 text-center text-slate-400">
+                  <td colSpan={11} className="px-6 py-12 text-center text-slate-400">
                     Tidak ada transaksi yang cocok dengan filter yang dipilih.
                   </td>
                 </tr>
@@ -583,17 +636,15 @@ export default function DataLogger({
                     <td className="px-3 py-3 text-center font-mono font-bold text-slate-900">
                       {log.pallet_qty || 0}
                     </td>
-                    <td className="px-3 py-3 text-center">
-                      {log.image_url ? (
-                        <span className="inline-flex items-center gap-1 text-[10px] bg-blue-50 text-blue-700 px-1.5 py-0.5 rounded font-medium">
-                          <ImageIcon className="w-3 h-3" /> Ada
-                        </span>
-                      ) : (
-                        <span className="text-slate-300">-</span>
-                      )}
-                    </td>
                     <td className="px-4 py-3 text-right whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
                       <div className="flex items-center justify-end gap-1.5">
+                        <button
+                          onClick={() => handleOpenEdit(log)}
+                          className="p-1.5 bg-amber-50 hover:bg-amber-100 text-amber-700 rounded-lg text-xs transition-colors"
+                          title="Edit Data / Koreksi Typo"
+                        >
+                          <Edit3 className="w-3.5 h-3.5" />
+                        </button>
                         <button
                           onClick={() => setSelectedLog(log)}
                           className="p-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs transition-colors"
@@ -725,9 +776,21 @@ export default function DataLogger({
                 onClick={() => handleDelete(selectedLog.id)}
                 className="text-red-600 hover:text-red-700 font-semibold text-xs flex items-center gap-1"
               >
-                <Trash2 className="w-3.5 h-3.5" /> Hapus dari Data Logger
+                <Trash2 className="w-3.5 h-3.5" /> Hapus
               </button>
               <div className="flex items-center gap-2">
+                <button
+                  onClick={() => {
+                    const toEdit = selectedLog;
+                    setSelectedLog(null);
+                    handleOpenEdit(toEdit);
+                  }}
+                  className="inline-flex items-center gap-1.5 px-3 py-2 bg-amber-500 hover:bg-amber-600 text-white rounded-xl text-xs font-bold shadow-xs transition-colors"
+                  title="Koreksi Salah Ketik (Typo)"
+                >
+                  <Edit3 className="w-3.5 h-3.5" />
+                  <span>Edit Data</span>
+                </button>
                 <button
                   onClick={() => setSelectedLog(null)}
                   className="px-4 py-2 border border-slate-300 rounded-xl text-xs font-semibold text-slate-700 hover:bg-slate-50"
@@ -741,9 +804,269 @@ export default function DataLogger({
                   className="inline-flex items-center gap-1.5 px-4 py-2 bg-emerald-800 text-white rounded-xl text-xs font-bold hover:bg-emerald-900 shadow-xs"
                 >
                   <Printer className="w-3.5 h-3.5" />
-                  <span>Buka Dokumen PDF</span>
+                  <span>Buka PDF</span>
                 </button>
               </div>
+            </div>
+
+          </div>
+        </div>
+      )}
+
+      {/* Edit Document Modal */}
+      {editingLog && (
+        <div 
+          className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 overflow-y-auto"
+          onClick={() => !isSavingEdit && setEditingLog(null)}
+        >
+          <div 
+            className="bg-white rounded-2xl max-w-2xl w-full my-auto shadow-2xl border border-slate-200 overflow-hidden flex flex-col max-h-[92vh] animate-in fade-in zoom-in-95 duration-200"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Modal Header */}
+            <div className="bg-gradient-to-r from-amber-600 to-amber-700 px-6 py-4 text-white flex items-center justify-between shrink-0">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-lg bg-white/20 flex items-center justify-center">
+                  <Edit3 className="w-4 h-4 text-white" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded bg-white/20 text-white">
+                      EDIT {editingLog.doc_type}
+                    </span>
+                    <span className="font-mono font-bold text-xs opacity-90">{editingLog.doc_number}</span>
+                  </div>
+                  <h2 className="text-base font-extrabold tracking-tight">Koreksi Data Dokumen</h2>
+                </div>
+              </div>
+              <button
+                onClick={() => !isSavingEdit && setEditingLog(null)}
+                className="p-1.5 rounded-lg text-amber-100 hover:text-white hover:bg-white/10 transition-colors"
+                title="Tutup Modal (Esc)"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Modal Scrollable Form */}
+            <form id="edit-logger-form" onSubmit={handleSaveEdit} className="overflow-y-auto p-6 space-y-4 text-xs flex-1">
+              
+              {/* Row 1: Nomor Dokumen & Tanggal */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-700 uppercase mb-1">
+                    Nomor Dokumen <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={editForm.doc_number || ''}
+                    onChange={(e) => setEditForm({ ...editForm, doc_number: e.target.value })}
+                    className="w-full px-3 py-2 rounded-xl border border-slate-300 focus:border-amber-600 font-mono text-xs"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-700 uppercase mb-1">
+                    Tanggal Dokumen <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="date"
+                    required
+                    value={editForm.doc_date || ''}
+                    onChange={(e) => setEditForm({ ...editForm, doc_date: e.target.value })}
+                    className="w-full px-3 py-2 rounded-xl border border-slate-300 focus:border-amber-600 text-xs"
+                  />
+                </div>
+              </div>
+
+              {/* Row 2: Customer Name & Customer ID */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
+                <div className="sm:col-span-2">
+                  <label className="block text-[11px] font-bold text-slate-700 uppercase mb-1">
+                    Nama Customer <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    list="edit-customers-list"
+                    required
+                    value={editForm.customer_name || ''}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      const found = customers.find(c => c.customer_name === val);
+                      setEditForm(prev => ({
+                        ...prev,
+                        customer_name: val,
+                        customer_id: found?.customer_id || prev.customer_id
+                      }));
+                    }}
+                    className="w-full px-3 py-2 rounded-xl border border-slate-300 focus:border-amber-600 text-xs"
+                  />
+                  <datalist id="edit-customers-list">
+                    {customers.map(c => (
+                      <option key={c.id} value={c.customer_name} />
+                    ))}
+                  </datalist>
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-700 uppercase mb-1">
+                    Customer ID
+                  </label>
+                  <input
+                    type="text"
+                    value={editForm.customer_id || ''}
+                    onChange={(e) => setEditForm({ ...editForm, customer_id: e.target.value })}
+                    className="w-full px-3 py-2 rounded-xl border border-slate-300 focus:border-amber-600 font-mono text-xs bg-slate-50"
+                  />
+                </div>
+              </div>
+
+              {/* Row 3: PO Number & Terms */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-700 uppercase mb-1">
+                    Customer PO No
+                  </label>
+                  <input
+                    type="text"
+                    value={editForm.po_no || ''}
+                    onChange={(e) => setEditForm({ ...editForm, po_no: e.target.value })}
+                    className="w-full px-3 py-2 rounded-xl border border-slate-300 focus:border-amber-600 text-xs"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-700 uppercase mb-1">
+                    Terms of Delivery
+                  </label>
+                  <input
+                    type="text"
+                    list="edit-delivery-terms-list"
+                    value={editForm.terms_of_delivery || ''}
+                    onChange={(e) => setEditForm({ ...editForm, terms_of_delivery: e.target.value })}
+                    className="w-full px-3 py-2 rounded-xl border border-slate-300 focus:border-amber-600 text-xs"
+                  />
+                  <datalist id="edit-delivery-terms-list">
+                    {deliveryTerms.map(d => (
+                      <option key={d.id} value={d.name} />
+                    ))}
+                  </datalist>
+                </div>
+              </div>
+
+              {/* Row 4: Payment Term (if Invoice) or Dimensions (if Packing List) */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                {editingLog.doc_type === 'INVOICE' ? (
+                  <div>
+                    <label className="block text-[11px] font-bold text-slate-700 uppercase mb-1">
+                      Payment Term
+                    </label>
+                    <input
+                      type="text"
+                      list="edit-payment-terms-list"
+                      value={editForm.payment_term || ''}
+                      onChange={(e) => setEditForm({ ...editForm, payment_term: e.target.value })}
+                      className="w-full px-3 py-2 rounded-xl border border-slate-300 focus:border-amber-600 text-xs"
+                    />
+                    <datalist id="edit-payment-terms-list">
+                      {paymentTerms.map(p => (
+                        <option key={p.id} value={p.name} />
+                      ))}
+                    </datalist>
+                  </div>
+                ) : (
+                  <div>
+                    <label className="block text-[11px] font-bold text-slate-700 uppercase mb-1">
+                      Dimensi (L x W x H)
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="Contoh: 120 x 80 x 100 mm"
+                      value={editForm.dimensions || ''}
+                      onChange={(e) => setEditForm({ ...editForm, dimensions: e.target.value })}
+                      className="w-full px-3 py-2 rounded-xl border border-slate-300 focus:border-amber-600 text-xs font-mono"
+                    />
+                  </div>
+                )}
+
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-700 uppercase mb-1">
+                    Part Specification
+                  </label>
+                  <input
+                    type="text"
+                    value={editForm.part_name || ''}
+                    onChange={(e) => setEditForm({ ...editForm, part_name: e.target.value })}
+                    className="w-full px-3 py-2 rounded-xl border border-slate-300 focus:border-amber-600 text-xs"
+                  />
+                </div>
+              </div>
+
+              {/* Row 5: Quantities Box & Pallet */}
+              <div className="grid grid-cols-2 gap-3.5 bg-slate-50 p-3.5 rounded-xl border border-slate-200">
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-700 uppercase mb-1">
+                    No of Box (Qty)
+                  </label>
+                  <input
+                    type="number"
+                    min="0"
+                    value={editForm.box_qty ?? ''}
+                    onChange={(e) => setEditForm({ ...editForm, box_qty: e.target.value })}
+                    className="w-full px-3 py-2 rounded-xl border border-slate-300 focus:border-amber-600 font-mono text-xs bg-white"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-700 uppercase mb-1">
+                    No of Pallet (Qty)
+                  </label>
+                  <input
+                    type="number"
+                    min="0"
+                    value={editForm.pallet_qty ?? ''}
+                    onChange={(e) => setEditForm({ ...editForm, pallet_qty: e.target.value })}
+                    className="w-full px-3 py-2 rounded-xl border border-slate-300 focus:border-amber-600 font-mono text-xs bg-white"
+                  />
+                </div>
+              </div>
+
+              {/* Row 6: Notes */}
+              <div>
+                <label className="block text-[11px] font-bold text-slate-700 uppercase mb-1">
+                  Catatan / Notes
+                </label>
+                <textarea
+                  rows={2}
+                  value={editForm.notes || ''}
+                  onChange={(e) => setEditForm({ ...editForm, notes: e.target.value })}
+                  className="w-full px-3 py-2 rounded-xl border border-slate-300 focus:border-amber-600 text-xs"
+                  placeholder="Keterangan tambahan..."
+                />
+              </div>
+
+            </form>
+
+            {/* Modal Footer */}
+            <div className="bg-slate-50 px-6 py-3.5 border-t border-slate-200 flex items-center justify-between shrink-0">
+              <button
+                type="button"
+                onClick={() => !isSavingEdit && setEditingLog(null)}
+                className="px-4 py-2 border border-slate-300 rounded-xl text-xs font-semibold text-slate-700 hover:bg-slate-100 transition-colors"
+              >
+                Batal
+              </button>
+
+              <button
+                type="submit"
+                form="edit-logger-form"
+                disabled={isSavingEdit}
+                className="inline-flex items-center gap-1.5 px-5 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-xs font-bold transition-colors shadow-xs cursor-pointer disabled:opacity-50"
+              >
+                <Save className="w-3.5 h-3.5" />
+                <span>{isSavingEdit ? 'Menyimpan...' : 'SIMPAN PERUBAHAN'}</span>
+              </button>
             </div>
 
           </div>

@@ -75,125 +75,135 @@ export default function Dashboard({
       </div>
 
       {/* Main Action Menu Cards (Mirip Tombol VBA dengan Modal Pop-up) */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-10">
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3.5 sm:gap-4 mb-10">
         
         {/* Card 1: Invoice Form (Opens Modal) */}
         <div 
           onClick={onOpenInvoiceModal}
-          className="group relative bg-gradient-to-br from-emerald-700 to-teal-900 rounded-2xl p-6 text-white shadow-lg shadow-emerald-900/15 cursor-pointer transform hover:-translate-y-1 transition-all duration-200 overflow-hidden"
+          className="group relative bg-gradient-to-br from-emerald-700 to-teal-900 rounded-2xl p-4 sm:p-5 text-white shadow-md shadow-emerald-900/15 cursor-pointer transform hover:-translate-y-1 transition-all duration-200 overflow-hidden flex flex-col justify-between"
         >
-          <div className="absolute right-[-10px] top-[-10px] w-28 h-28 bg-white/10 rounded-full blur-xl group-hover:scale-150 transition-transform"></div>
-          <div className="w-12 h-12 rounded-xl bg-white/20 backdrop-blur-sm flex items-center justify-center mb-4 text-white">
-            <FileText className="w-6 h-6" />
+          <div className="absolute right-[-10px] top-[-10px] w-24 h-24 bg-white/10 rounded-full blur-xl group-hover:scale-150 transition-transform"></div>
+          <div>
+            <div className="w-10 h-10 rounded-xl bg-white/20 backdrop-blur-sm flex items-center justify-center mb-3 text-white">
+              <FileText className="w-5 h-5" />
+            </div>
+            <span className="inline-block text-[10px] font-bold uppercase tracking-wider bg-emerald-500/40 text-emerald-100 px-2 py-0.5 rounded mb-1.5">
+              Dokumen Keuangan
+            </span>
+            <h2 className="text-base sm:text-lg font-bold mb-1 group-hover:text-emerald-200 transition-colors">
+              Invoice Form
+            </h2>
+            <p className="text-[11px] sm:text-xs text-emerald-100/80 mb-4 leading-relaxed">
+              Buka form invoice, catat ke log, dan cetak PDF A4.
+            </p>
           </div>
-          <span className="inline-block text-[11px] font-bold uppercase tracking-wider bg-emerald-500/40 text-emerald-100 px-2 py-0.5 rounded mb-2">
-            Dokumen Keuangan
-          </span>
-          <h2 className="text-xl font-bold mb-1 group-hover:text-emerald-200 transition-colors">
-            Invoice Form
-          </h2>
-          <p className="text-xs text-emerald-100/80 mb-5 leading-relaxed">
-            Buka modal form pembuatan invoice, rekam ke Data Logger, dan langsung cetak PDF A4.
-          </p>
-          <div className="flex items-center justify-between text-xs font-semibold text-emerald-200 pt-3 border-t border-white/10">
-            <span>Buka Modal Input</span>
-            <ArrowRight className="w-4 h-4 transform group-hover:translate-x-1 transition-transform" />
+          <div className="flex items-center justify-between text-xs font-semibold text-emerald-200 pt-3 border-t border-white/10 mt-auto">
+            <span>Buka Modal</span>
+            <ArrowRight className="w-3.5 h-3.5 transform group-hover:translate-x-1 transition-transform" />
           </div>
         </div>
 
         {/* Card 2: Packing List Form (Opens Modal) */}
         <div 
           onClick={onOpenPackingListModal}
-          className="group relative bg-gradient-to-br from-teal-700 to-emerald-900 rounded-2xl p-6 text-white shadow-lg shadow-teal-900/15 cursor-pointer transform hover:-translate-y-1 transition-all duration-200 overflow-hidden"
+          className="group relative bg-gradient-to-br from-teal-700 to-emerald-900 rounded-2xl p-4 sm:p-5 text-white shadow-md shadow-teal-900/15 cursor-pointer transform hover:-translate-y-1 transition-all duration-200 overflow-hidden flex flex-col justify-between"
         >
-          <div className="absolute right-[-10px] top-[-10px] w-28 h-28 bg-white/10 rounded-full blur-xl group-hover:scale-150 transition-transform"></div>
-          <div className="w-12 h-12 rounded-xl bg-white/20 backdrop-blur-sm flex items-center justify-center mb-4 text-white">
-            <Package className="w-6 h-6" />
+          <div className="absolute right-[-10px] top-[-10px] w-24 h-24 bg-white/10 rounded-full blur-xl group-hover:scale-150 transition-transform"></div>
+          <div>
+            <div className="w-10 h-10 rounded-xl bg-white/20 backdrop-blur-sm flex items-center justify-center mb-3 text-white">
+              <Package className="w-5 h-5" />
+            </div>
+            <span className="inline-block text-[10px] font-bold uppercase tracking-wider bg-teal-500/40 text-teal-100 px-2 py-0.5 rounded mb-1.5">
+              Dokumen Logistik
+            </span>
+            <h2 className="text-base sm:text-lg font-bold mb-1 group-hover:text-teal-200 transition-colors">
+              Packing List Form
+            </h2>
+            <p className="text-[11px] sm:text-xs text-teal-100/80 mb-4 leading-relaxed">
+              Buka form pengemasan, dimensi, box, dan palet.
+            </p>
           </div>
-          <span className="inline-block text-[11px] font-bold uppercase tracking-wider bg-teal-500/40 text-teal-100 px-2 py-0.5 rounded mb-2">
-            Dokumen Logistik
-          </span>
-          <h2 className="text-xl font-bold mb-1 group-hover:text-teal-200 transition-colors">
-            Packing List Form
-          </h2>
-          <p className="text-xs text-teal-100/80 mb-5 leading-relaxed">
-            Buka modal form spesifikasi pengemasan, dimensi part, box, palet, dan packing.
-          </p>
-          <div className="flex items-center justify-between text-xs font-semibold text-teal-200 pt-3 border-t border-white/10">
-            <span>Buka Modal Input</span>
-            <ArrowRight className="w-4 h-4 transform group-hover:translate-x-1 transition-transform" />
+          <div className="flex items-center justify-between text-xs font-semibold text-teal-200 pt-3 border-t border-white/10 mt-auto">
+            <span>Buka Modal</span>
+            <ArrowRight className="w-3.5 h-3.5 transform group-hover:translate-x-1 transition-transform" />
           </div>
         </div>
 
         {/* Card 3: Delivery Order Form (Opens Modal) */}
         <div 
           onClick={onOpenDeliveryOrderModal}
-          className="group relative bg-gradient-to-br from-[#0b4d53] to-[#083a3f] rounded-2xl p-6 text-white shadow-lg shadow-teal-950/15 cursor-pointer transform hover:-translate-y-1 transition-all duration-200 overflow-hidden"
+          className="group relative bg-gradient-to-br from-[#0b4d53] to-[#083a3f] rounded-2xl p-4 sm:p-5 text-white shadow-md shadow-teal-950/15 cursor-pointer transform hover:-translate-y-1 transition-all duration-200 overflow-hidden flex flex-col justify-between"
         >
-          <div className="absolute right-[-10px] top-[-10px] w-28 h-28 bg-white/10 rounded-full blur-xl group-hover:scale-150 transition-transform"></div>
-          <div className="w-12 h-12 rounded-xl bg-white/20 backdrop-blur-sm flex items-center justify-center mb-4 text-white">
-            <Truck className="w-6 h-6" />
+          <div className="absolute right-[-10px] top-[-10px] w-24 h-24 bg-white/10 rounded-full blur-xl group-hover:scale-150 transition-transform"></div>
+          <div>
+            <div className="w-10 h-10 rounded-xl bg-white/20 backdrop-blur-sm flex items-center justify-center mb-3 text-white">
+              <Truck className="w-5 h-5" />
+            </div>
+            <span className="inline-block text-[10px] font-bold uppercase tracking-wider bg-teal-400/30 text-teal-100 px-2 py-0.5 rounded mb-1.5">
+              Surat Jalan Fisik
+            </span>
+            <h2 className="text-base sm:text-lg font-bold mb-1 group-hover:text-teal-200 transition-colors">
+              Delivery Order
+            </h2>
+            <p className="text-[11px] sm:text-xs text-teal-100/80 mb-4 leading-relaxed">
+              Buka surat jalan nomor DO, customer, PO, dan part.
+            </p>
           </div>
-          <span className="inline-block text-[11px] font-bold uppercase tracking-wider bg-teal-400/30 text-teal-100 px-2 py-0.5 rounded mb-2">
-            Surat Jalan Fisik
-          </span>
-          <h2 className="text-xl font-bold mb-1 group-hover:text-teal-200 transition-colors">
-            Delivery Order
-          </h2>
-          <p className="text-xs text-teal-100/80 mb-5 leading-relaxed">
-            Buka modal surat jalan pengiriman part, nomor DO, customer, PO, dan kuantiti palet/box.
-          </p>
-          <div className="flex items-center justify-between text-xs font-semibold text-teal-200 pt-3 border-t border-white/10">
-            <span>Buka Modal Input</span>
-            <ArrowRight className="w-4 h-4 transform group-hover:translate-x-1 transition-transform" />
+          <div className="flex items-center justify-between text-xs font-semibold text-teal-200 pt-3 border-t border-white/10 mt-auto">
+            <span>Buka Modal</span>
+            <ArrowRight className="w-3.5 h-3.5 transform group-hover:translate-x-1 transition-transform" />
           </div>
         </div>
 
         {/* Card 4: Data Logger */}
         <div 
           onClick={() => setActiveView('data-logger')}
-          className="group relative bg-gradient-to-br from-slate-800 to-slate-900 rounded-2xl p-6 text-white shadow-lg shadow-slate-900/15 cursor-pointer transform hover:-translate-y-1 transition-all duration-200 overflow-hidden"
+          className="group relative bg-gradient-to-br from-slate-800 to-slate-900 rounded-2xl p-4 sm:p-5 text-white shadow-md shadow-slate-900/15 cursor-pointer transform hover:-translate-y-1 transition-all duration-200 overflow-hidden flex flex-col justify-between"
         >
-          <div className="absolute right-[-10px] top-[-10px] w-28 h-28 bg-white/10 rounded-full blur-xl group-hover:scale-150 transition-transform"></div>
-          <div className="w-12 h-12 rounded-xl bg-white/20 backdrop-blur-sm flex items-center justify-center mb-4 text-white">
-            <Database className="w-6 h-6" />
+          <div className="absolute right-[-10px] top-[-10px] w-24 h-24 bg-white/10 rounded-full blur-xl group-hover:scale-150 transition-transform"></div>
+          <div>
+            <div className="w-10 h-10 rounded-xl bg-white/20 backdrop-blur-sm flex items-center justify-center mb-3 text-white">
+              <Database className="w-5 h-5" />
+            </div>
+            <span className="inline-block text-[10px] font-bold uppercase tracking-wider bg-slate-700 text-slate-200 px-2 py-0.5 rounded mb-1.5">
+              Audit Trail Tree
+            </span>
+            <h2 className="text-base sm:text-lg font-bold mb-1 group-hover:text-slate-300 transition-colors">
+              Data Logger
+            </h2>
+            <p className="text-[11px] sm:text-xs text-slate-300/80 mb-4 leading-relaxed">
+              Lihat riwayat transaksi tree, filter, dan ekspor.
+            </p>
           </div>
-          <span className="inline-block text-[11px] font-bold uppercase tracking-wider bg-slate-700 text-slate-200 px-2 py-0.5 rounded mb-2">
-            Audit Trail Tree
-          </span>
-          <h2 className="text-xl font-bold mb-1 group-hover:text-slate-300 transition-colors">
-            Data Logger
-          </h2>
-          <p className="text-xs text-slate-300/80 mb-5 leading-relaxed">
-            Lihat histori transaksi tree hirarki, multi-filter, ekspor CSV, dan cetak berkas.
-          </p>
-          <div className="flex items-center justify-between text-xs font-semibold text-slate-300 pt-3 border-t border-white/10">
-            <span>Buka Riwayat ({stats.totalInvoices + stats.totalPackingLists + stats.totalDeliveryOrders})</span>
-            <ArrowRight className="w-4 h-4 transform group-hover:translate-x-1 transition-transform" />
+          <div className="flex items-center justify-between text-xs font-semibold text-slate-300 pt-3 border-t border-white/10 mt-auto">
+            <span>Buka Log ({stats.totalInvoices + stats.totalPackingLists + stats.totalDeliveryOrders})</span>
+            <ArrowRight className="w-3.5 h-3.5 transform group-hover:translate-x-1 transition-transform" />
           </div>
         </div>
 
         {/* Card 5: Master Data */}
         <div 
           onClick={() => setActiveView('master-data')}
-          className="group relative bg-gradient-to-br from-blue-800 to-indigo-950 rounded-2xl p-6 text-white shadow-lg shadow-blue-950/15 cursor-pointer transform hover:-translate-y-1 transition-all duration-200 overflow-hidden"
+          className="group relative bg-gradient-to-br from-blue-800 to-indigo-950 rounded-2xl p-4 sm:p-5 text-white shadow-md shadow-blue-950/15 cursor-pointer transform hover:-translate-y-1 transition-all duration-200 overflow-hidden flex flex-col justify-between"
         >
-          <div className="absolute right-[-10px] top-[-10px] w-28 h-28 bg-white/10 rounded-full blur-xl group-hover:scale-150 transition-transform"></div>
-          <div className="w-12 h-12 rounded-xl bg-white/20 backdrop-blur-sm flex items-center justify-center mb-4 text-white">
-            <Settings className="w-6 h-6" />
+          <div className="absolute right-[-10px] top-[-10px] w-24 h-24 bg-white/10 rounded-full blur-xl group-hover:scale-150 transition-transform"></div>
+          <div>
+            <div className="w-10 h-10 rounded-xl bg-white/20 backdrop-blur-sm flex items-center justify-center mb-3 text-white">
+              <Settings className="w-5 h-5" />
+            </div>
+            <span className="inline-block text-[10px] font-bold uppercase tracking-wider bg-blue-500/40 text-blue-100 px-2 py-0.5 rounded mb-1.5">
+              Konfigurasi
+            </span>
+            <h2 className="text-base sm:text-lg font-bold mb-1 group-hover:text-blue-200 transition-colors">
+              Master Data
+            </h2>
+            <p className="text-[11px] sm:text-xs text-blue-100/80 mb-4 leading-relaxed">
+              Kelola master customer, terms, dan katalog part.
+            </p>
           </div>
-          <span className="inline-block text-[11px] font-bold uppercase tracking-wider bg-blue-500/40 text-blue-100 px-2 py-0.5 rounded mb-2">
-            Konfigurasi Template
-          </span>
-          <h2 className="text-xl font-bold mb-1 group-hover:text-blue-200 transition-colors">
-            Master Data
-          </h2>
-          <p className="text-xs text-blue-100/80 mb-5 leading-relaxed">
-            Data customer, payment terms, delivery terms, dan katalog part untuk pengisian cepat.
-          </p>
-          <div className="flex items-center justify-between text-xs font-semibold text-blue-200 pt-3 border-t border-white/10">
-            <span>Kelola Master ({stats.totalCustomers} Customer)</span>
-            <ArrowRight className="w-4 h-4 transform group-hover:translate-x-1 transition-transform" />
+          <div className="flex items-center justify-between text-xs font-semibold text-blue-200 pt-3 border-t border-white/10 mt-auto">
+            <span>Kelola ({stats.totalCustomers} Cust)</span>
+            <ArrowRight className="w-3.5 h-3.5 transform group-hover:translate-x-1 transition-transform" />
           </div>
         </div>
 

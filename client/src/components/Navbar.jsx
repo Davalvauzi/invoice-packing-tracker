@@ -71,10 +71,10 @@ export default function Navbar({
               <FileText className="w-5 h-5" />
             </div>
             <div>
-              <span className="text-base sm:text-lg font-bold tracking-tight text-slate-800 flex items-center gap-1.5">
-                Invoice & Packing List <span className="text-xs bg-emerald-100 text-emerald-800 font-bold px-2 py-0.5 rounded-full border border-emerald-200">Record</span>
+              <span className="text-lg font-extrabold tracking-tight text-slate-800">
+                DocuTrack
               </span>
-              <p className="text-[11px] text-slate-500 font-medium -mt-0.5">Management & Audit Trail System</p>
+              <p className="text-[11px] text-slate-500 font-medium -mt-0.5">Invoice & Packing List Record</p>
             </div>
           </div>
 

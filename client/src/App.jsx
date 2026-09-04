@@ -7,6 +7,7 @@ import PrintInvoice from './pages/PrintInvoice';
 import PrintPackingList from './pages/PrintPackingList';
 import InvoiceModal from './components/InvoiceModal';
 import PackingListModal from './components/PackingListModal';
+import DeliveryOrderModal from './components/DeliveryOrderModal';
 
 export default function App() {
   const [activeView, setActiveView] = useState('dashboard');
@@ -15,6 +16,7 @@ export default function App() {
   // Modal Overlay States
   const [isInvoiceModalOpen, setIsInvoiceModalOpen] = useState(false);
   const [isPackingListModalOpen, setIsPackingListModalOpen] = useState(false);
+  const [isDeliveryOrderModalOpen, setIsDeliveryOrderModalOpen] = useState(false);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
 
   // Check URL parameters on mount (enables opening in a fresh new tab!)
@@ -76,6 +78,7 @@ export default function App() {
         setActiveView={setActiveView} 
         onOpenInvoiceModal={() => setIsInvoiceModalOpen(true)}
         onOpenPackingListModal={() => setIsPackingListModalOpen(true)}
+        onOpenDeliveryOrderModal={() => setIsDeliveryOrderModalOpen(true)}
       />
 
       {/* Main Content Area */}
@@ -86,6 +89,7 @@ export default function App() {
             openPrintTab={openPrintTab}
             onOpenInvoiceModal={() => setIsInvoiceModalOpen(true)}
             onOpenPackingListModal={() => setIsPackingListModalOpen(true)}
+            onOpenDeliveryOrderModal={() => setIsDeliveryOrderModalOpen(true)}
             refreshTrigger={refreshTrigger}
           />
         )}
@@ -95,6 +99,7 @@ export default function App() {
             openPrintTab={openPrintTab} 
             onOpenInvoiceModal={() => setIsInvoiceModalOpen(true)}
             onOpenPackingListModal={() => setIsPackingListModalOpen(true)}
+            onOpenDeliveryOrderModal={() => setIsDeliveryOrderModalOpen(true)}
             refreshTrigger={refreshTrigger}
           />
         )}
@@ -119,6 +124,13 @@ export default function App() {
         isOpen={isPackingListModalOpen}
         onClose={() => setIsPackingListModalOpen(false)}
         openPrintTab={openPrintTab}
+        onSuccess={handleDocumentSuccess}
+      />
+
+      {/* Global Delivery Order Form Modal */}
+      <DeliveryOrderModal
+        isOpen={isDeliveryOrderModalOpen}
+        onClose={() => setIsDeliveryOrderModalOpen(false)}
         onSuccess={handleDocumentSuccess}
       />
 

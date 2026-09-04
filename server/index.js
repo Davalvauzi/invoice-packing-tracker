@@ -589,6 +589,161 @@ app.put('/api/packing-lists/:id', (req, res) => {
   }
 });
 
+// ================= DELIVERY ORDER TRANSACTIONS ================= //
+
+app.get('/api/delivery-orders', (req, res) => {
+  try {
+    const rows = db.prepare('SELECT * FROM delivery_orders ORDER BY id DESC').all();
+    res.json(rows);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get('/api/delivery-orders/:id', (req, res) => {
+  try {
+    const row = db.prepare('SELECT * FROM delivery_orders WHERE id = ?').get(req.params.id);
+    if (!row) return res.status(404).json({ error: 'Delivery order not found' });
+    res.json(row);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/delivery-orders', (req, res) => {
+  try {
+    const {
+      do_number,
+      do_date,
+      invoice_number,
+      customer_name,
+      customer_id,
+      customer_po_no,
+      part_name,
+      pallet_qty,
+      box_qty,
+      notes
+    } = req.body;
+
+    const stmt = db.prepare(`
+      INSERT INTO delivery_orders (
+        do_number, do_date, invoice_number, customer_name, customer_id,
+        customer_po_no, part_name, pallet_qty, box_qty, notes
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `);
+
+    const info = stmt.run(
+      do_number || '',
+      do_date || new Date().toISOString().slice(0, 10),
+      invoice_number || '',
+      customer_name || '',
+      customer_id || '',
+      customer_po_no || '',
+      part_name || '',
+      Number(pallet_qty) || 0,
+      Number(box_qty) || 0,
+      notes || ''
+    );
+
+    const refId = info.lastInsertRowid;
+
+    // Log to data_logger
+    const loggerStmt = db.prepare(`
+      INSERT INTO data_logger (
+        doc_type, doc_number, doc_date, customer_name, customer_id, po_no,
+        part_name, box_qty, pallet_qty, terms_of_delivery, payment_term, dimensions, image_url, notes, ref_id
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `);
+    loggerStmt.run(
+      'DELIVERY_ORDER',
+      do_number || `DO-${refId}`,
+      do_date || new Date().toISOString().slice(0, 10),
+      customer_name || '',
+      customer_id || '',
+      customer_po_no || '',
+      part_name || '',
+      Number(box_qty) || 0,
+      Number(pallet_qty) || 0,
+      invoice_number ? `Ref Inv: ${invoice_number}` : '',
+      null,
+      null,
+      null,
+      notes || '',
+      refId
+    );
+
+    const created = db.prepare('SELECT * FROM delivery_orders WHERE id = ?').get(refId);
+    res.status(201).json(created);
+  } catch (err) {
+    console.error('Delivery order create error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.put('/api/delivery-orders/:id', (req, res) => {
+  try {
+    const {
+      do_number,
+      do_date,
+      invoice_number,
+      customer_name,
+      customer_id,
+      customer_po_no,
+      part_name,
+      pallet_qty,
+      box_qty,
+      notes
+    } = req.body;
+
+    db.prepare(`
+      UPDATE delivery_orders
+      SET do_number = ?, do_date = ?, invoice_number = ?, customer_name = ?,
+          customer_id = ?, customer_po_no = ?, part_name = ?, pallet_qty = ?,
+          box_qty = ?, notes = ?
+      WHERE id = ?
+    `).run(
+      do_number || '',
+      do_date || '',
+      invoice_number || '',
+      customer_name || '',
+      customer_id || '',
+      customer_po_no || '',
+      part_name || '',
+      Number(pallet_qty) || 0,
+      Number(box_qty) || 0,
+      notes || '',
+      req.params.id
+    );
+
+    // Sync to data_logger
+    db.prepare(`
+      UPDATE data_logger
+      SET doc_number = ?, doc_date = ?, customer_name = ?, customer_id = ?,
+          po_no = ?, part_name = ?, box_qty = ?, pallet_qty = ?,
+          terms_of_delivery = ?, notes = ?
+      WHERE doc_type = 'DELIVERY_ORDER' AND ref_id = ?
+    `).run(
+      do_number || '',
+      do_date || '',
+      customer_name || '',
+      customer_id || '',
+      customer_po_no || '',
+      part_name || '',
+      Number(box_qty) || 0,
+      Number(pallet_qty) || 0,
+      invoice_number ? `Ref Inv: ${invoice_number}` : '',
+      notes || '',
+      req.params.id
+    );
+
+    const updated = db.prepare('SELECT * FROM delivery_orders WHERE id = ?').get(req.params.id);
+    res.json(updated);
+  } catch (err) {
+    console.error('Delivery order update error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // ================= DATA LOGGER ROUTES ================= //
 
 app.get('/api/data-logger', (req, res) => {
@@ -735,6 +890,25 @@ app.put('/api/data-logger/:id', (req, res) => {
           Number(box_qty) || 0,
           Number(pallet_qty) || 0,
           terms_of_delivery || '',
+          notes || '',
+          log.ref_id
+        );
+      } else if (log.doc_type === 'DELIVERY_ORDER') {
+        db.prepare(`
+          UPDATE delivery_orders
+          SET do_number = ?, do_date = ?, customer_name = ?, customer_id = ?,
+              customer_po_no = ?, part_name = ?, box_qty = ?, pallet_qty = ?,
+              notes = ?
+          WHERE id = ?
+        `).run(
+          doc_number || '',
+          doc_date || '',
+          customer_name || '',
+          customer_id || '',
+          po_no || '',
+          part_name || '',
+          Number(box_qty) || 0,
+          Number(pallet_qty) || 0,
           notes || '',
           log.ref_id
         );

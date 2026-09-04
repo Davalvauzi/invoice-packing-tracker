@@ -76,9 +76,24 @@ db.exec(`
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
   );
 
+  CREATE TABLE IF NOT EXISTS delivery_orders (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    do_number TEXT NOT NULL,
+    do_date TEXT NOT NULL,
+    invoice_number TEXT,
+    customer_name TEXT NOT NULL,
+    customer_id TEXT,
+    customer_po_no TEXT,
+    part_name TEXT,
+    pallet_qty INTEGER DEFAULT 0,
+    box_qty INTEGER DEFAULT 0,
+    notes TEXT,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  );
+
   CREATE TABLE IF NOT EXISTS data_logger (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    doc_type TEXT NOT NULL, -- 'INVOICE' | 'PACKING_LIST'
+    doc_type TEXT NOT NULL, -- 'INVOICE' | 'PACKING_LIST' | 'DELIVERY_ORDER'
     doc_number TEXT NOT NULL,
     doc_date TEXT NOT NULL,
     customer_name TEXT NOT NULL,

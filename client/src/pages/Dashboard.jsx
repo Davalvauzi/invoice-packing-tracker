@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { 
   FileText, 
   Package, 
+  Truck,
   Database, 
   Settings, 
   ArrowRight, 
@@ -17,11 +18,13 @@ export default function Dashboard({
   openPrintTab, 
   onOpenInvoiceModal, 
   onOpenPackingListModal,
+  onOpenDeliveryOrderModal,
   refreshTrigger 
 }) {
   const [stats, setStats] = useState({
     totalInvoices: 0,
     totalPackingLists: 0,
+    totalDeliveryOrders: 0,
     totalCustomers: 0,
     recentLogs: []
   });
@@ -42,10 +45,12 @@ export default function Dashboard({
 
       const invCount = logs.filter(l => l.doc_type === 'INVOICE').length;
       const plCount = logs.filter(l => l.doc_type === 'PACKING_LIST').length;
+      const doCount = logs.filter(l => l.doc_type === 'DELIVERY_ORDER').length;
 
       setStats({
         totalInvoices: invCount,
         totalPackingLists: plCount,
+        totalDeliveryOrders: doCount,
         totalCustomers: custs.length,
         recentLogs: logs.slice(0, 5)
       });
@@ -66,10 +71,10 @@ export default function Dashboard({
             Main Menu Dashboard
           </h1>
           <p className="text-sm text-slate-500 mt-1">
-            Sistem terintegrasi pembuatan & pelacakan Invoice, Packing List, dan Riwayat Data Log.
+            Sistem terintegrasi pembuatan & pelacakan Invoice, Packing List, Delivery Order, dan Riwayat Data Log.
           </p>
         </div>
-        <div className="flex items-center gap-2.5">
+        <div className="flex flex-wrap items-center gap-2.5">
           <button 
             onClick={onOpenInvoiceModal}
             className="inline-flex items-center gap-1.5 px-4 py-2 bg-emerald-800 text-white rounded-xl text-xs font-bold hover:bg-emerald-900 shadow-sm transition-colors cursor-pointer"
@@ -83,6 +88,13 @@ export default function Dashboard({
           >
             <Plus className="w-4 h-4" />
             Packing List (Modal)
+          </button>
+          <button 
+            onClick={onOpenDeliveryOrderModal}
+            className="inline-flex items-center gap-1.5 px-4 py-2 bg-[#0b4d53] text-white rounded-xl text-xs font-bold hover:bg-[#083a3f] shadow-sm transition-colors cursor-pointer"
+          >
+            <Plus className="w-4 h-4" />
+            Delivery Order (Modal)
           </button>
         </div>
       </div>
@@ -130,7 +142,7 @@ export default function Dashboard({
             Packing List Form
           </h2>
           <p className="text-xs text-teal-100/80 mb-5 leading-relaxed">
-            Buka modal form spesifikasi pengemasan, dimensi part, box, palet, dan drawing.
+            Buka modal form spesifikasi pengemasan, dimensi part, box, palet, dan packing.
           </p>
           <div className="flex items-center justify-between text-xs font-semibold text-teal-200 pt-3 border-t border-white/10">
             <span>Buka Modal Input</span>
@@ -138,7 +150,31 @@ export default function Dashboard({
           </div>
         </div>
 
-        {/* Card 3: Data Logger */}
+        {/* Card 3: Delivery Order Form (Opens Modal) */}
+        <div 
+          onClick={onOpenDeliveryOrderModal}
+          className="group relative bg-gradient-to-br from-[#0b4d53] to-[#083a3f] rounded-2xl p-6 text-white shadow-lg shadow-teal-950/15 cursor-pointer transform hover:-translate-y-1 transition-all duration-200 overflow-hidden"
+        >
+          <div className="absolute right-[-10px] top-[-10px] w-28 h-28 bg-white/10 rounded-full blur-xl group-hover:scale-150 transition-transform"></div>
+          <div className="w-12 h-12 rounded-xl bg-white/20 backdrop-blur-sm flex items-center justify-center mb-4 text-white">
+            <Truck className="w-6 h-6" />
+          </div>
+          <span className="inline-block text-[11px] font-bold uppercase tracking-wider bg-teal-400/30 text-teal-100 px-2 py-0.5 rounded mb-2">
+            Surat Jalan Fisik
+          </span>
+          <h2 className="text-xl font-bold mb-1 group-hover:text-teal-200 transition-colors">
+            Delivery Order
+          </h2>
+          <p className="text-xs text-teal-100/80 mb-5 leading-relaxed">
+            Buka modal surat jalan pengiriman part, nomor DO, customer, PO, dan kuantiti palet/box.
+          </p>
+          <div className="flex items-center justify-between text-xs font-semibold text-teal-200 pt-3 border-t border-white/10">
+            <span>Buka Modal Input</span>
+            <ArrowRight className="w-4 h-4 transform group-hover:translate-x-1 transition-transform" />
+          </div>
+        </div>
+
+        {/* Card 4: Data Logger */}
         <div 
           onClick={() => setActiveView('data-logger')}
           className="group relative bg-gradient-to-br from-slate-800 to-slate-900 rounded-2xl p-6 text-white shadow-lg shadow-slate-900/15 cursor-pointer transform hover:-translate-y-1 transition-all duration-200 overflow-hidden"
@@ -148,21 +184,21 @@ export default function Dashboard({
             <Database className="w-6 h-6" />
           </div>
           <span className="inline-block text-[11px] font-bold uppercase tracking-wider bg-slate-700 text-slate-200 px-2 py-0.5 rounded mb-2">
-            Audit Trail
+            Audit Trail Tree
           </span>
           <h2 className="text-xl font-bold mb-1 group-hover:text-slate-300 transition-colors">
             Data Logger
           </h2>
           <p className="text-xs text-slate-300/80 mb-5 leading-relaxed">
-            Lihat histori transaksi, multi-filter, ekspor CSV/Excel, dan cetak ulang berkas.
+            Lihat histori transaksi tree hirarki, multi-filter, ekspor CSV, dan cetak berkas.
           </p>
           <div className="flex items-center justify-between text-xs font-semibold text-slate-300 pt-3 border-t border-white/10">
-            <span>Buka Riwayat ({stats.totalInvoices + stats.totalPackingLists})</span>
+            <span>Buka Riwayat ({stats.totalInvoices + stats.totalPackingLists + stats.totalDeliveryOrders})</span>
             <ArrowRight className="w-4 h-4 transform group-hover:translate-x-1 transition-transform" />
           </div>
         </div>
 
-        {/* Card 4: Master Data */}
+        {/* Card 5: Master Data */}
         <div 
           onClick={() => setActiveView('master-data')}
           className="group relative bg-gradient-to-br from-blue-800 to-indigo-950 rounded-2xl p-6 text-white shadow-lg shadow-blue-950/15 cursor-pointer transform hover:-translate-y-1 transition-all duration-200 overflow-hidden"
@@ -211,22 +247,22 @@ export default function Dashboard({
         </div>
 
         <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-xs flex items-center gap-3">
+          <div className="p-2.5 rounded-lg bg-teal-50 text-[#0b4d53]">
+            <Truck className="w-5 h-5" />
+          </div>
+          <div>
+            <p className="text-xs text-slate-500 font-medium">Total Delivery Order</p>
+            <p className="text-lg font-bold text-slate-900">{stats.totalDeliveryOrders}</p>
+          </div>
+        </div>
+
+        <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-xs flex items-center gap-3">
           <div className="p-2.5 rounded-lg bg-blue-50 text-blue-700">
             <Layers className="w-5 h-5" />
           </div>
           <div>
             <p className="text-xs text-slate-500 font-medium">Master Customer</p>
             <p className="text-lg font-bold text-slate-900">{stats.totalCustomers}</p>
-          </div>
-        </div>
-
-        <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-xs flex items-center gap-3">
-          <div className="p-2.5 rounded-lg bg-emerald-50 text-emerald-700">
-            <CheckCircle2 className="w-5 h-5" />
-          </div>
-          <div>
-            <p className="text-xs text-slate-500 font-medium">Status Sistem</p>
-            <p className="text-xs font-bold text-emerald-700">Aktif & Siap LAN</p>
           </div>
         </div>
       </div>

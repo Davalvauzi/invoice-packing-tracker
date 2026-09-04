@@ -15,7 +15,8 @@ export default function Navbar({
   activeView, 
   setActiveView, 
   onOpenInvoiceModal, 
-  onOpenPackingListModal 
+  onOpenPackingListModal,
+  onOpenDeliveryOrderModal
 }) {
   const [networkInfo, setNetworkInfo] = useState(null);
   const [copied, setCopied] = useState(false);
@@ -122,6 +123,15 @@ export default function Navbar({
                 <Plus className="w-3.5 h-3.5" />
                 <span>Packing List Form</span>
               </button>
+
+              <button
+                onClick={onOpenDeliveryOrderModal}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-[#0b4d53] hover:bg-[#083a3f] text-white rounded-lg text-xs font-bold shadow-xs transition-colors cursor-pointer"
+                title="Buka Form Delivery Order (Modal)"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                <span>Delivery Order Form</span>
+              </button>
             </div>
 
             {/* LAN Connection Badge */}
@@ -184,6 +194,12 @@ export default function Navbar({
             className="px-2 py-1 bg-teal-800 text-white rounded text-[11px] font-bold"
           >
             + Packing List
+          </button>
+          <button
+            onClick={onOpenDeliveryOrderModal}
+            className="px-2 py-1 bg-[#0b4d53] text-white rounded text-[11px] font-bold"
+          >
+            + DO
           </button>
         </div>
       </div>

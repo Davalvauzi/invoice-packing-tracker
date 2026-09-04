@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { 
   Database, 
   Search, 
@@ -9,6 +9,7 @@ import {
   RefreshCw, 
   FileText, 
   Package, 
+  Truck,
   ArrowUpDown,
   Calendar,
   Building2,
@@ -17,13 +18,19 @@ import {
   X,
   Edit3,
   Save,
-  Check
+  Check,
+  ChevronRight,
+  ChevronDown,
+  ListTree,
+  List,
+  CornerDownRight
 } from 'lucide-react';
 
 export default function DataLogger({ 
   openPrintTab, 
   onOpenInvoiceModal, 
   onOpenPackingListModal, 
+  onOpenDeliveryOrderModal,
   refreshTrigger 
 }) {
   const [logs, setLogs] = useState([]);
@@ -42,6 +49,10 @@ export default function DataLogger({
   // Sorting
   const [sortBy, setSortBy] = useState('id');
   const [sortOrder, setSortOrder] = useState('DESC');
+
+  // Tree View State ('tree' as default per leader request, or 'flat')
+  const [viewMode, setViewMode] = useState('tree');
+  const [expandedRows, setExpandedRows] = useState({});
 
   // Detail Modal State
   const [selectedLog, setSelectedLog] = useState(null);
@@ -240,11 +251,85 @@ export default function DataLogger({
     }
   };
 
+  // Tree View Helpers
+  const toggleRow = (docNum) => {
+    setExpandedRows(prev => ({
+      ...prev,
+      [docNum]: !prev[docNum]
+    }));
+  };
+
+  // Group logs into Tree Structure (Parent: Invoice, Children: Packing List & Delivery Order)
+  const treeData = useMemo(() => {
+    const invoices = logs.filter(l => l.doc_type === 'INVOICE');
+    const children = logs.filter(l => l.doc_type !== 'INVOICE');
+
+    const invoiceMap = new Map();
+    invoices.forEach(inv => {
+      invoiceMap.set(inv.doc_number, {
+        parent: inv,
+        children: []
+      });
+    });
+
+    const orphans = [];
+
+    children.forEach(child => {
+      let parentEntry = null;
+
+      // 1. Direct doc_number match (e.g. child was given the invoice's number)
+      if (invoiceMap.has(child.doc_number)) {
+        parentEntry = invoiceMap.get(child.doc_number);
+      } 
+      // 2. Reference in terms_of_delivery or notes: 'Ref Inv: ...'
+      else if (child.terms_of_delivery && child.terms_of_delivery.startsWith('Ref Inv: ')) {
+        const refNum = child.terms_of_delivery.replace('Ref Inv: ', '').trim();
+        if (invoiceMap.has(refNum)) {
+          parentEntry = invoiceMap.get(refNum);
+        }
+      }
+      
+      // 3. Fallback match by PO No & Customer Name
+      if (!parentEntry && child.po_no && child.customer_name) {
+        for (const entry of invoiceMap.values()) {
+          if (entry.parent.po_no && entry.parent.po_no === child.po_no && entry.parent.customer_name === child.customer_name) {
+            parentEntry = entry;
+            break;
+          }
+        }
+      }
+
+      if (parentEntry) {
+        parentEntry.children.push(child);
+      } else {
+        orphans.push(child);
+      }
+    });
+
+    return {
+      invoiceTrees: Array.from(invoiceMap.values()),
+      orphans
+    };
+  }, [logs]);
+
+  const expandAll = () => {
+    const next = {};
+    treeData.invoiceTrees.forEach(item => {
+      if (item.children.length > 0) {
+        next[item.parent.doc_number] = true;
+      }
+    });
+    setExpandedRows(next);
+  };
+
+  const collapseAll = () => {
+    setExpandedRows({});
+  };
+
   // Aggregated Summary Statistics
   const totalInvoices = logs.filter(l => l.doc_type === 'INVOICE').length;
   const totalPackingLists = logs.filter(l => l.doc_type === 'PACKING_LIST').length;
-  const totalBoxes = logs.reduce((acc, curr) => acc + (Number(curr.box_qty) || 0), 0);
-  const totalPallets = logs.reduce((acc, curr) => acc + (Number(curr.pallet_qty) || 0), 0);
+  const totalDeliveryOrders = logs.filter(l => l.doc_type === 'DELIVERY_ORDER').length;
 
   // Enhanced CSV Export
   const exportToCsv = () => {
@@ -338,8 +423,16 @@ export default function DataLogger({
           </button>
 
           <button
+            onClick={onOpenDeliveryOrderModal}
+            className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-[#0b4d53] text-white rounded-xl text-xs font-bold hover:bg-[#07363b] shadow-xs transition-colors cursor-pointer"
+          >
+            <Truck className="w-3.5 h-3.5" />
+            <span>+ Delivery Order</span>
+          </button>
+
+          <button
             onClick={fetchLogs}
-            className="inline-flex items-center gap-1.5 px-3 py-2 bg-white border border-slate-300 text-slate-700 rounded-xl text-xs font-semibold hover:bg-slate-50 transition-colors shadow-xs"
+            className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-white border border-slate-300 text-slate-700 rounded-xl text-xs font-semibold hover:bg-slate-50 transition-colors shadow-xs"
             title="Refresh Data"
           >
             <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
@@ -357,10 +450,10 @@ export default function DataLogger({
       </div>
 
       {/* Summary KPI Cards (Based on Current Filters) */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3.5 mb-6">
         <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-xs flex items-center justify-between">
           <div>
-            <span className="text-xs font-bold text-slate-500 block uppercase tracking-wider">Total Dokumen</span>
+            <span className="text-[11px] font-bold text-slate-500 block uppercase tracking-wider">Total Dokumen</span>
             <span className="text-2xl font-black text-slate-900">{logs.length}</span>
           </div>
           <div className="w-10 h-10 rounded-xl bg-slate-100 flex items-center justify-center text-slate-700 font-bold">
@@ -370,7 +463,7 @@ export default function DataLogger({
 
         <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-xs flex items-center justify-between">
           <div>
-            <span className="text-xs font-bold text-emerald-700 block uppercase tracking-wider">Total Invoice</span>
+            <span className="text-[11px] font-bold text-emerald-700 block uppercase tracking-wider">Total Invoice</span>
             <span className="text-2xl font-black text-emerald-800">{totalInvoices}</span>
           </div>
           <div className="w-10 h-10 rounded-xl bg-emerald-50 flex items-center justify-center text-emerald-700 font-bold">
@@ -380,11 +473,21 @@ export default function DataLogger({
 
         <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-xs flex items-center justify-between">
           <div>
-            <span className="text-xs font-bold text-teal-700 block uppercase tracking-wider">Total Packing List</span>
+            <span className="text-[11px] font-bold text-teal-700 block uppercase tracking-wider">Total Packing List</span>
             <span className="text-2xl font-black text-teal-800">{totalPackingLists}</span>
           </div>
           <div className="w-10 h-10 rounded-xl bg-teal-50 flex items-center justify-center text-teal-700 font-bold">
             <Package className="w-5 h-5" />
+          </div>
+        </div>
+
+        <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-xs flex items-center justify-between">
+          <div>
+            <span className="text-[11px] font-bold text-[#0b4d53] block uppercase tracking-wider">Delivery Order</span>
+            <span className="text-2xl font-black text-[#0b4d53]">{totalDeliveryOrders}</span>
+          </div>
+          <div className="w-10 h-10 rounded-xl bg-cyan-50 flex items-center justify-center text-[#0b4d53] font-bold">
+            <Truck className="w-5 h-5" />
           </div>
         </div>
       </div>
@@ -424,6 +527,16 @@ export default function DataLogger({
               }`}
             >
               Hanya Packing List
+            </button>
+            <button
+              onClick={() => setTypeFilter('DELIVERY_ORDER')}
+              className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                typeFilter === 'DELIVERY_ORDER'
+                  ? 'bg-[#0b4d53] text-white shadow-xs'
+                  : 'text-[#0b4d53] hover:bg-cyan-50'
+              }`}
+            >
+              Hanya Delivery Order
             </button>
           </div>
 
@@ -538,13 +651,68 @@ export default function DataLogger({
 
       </div>
 
+      {/* View Mode Bar (Tree vs Flat) */}
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 mb-3 px-1">
+        <div className="flex items-center gap-2">
+          <div className="inline-flex p-1 bg-slate-200/70 rounded-xl border border-slate-300/60">
+            <button
+              onClick={() => setViewMode('tree')}
+              className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                viewMode === 'tree'
+                  ? 'bg-white text-slate-900 shadow-xs'
+                  : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              <ListTree className="w-3.5 h-3.5 text-emerald-700" />
+              <span>Tampilan Hirarki (Tree)</span>
+            </button>
+            <button
+              onClick={() => setViewMode('flat')}
+              className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                viewMode === 'flat'
+                  ? 'bg-white text-slate-900 shadow-xs'
+                  : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              <List className="w-3.5 h-3.5 text-slate-700" />
+              <span>Tampilan Biasa (Flat)</span>
+            </button>
+          </div>
+
+          {viewMode === 'tree' && (
+            <div className="flex items-center gap-1.5 ml-1">
+              <button
+                onClick={expandAll}
+                className="px-2.5 py-1 text-[11px] font-semibold text-emerald-800 hover:bg-emerald-50 rounded-lg border border-emerald-200 transition-colors"
+              >
+                Buka Semua
+              </button>
+              <button
+                onClick={collapseAll}
+                className="px-2.5 py-1 text-[11px] font-semibold text-slate-600 hover:bg-slate-100 rounded-lg border border-slate-200 transition-colors"
+              >
+                Tutup Semua
+              </button>
+            </div>
+          )}
+        </div>
+
+        {viewMode === 'tree' && (
+          <p className="text-[11px] text-slate-500 italic">
+            💡 Induk: <b>Invoice</b> ➔ Anakan: <b>Packing List & Delivery Order</b> (klik tanda panah ▶ untuk melipat/membuka)
+          </p>
+        )}
+      </div>
+
       {/* Main Data Table */}
       <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs text-slate-700">
             <thead className="bg-slate-50 text-slate-500 uppercase tracking-wider font-semibold border-b border-slate-200 select-none">
               <tr>
-                <th className="px-3 py-3.5 w-12 text-center">No</th>
+                <th className="px-3 py-3.5 w-14 text-center">
+                  {viewMode === 'tree' ? 'Tree' : 'No'}
+                </th>
                 <th className="px-3 py-3.5 cursor-pointer hover:text-slate-800" onClick={() => toggleSort('doc_type')}>
                   <div className="flex items-center gap-1">Tipe <ArrowUpDown className="w-3 h-3" /></div>
                 </th>
@@ -583,7 +751,305 @@ export default function DataLogger({
                     Tidak ada transaksi yang cocok dengan filter yang dipilih.
                   </td>
                 </tr>
+              ) : viewMode === 'tree' ? (
+                /* TREE VIEW MODE */
+                <>
+                  {treeData.invoiceTrees.map((group, idx) => {
+                    const inv = group.parent;
+                    const isExpanded = !!expandedRows[inv.doc_number];
+                    const hasChildren = group.children.length > 0;
+                    const plCount = group.children.filter(c => c.doc_type === 'PACKING_LIST').length;
+                    const doCount = group.children.filter(c => c.doc_type === 'DELIVERY_ORDER').length;
+
+                    return (
+                      <React.Fragment key={`inv-group-${inv.id}`}>
+                        {/* Parent Invoice Row */}
+                        <tr 
+                          className="bg-white hover:bg-emerald-50/40 transition-colors cursor-pointer group"
+                          onClick={() => setSelectedLog(inv)}
+                        >
+                          <td className="px-2 py-3 text-center" onClick={(e) => { e.stopPropagation(); toggleRow(inv.doc_number); }}>
+                            {hasChildren ? (
+                              <button
+                                type="button"
+                                className={`p-1 rounded-md transition-colors ${
+                                  isExpanded ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                                }`}
+                                title={isExpanded ? 'Tutup anakan' : 'Buka anakan'}
+                              >
+                                {isExpanded ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
+                              </button>
+                            ) : (
+                              <span className="text-[11px] text-slate-300 font-mono">#{idx + 1}</span>
+                            )}
+                          </td>
+                          <td className="px-3 py-3 font-medium whitespace-nowrap">
+                            <div className="flex items-center gap-1.5">
+                              <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-extrabold tracking-wide bg-emerald-100 text-emerald-800">
+                                INVOICE
+                              </span>
+                              {hasChildren && (
+                                <div className="flex items-center gap-1">
+                                  {plCount > 0 && (
+                                    <span className="text-[9px] bg-teal-50 text-teal-800 px-1.5 py-0.5 rounded font-bold border border-teal-200" title={`${plCount} Packing List terhubung`}>
+                                      {plCount} PL
+                                    </span>
+                                  )}
+                                  {doCount > 0 && (
+                                    <span className="text-[9px] bg-cyan-50 text-[#0b4d53] px-1.5 py-0.5 rounded font-bold border border-cyan-200" title={`${doCount} Delivery Order terhubung`}>
+                                      {doCount} DO
+                                    </span>
+                                  )}
+                                </div>
+                              )}
+                            </div>
+                          </td>
+                          <td className="px-4 py-3 font-mono font-bold text-emerald-900 whitespace-nowrap group-hover:text-emerald-700">
+                            {inv.doc_number}
+                          </td>
+                          <td className="px-3 py-3 text-slate-500 whitespace-nowrap">
+                            {inv.doc_date}
+                          </td>
+                          <td className="px-4 py-3 font-semibold text-slate-800 max-w-[180px] truncate">
+                            {inv.customer_name}
+                            {inv.customer_id && (
+                              <span className="block text-[10px] text-slate-400 font-mono font-normal">
+                                {inv.customer_id}
+                              </span>
+                            )}
+                          </td>
+                          <td className="px-3 py-3 font-mono text-slate-600 whitespace-nowrap">
+                            {inv.po_no || '-'}
+                          </td>
+                          <td className="px-4 py-3 text-slate-700 max-w-[200px]">
+                            <div className="truncate font-medium">{inv.part_name || '-'}</div>
+                            {inv.dimensions && (
+                              <span className="text-[10px] text-slate-400 font-mono">
+                                Dim: {inv.dimensions}
+                              </span>
+                            )}
+                          </td>
+                          <td className="px-3 py-3 text-slate-600 text-[11px] whitespace-nowrap">
+                            {inv.terms_of_delivery || inv.payment_term || '-'}
+                          </td>
+                          <td className="px-3 py-3 text-center font-mono font-bold text-slate-900">
+                            {inv.box_qty || 0}
+                          </td>
+                          <td className="px-3 py-3 text-center font-mono font-bold text-slate-900">
+                            {inv.pallet_qty || 0}
+                          </td>
+                          <td className="px-4 py-3 text-right whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
+                            <div className="flex items-center justify-end gap-1.5">
+                              <button
+                                onClick={() => handleOpenEdit(inv)}
+                                className="p-1.5 bg-amber-50 hover:bg-amber-100 text-amber-700 rounded-lg text-xs transition-colors"
+                                title="Edit Data / Koreksi Typo"
+                              >
+                                <Edit3 className="w-3.5 h-3.5" />
+                              </button>
+                              <button
+                                onClick={() => setSelectedLog(inv)}
+                                className="p-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs transition-colors"
+                                title="Lihat Detail Transaksi"
+                              >
+                                <Eye className="w-3.5 h-3.5" />
+                              </button>
+                              <button
+                                onClick={() => openPrintTab('print-invoice', inv.ref_id)}
+                                className="inline-flex items-center gap-1 px-2.5 py-1 bg-emerald-50 text-emerald-800 hover:bg-emerald-100 rounded-lg text-xs font-bold transition-colors"
+                                title="Buka / Cetak PDF di Tab Baru"
+                              >
+                                <Printer className="w-3.5 h-3.5" />
+                                <span>PDF</span>
+                              </button>
+                              <button
+                                onClick={() => handleDelete(inv.id)}
+                                className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                                title="Hapus Log"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+
+                        {/* Child Rows (Packing List & Delivery Order) */}
+                        {isExpanded && group.children.map((child) => (
+                          <tr 
+                            key={`child-${child.id}`}
+                            className="bg-slate-50/70 hover:bg-slate-100/90 transition-colors cursor-pointer border-l-4 border-l-emerald-600"
+                            onClick={() => setSelectedLog(child)}
+                          >
+                            <td className="px-2 py-2.5 text-center text-slate-400">
+                              <CornerDownRight className="w-3.5 h-3.5 ml-auto mr-1 text-slate-400" />
+                            </td>
+                            <td className="px-3 py-2.5 font-medium whitespace-nowrap">
+                              <span className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-extrabold tracking-wide ${
+                                child.doc_type === 'PACKING_LIST'
+                                  ? 'bg-teal-100 text-teal-800'
+                                  : 'bg-cyan-100 text-[#0b4d53]'
+                              }`}>
+                                {child.doc_type === 'PACKING_LIST' ? 'PACKING LIST' : 'DELIVERY ORDER'}
+                              </span>
+                            </td>
+                            <td className="px-4 py-2.5 font-mono font-bold text-slate-800 whitespace-nowrap pl-6">
+                              <span className="text-slate-400 mr-1.5 font-normal">↳</span>
+                              {child.doc_number}
+                            </td>
+                            <td className="px-3 py-2.5 text-slate-500 whitespace-nowrap">
+                              {child.doc_date}
+                            </td>
+                            <td className="px-4 py-2.5 font-semibold text-slate-700 max-w-[180px] truncate">
+                              {child.customer_name}
+                            </td>
+                            <td className="px-3 py-2.5 font-mono text-slate-500 whitespace-nowrap">
+                              {child.po_no || '-'}
+                            </td>
+                            <td className="px-4 py-2.5 text-slate-600 max-w-[200px]">
+                              <div className="truncate font-medium">{child.part_name || '-'}</div>
+                            </td>
+                            <td className="px-3 py-2.5 text-slate-500 text-[11px] whitespace-nowrap">
+                              {child.terms_of_delivery || child.payment_term || '-'}
+                            </td>
+                            <td className="px-3 py-2.5 text-center font-mono font-bold text-slate-700">
+                              {child.box_qty || 0}
+                            </td>
+                            <td className="px-3 py-2.5 text-center font-mono font-bold text-slate-700">
+                              {child.pallet_qty || 0}
+                            </td>
+                            <td className="px-4 py-2.5 text-right whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
+                              <div className="flex items-center justify-end gap-1.5">
+                                <button
+                                  onClick={() => handleOpenEdit(child)}
+                                  className="p-1 bg-amber-50 hover:bg-amber-100 text-amber-700 rounded-lg text-xs transition-colors"
+                                  title="Edit Data"
+                                >
+                                  <Edit3 className="w-3.5 h-3.5" />
+                                </button>
+                                <button
+                                  onClick={() => setSelectedLog(child)}
+                                  className="p-1 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs transition-colors"
+                                  title="Lihat Detail"
+                                >
+                                  <Eye className="w-3.5 h-3.5" />
+                                </button>
+                                {child.doc_type === 'PACKING_LIST' && (
+                                  <button
+                                    onClick={() => openPrintTab('print-packing-list', child.ref_id)}
+                                    className="inline-flex items-center gap-1 px-2 py-0.5 bg-teal-50 text-teal-800 hover:bg-teal-100 rounded-lg text-xs font-bold transition-colors"
+                                    title="Buka / Cetak PDF di Tab Baru"
+                                  >
+                                    <Printer className="w-3 h-3" />
+                                    <span>PDF</span>
+                                  </button>
+                                )}
+                                <button
+                                  onClick={() => handleDelete(child.id)}
+                                  className="p-1 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                                  title="Hapus Log"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        ))}
+                      </React.Fragment>
+                    );
+                  })}
+
+                  {/* Standalone / Orphan Documents */}
+                  {treeData.orphans.length > 0 && (
+                    <>
+                      <tr className="bg-slate-100/80 border-t-2 border-slate-300">
+                        <td colSpan={11} className="px-4 py-2 font-bold text-slate-600 text-[11px] uppercase tracking-wider">
+                          📁 Dokumen Lainnya / Tanpa Induk Invoice Terhubung ({treeData.orphans.length})
+                        </td>
+                      </tr>
+                      {treeData.orphans.map((orphan, oIdx) => (
+                        <tr 
+                          key={`orphan-${orphan.id}`} 
+                          className="hover:bg-slate-50/80 transition-colors cursor-pointer group"
+                          onClick={() => setSelectedLog(orphan)}
+                        >
+                          <td className="px-3 py-3 text-center text-slate-400 font-mono text-[11px]">
+                            {oIdx + 1}
+                          </td>
+                          <td className="px-3 py-3 font-medium whitespace-nowrap">
+                            <span className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-extrabold tracking-wide ${
+                              orphan.doc_type === 'PACKING_LIST'
+                                ? 'bg-teal-100 text-teal-800'
+                                : 'bg-cyan-100 text-[#0b4d53]'
+                            }`}>
+                              {orphan.doc_type}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3 font-mono font-bold text-slate-900 whitespace-nowrap group-hover:text-teal-700">
+                            {orphan.doc_number}
+                          </td>
+                          <td className="px-3 py-3 text-slate-500 whitespace-nowrap">
+                            {orphan.doc_date}
+                          </td>
+                          <td className="px-4 py-3 font-semibold text-slate-800 max-w-[180px] truncate">
+                            {orphan.customer_name}
+                          </td>
+                          <td className="px-3 py-3 font-mono text-slate-600 whitespace-nowrap">
+                            {orphan.po_no || '-'}
+                          </td>
+                          <td className="px-4 py-3 text-slate-700 max-w-[200px]">
+                            <div className="truncate font-medium">{orphan.part_name || '-'}</div>
+                          </td>
+                          <td className="px-3 py-3 text-slate-600 text-[11px] whitespace-nowrap">
+                            {orphan.terms_of_delivery || orphan.payment_term || '-'}
+                          </td>
+                          <td className="px-3 py-3 text-center font-mono font-bold text-slate-900">
+                            {orphan.box_qty || 0}
+                          </td>
+                          <td className="px-3 py-3 text-center font-mono font-bold text-slate-900">
+                            {orphan.pallet_qty || 0}
+                          </td>
+                          <td className="px-4 py-3 text-right whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
+                            <div className="flex items-center justify-end gap-1.5">
+                              <button
+                                onClick={() => handleOpenEdit(orphan)}
+                                className="p-1.5 bg-amber-50 hover:bg-amber-100 text-amber-700 rounded-lg text-xs transition-colors"
+                                title="Edit Data"
+                              >
+                                <Edit3 className="w-3.5 h-3.5" />
+                              </button>
+                              <button
+                                onClick={() => setSelectedLog(orphan)}
+                                className="p-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs transition-colors"
+                                title="Lihat Detail"
+                              >
+                                <Eye className="w-3.5 h-3.5" />
+                              </button>
+                              {orphan.doc_type === 'PACKING_LIST' && (
+                                <button
+                                  onClick={() => openPrintTab('print-packing-list', orphan.ref_id)}
+                                  className="inline-flex items-center gap-1 px-2.5 py-1 bg-teal-50 text-teal-800 hover:bg-teal-100 rounded-lg text-xs font-bold transition-colors"
+                                  title="Buka / Cetak PDF di Tab Baru"
+                                >
+                                  <Printer className="w-3.5 h-3.5" />
+                                  <span>PDF</span>
+                                </button>
+                              )}
+                              <button
+                                onClick={() => handleDelete(orphan.id)}
+                                className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                                title="Hapus Log"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </>
+                  )}
+                </>
               ) : (
+                /* FLAT VIEW MODE */
                 logs.map((log, index) => (
                   <tr 
                     key={log.id} 
@@ -597,7 +1063,9 @@ export default function DataLogger({
                       <span className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-extrabold tracking-wide ${
                         log.doc_type === 'INVOICE'
                           ? 'bg-emerald-100 text-emerald-800'
-                          : 'bg-teal-100 text-teal-800'
+                          : log.doc_type === 'PACKING_LIST'
+                          ? 'bg-teal-100 text-teal-800'
+                          : 'bg-cyan-100 text-[#0b4d53]'
                       }`}>
                         {log.doc_type}
                       </span>
@@ -652,14 +1120,16 @@ export default function DataLogger({
                         >
                           <Eye className="w-3.5 h-3.5" />
                         </button>
-                        <button
-                          onClick={() => openPrintTab(log.doc_type.toLowerCase() === 'invoice' ? 'print-invoice' : 'print-packing-list', log.ref_id)}
-                          className="inline-flex items-center gap-1 px-2.5 py-1 bg-emerald-50 text-emerald-800 hover:bg-emerald-100 rounded-lg text-xs font-bold transition-colors"
-                          title="Buka / Cetak PDF di Tab Baru"
-                        >
-                          <Printer className="w-3.5 h-3.5" />
-                          <span>PDF</span>
-                        </button>
+                        {log.doc_type !== 'DELIVERY_ORDER' && (
+                          <button
+                            onClick={() => openPrintTab(log.doc_type.toLowerCase() === 'invoice' ? 'print-invoice' : 'print-packing-list', log.ref_id)}
+                            className="inline-flex items-center gap-1 px-2.5 py-1 bg-emerald-50 text-emerald-800 hover:bg-emerald-100 rounded-lg text-xs font-bold transition-colors"
+                            title="Buka / Cetak PDF di Tab Baru"
+                          >
+                            <Printer className="w-3.5 h-3.5" />
+                            <span>PDF</span>
+                          </button>
+                        )}
                         <button
                           onClick={() => handleDelete(log.id)}
                           className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
@@ -694,7 +1164,9 @@ export default function DataLogger({
                 <span className={`inline-block text-[10px] font-extrabold uppercase px-2 py-0.5 rounded mb-1.5 ${
                   selectedLog.doc_type === 'INVOICE'
                     ? 'bg-emerald-100 text-emerald-800'
-                    : 'bg-teal-100 text-teal-800'
+                    : selectedLog.doc_type === 'PACKING_LIST'
+                    ? 'bg-teal-100 text-teal-800'
+                    : 'bg-cyan-100 text-[#0b4d53]'
                 }`}>
                   {selectedLog.doc_type} DETAIL
                 </span>
@@ -797,15 +1269,17 @@ export default function DataLogger({
                 >
                   Tutup
                 </button>
-                <button
-                  onClick={() => {
-                    openPrintTab(selectedLog.doc_type.toLowerCase() === 'invoice' ? 'print-invoice' : 'print-packing-list', selectedLog.ref_id);
-                  }}
-                  className="inline-flex items-center gap-1.5 px-4 py-2 bg-emerald-800 text-white rounded-xl text-xs font-bold hover:bg-emerald-900 shadow-xs"
-                >
-                  <Printer className="w-3.5 h-3.5" />
-                  <span>Buka PDF</span>
-                </button>
+                {selectedLog.doc_type !== 'DELIVERY_ORDER' && (
+                  <button
+                    onClick={() => {
+                      openPrintTab(selectedLog.doc_type.toLowerCase() === 'invoice' ? 'print-invoice' : 'print-packing-list', selectedLog.ref_id);
+                    }}
+                    className="inline-flex items-center gap-1.5 px-4 py-2 bg-emerald-800 text-white rounded-xl text-xs font-bold hover:bg-emerald-900 shadow-xs"
+                  >
+                    <Printer className="w-3.5 h-3.5" />
+                    <span>Buka PDF</span>
+                  </button>
+                )}
               </div>
             </div>
 

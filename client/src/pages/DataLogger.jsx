@@ -47,6 +47,25 @@ export default function DataLogger({
   // Detail Modal State
   const [selectedLog, setSelectedLog] = useState(null);
 
+  // Lock body scroll and listen for Escape key on detail modal
+  useEffect(() => {
+    if (!selectedLog) return;
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape') {
+        setSelectedLog(null);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+
+    return () => {
+      document.body.style.overflow = prevOverflow;
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [selectedLog]);
+
   useEffect(() => {
     fetchFilterOptions();
   }, []);
@@ -609,8 +628,14 @@ export default function DataLogger({
 
       {/* Quick Details Modal */}
       {selectedLog && (
-        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl max-w-xl w-full p-6 shadow-2xl border border-slate-200 animate-in fade-in zoom-in-95 duration-200">
+        <div 
+          className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4"
+          onClick={() => setSelectedLog(null)}
+        >
+          <div 
+            className="bg-white rounded-2xl max-w-xl w-full p-6 shadow-2xl border border-slate-200 animate-in fade-in zoom-in-95 duration-200"
+            onClick={(e) => e.stopPropagation()}
+          >
             
             {/* Modal Header */}
             <div className="flex items-start justify-between pb-4 border-b border-slate-100">

@@ -65,38 +65,13 @@ export default function Dashboard({
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
       
       {/* Header Greeting & Overview */}
-      <div className="mb-8 flex flex-col md:flex-row md:items-center md:justify-between gap-4 border-b border-slate-200 pb-6">
-        <div>
-          <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight">
-            Main Menu Dashboard
-          </h1>
-          <p className="text-sm text-slate-500 mt-1">
-            Sistem terintegrasi pembuatan & pelacakan Invoice, Packing List, Delivery Order, dan Riwayat Data Log.
-          </p>
-        </div>
-        <div className="flex flex-wrap items-center gap-2.5">
-          <button 
-            onClick={onOpenInvoiceModal}
-            className="inline-flex items-center gap-1.5 px-4 py-2 bg-emerald-800 text-white rounded-xl text-xs font-bold hover:bg-emerald-900 shadow-sm transition-colors cursor-pointer"
-          >
-            <Plus className="w-4 h-4" />
-            Invoice Form (Modal)
-          </button>
-          <button 
-            onClick={onOpenPackingListModal}
-            className="inline-flex items-center gap-1.5 px-4 py-2 bg-teal-800 text-white rounded-xl text-xs font-bold hover:bg-teal-900 shadow-sm transition-colors cursor-pointer"
-          >
-            <Plus className="w-4 h-4" />
-            Packing List (Modal)
-          </button>
-          <button 
-            onClick={onOpenDeliveryOrderModal}
-            className="inline-flex items-center gap-1.5 px-4 py-2 bg-[#0b4d53] text-white rounded-xl text-xs font-bold hover:bg-[#083a3f] shadow-sm transition-colors cursor-pointer"
-          >
-            <Plus className="w-4 h-4" />
-            Delivery Order (Modal)
-          </button>
-        </div>
+      <div className="mb-8 border-b border-slate-200 pb-6">
+        <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight">
+          Main Menu Dashboard
+        </h1>
+        <p className="text-sm text-slate-500 mt-1">
+          Sistem terintegrasi pembuatan & pelacakan Invoice, Packing List, Delivery Order, dan Riwayat Data Log.
+        </p>
       </div>
 
       {/* Main Action Menu Cards (Mirip Tombol VBA dengan Modal Pop-up) */}

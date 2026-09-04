@@ -7,8 +7,7 @@ import {
   Home, 
   Wifi, 
   Copy, 
-  Check,
-  Plus
+  Check
 } from 'lucide-react';
 
 export default function Navbar({ 
@@ -101,38 +100,8 @@ export default function Navbar({
             })}
           </nav>
 
-          {/* Quick Action Modal Buttons & LAN Badge */}
+          {/* LAN Connection Badge */}
           <div className="flex items-center gap-2.5">
-            
-            {/* Quick Action Modals */}
-            <div className="hidden sm:flex items-center gap-2">
-              <button
-                onClick={onOpenInvoiceModal}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-800 hover:bg-emerald-900 text-white rounded-lg text-xs font-bold shadow-xs transition-colors cursor-pointer"
-                title="Buka Form Invoice (Modal)"
-              >
-                <Plus className="w-3.5 h-3.5" />
-                <span>Invoice Form</span>
-              </button>
-
-              <button
-                onClick={onOpenPackingListModal}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-teal-800 hover:bg-teal-900 text-white rounded-lg text-xs font-bold shadow-xs transition-colors cursor-pointer"
-                title="Buka Form Packing List (Modal)"
-              >
-                <Plus className="w-3.5 h-3.5" />
-                <span>Packing List Form</span>
-              </button>
-
-              <button
-                onClick={onOpenDeliveryOrderModal}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-[#0b4d53] hover:bg-[#083a3f] text-white rounded-lg text-xs font-bold shadow-xs transition-colors cursor-pointer"
-                title="Buka Form Delivery Order (Modal)"
-              >
-                <Plus className="w-3.5 h-3.5" />
-                <span>Delivery Order Form</span>
-              </button>
-            </div>
 
             {/* LAN Connection Badge */}
             {networkInfo && (
@@ -162,8 +131,8 @@ export default function Navbar({
       </div>
 
       {/* Mobile Bar */}
-      <div className="md:hidden flex items-center justify-between border-t border-slate-200 py-2 bg-slate-50 px-3 overflow-x-auto gap-2">
-        <div className="flex items-center gap-1">
+      <div className="md:hidden flex items-center justify-around border-t border-slate-200 py-2 bg-slate-50 px-3">
+        <div className="flex items-center gap-2">
           {navItems.map((item) => {
             const Icon = item.icon;
             const isActive = activeView === item.id;
@@ -171,7 +140,7 @@ export default function Navbar({
               <button
                 key={item.id}
                 onClick={() => setActiveView(item.id)}
-                className={`flex items-center gap-1 py-1 px-2 rounded-lg text-xs font-medium whitespace-nowrap ${
+                className={`flex items-center gap-1.5 py-1.5 px-3 rounded-lg text-xs font-medium whitespace-nowrap ${
                   isActive ? 'text-emerald-800 font-bold bg-emerald-100/50' : 'text-slate-500'
                 }`}
               >
@@ -180,27 +149,6 @@ export default function Navbar({
               </button>
             );
           })}
-        </div>
-
-        <div className="flex items-center gap-1.5">
-          <button
-            onClick={onOpenInvoiceModal}
-            className="px-2 py-1 bg-emerald-800 text-white rounded text-[11px] font-bold"
-          >
-            + Invoice
-          </button>
-          <button
-            onClick={onOpenPackingListModal}
-            className="px-2 py-1 bg-teal-800 text-white rounded text-[11px] font-bold"
-          >
-            + Packing List
-          </button>
-          <button
-            onClick={onOpenDeliveryOrderModal}
-            className="px-2 py-1 bg-[#0b4d53] text-white rounded text-[11px] font-bold"
-          >
-            + DO
-          </button>
         </div>
       </div>
     </header>

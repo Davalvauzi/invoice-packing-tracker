@@ -20,11 +20,26 @@ export default function Navbar({
   const [networkInfo, setNetworkInfo] = useState(null);
   const [copied, setCopied] = useState(false);
 
-  useEffect(() => {
+  const fetchNetworkInfo = () => {
     fetch('/api/network-info')
       .then(res => res.json())
       .then(data => setNetworkInfo(data))
       .catch(err => console.error('Failed to fetch network info:', err));
+  };
+
+  useEffect(() => {
+    fetchNetworkInfo();
+
+    // Otomatis update jika ganti Wi-Fi atau kembali ke tab browser
+    window.addEventListener('focus', fetchNetworkInfo);
+    window.addEventListener('online', fetchNetworkInfo);
+    const interval = setInterval(fetchNetworkInfo, 8000); // Poll setiap 8 detik
+
+    return () => {
+      window.removeEventListener('focus', fetchNetworkInfo);
+      window.removeEventListener('online', fetchNetworkInfo);
+      clearInterval(interval);
+    };
   }, []);
 
   const copyLanUrl = () => {

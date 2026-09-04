@@ -1,0 +1,12 @@
+{
+  "name": "invoice-packing-tracker",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Invoice & Packing List Management Web App",
+  "scripts": {
+    "start": "node server/index.js",
+    "dev:server": "node server/index.js",
+    "dev:client": "npm run dev --prefix client",
+    "build": "npm run build --prefix client"
+  }
+}

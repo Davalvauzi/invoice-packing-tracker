@@ -65,6 +65,7 @@ db.exec(`
     no_of_box INTEGER DEFAULT 0,
     image_url TEXT,
     notes TEXT,
+    items TEXT,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
   );
 
@@ -84,6 +85,7 @@ db.exec(`
     unit_note TEXT,
     image_url TEXT,
     notes TEXT,
+    items TEXT,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
   );
 
@@ -99,6 +101,7 @@ db.exec(`
     pallet_qty INTEGER DEFAULT 0,
     box_qty INTEGER DEFAULT 0,
     notes TEXT,
+    items TEXT,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
   );
 
@@ -118,6 +121,7 @@ db.exec(`
     dimensions TEXT,
     image_url TEXT,
     notes TEXT,
+    items TEXT,
     ref_id INTEGER,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
   );
@@ -180,7 +184,11 @@ const migrationColumns = [
   'ALTER TABLE invoices ADD COLUMN vat_rate REAL DEFAULT 11',
   'ALTER TABLE invoices ADD COLUMN vat_amount REAL DEFAULT 0',
   'ALTER TABLE invoices ADD COLUMN grand_total REAL DEFAULT 0',
-  'ALTER TABLE invoices ADD COLUMN currency TEXT DEFAULT "USD"',
+  // Multi-item support columns
+  'ALTER TABLE invoices ADD COLUMN items TEXT',
+  'ALTER TABLE packing_lists ADD COLUMN items TEXT',
+  'ALTER TABLE delivery_orders ADD COLUMN items TEXT',
+  'ALTER TABLE data_logger ADD COLUMN items TEXT',
   // Dummy flags to allow safe deletion of dummy data only
   'ALTER TABLE customers ADD COLUMN is_dummy INTEGER DEFAULT 0',
   'ALTER TABLE parts ADD COLUMN is_dummy INTEGER DEFAULT 0',

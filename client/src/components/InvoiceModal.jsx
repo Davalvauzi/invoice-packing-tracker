@@ -10,10 +10,25 @@ import {
   DollarSign,
   Package,
   Building2,
-  Truck
+  Truck,
+  Plus,
+  Trash2
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { useNotification } from '../context/NotificationContext';
+
+const createEmptyItem = () => ({
+  id: Date.now() + Math.random(),
+  part_name: '',
+  part_no: '',
+  customer_po_no: '',
+  no_of_pallet: '',
+  no_of_box: '',
+  qty_per_box: '',
+  total_qty: '',
+  unit_price: '',
+  total_amount: ''
+});
 
 export default function InvoiceModal({ isOpen, onClose, openPrintTab, onSuccess }) {
   const { showSuccess, showError, showWarning } = useNotification();
@@ -35,20 +50,19 @@ export default function InvoiceModal({ isOpen, onClose, openPrintTab, onSuccess 
     terms_of_delivery: '',
     customer_po_no: '',
     hts_code: '8504.40.90',
-    part_name: '',
-    part_no: '',
+    currency: 'USD',
+    vat_rate: 0.11,
+    vat_amount: '0.00',
+    total_amount: '0.00',
+    grand_total: '0.00',
     no_of_pallet: '',
     no_of_box: '',
-    qty_per_box: '',
     total_qty: '',
-    unit_price: '',
-    currency: 'USD',
-    total_amount: '',
-    vat_rate: 0.11,
-    vat_amount: '',
-    grand_total: '',
     notes: ''
   });
+
+  // Dynamic Product Items
+  const [items, setItems] = useState([createEmptyItem()]);
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submittedDoc, setSubmittedDoc] = useState(null);
@@ -115,32 +129,27 @@ export default function InvoiceModal({ isOpen, onClose, openPrintTab, onSuccess 
     }
   };
 
-  // Re-calculate totals when box, qty_per_box, total_qty, or unit_price changes
+  // Re-calculate aggregate totals whenever items or vat_rate changes
   useEffect(() => {
-    const box = parseFloat(formData.no_of_box) || 0;
-    const perBox = parseFloat(formData.qty_per_box) || 0;
+    const totalBoxes = items.reduce((sum, item) => sum + (parseFloat(item.no_of_box) || 0), 0);
+    const totalPallets = items.reduce((sum, item) => sum + (parseFloat(item.no_of_pallet) || 0), 0);
+    const totalQty = items.reduce((sum, item) => sum + (parseFloat(item.total_qty) || 0), 0);
+    const totalAmount = items.reduce((sum, item) => sum + (parseFloat(item.total_amount) || 0), 0);
     
-    // Calculate total qty if box & qty_per_box provided, otherwise use current total_qty
-    let computedTotalQty = formData.total_qty;
-    if (box > 0 && perBox > 0) {
-      computedTotalQty = String(box * perBox);
-    }
-
-    const totalQtyNum = parseFloat(computedTotalQty) || 0;
-    const priceNum = parseFloat(formData.unit_price) || 0;
-
-    const subtotal = totalQtyNum * priceNum;
-    const vat = subtotal * (formData.vat_rate || 0.11);
-    const grand = subtotal + vat;
+    const vatRate = formData.vat_rate !== undefined ? parseFloat(formData.vat_rate) : 0.11;
+    const vatAmount = totalAmount * vatRate;
+    const grandTotal = totalAmount + vatAmount;
 
     setFormData(prev => ({
       ...prev,
-      total_qty: computedTotalQty,
-      total_amount: subtotal > 0 ? subtotal.toFixed(2) : '',
-      vat_amount: vat > 0 ? vat.toFixed(2) : '',
-      grand_total: grand > 0 ? grand.toFixed(2) : ''
+      no_of_box: totalBoxes > 0 ? String(totalBoxes) : '',
+      no_of_pallet: totalPallets > 0 ? String(totalPallets) : '',
+      total_qty: totalQty > 0 ? String(totalQty) : '',
+      total_amount: totalAmount > 0 ? totalAmount.toFixed(2) : '0.00',
+      vat_amount: vatAmount > 0 ? vatAmount.toFixed(2) : '0.00',
+      grand_total: grandTotal > 0 ? grandTotal.toFixed(2) : '0.00'
     }));
-  }, [formData.no_of_box, formData.qty_per_box, formData.unit_price, formData.vat_rate]);
+  }, [items, formData.vat_rate]);
 
   const handleCustomerChange = (e) => {
     const custName = e.target.value;
@@ -154,26 +163,78 @@ export default function InvoiceModal({ isOpen, onClose, openPrintTab, onSuccess 
     }));
   };
 
-  const handlePartSelect = (e) => {
-    const selectedVal = e.target.value;
-    // Check if user selected from datalist or typed
+  // Item row operations
+  const handleItemChange = (index, field, value) => {
+    setItems(prev => {
+      const updated = [...prev];
+      const row = { ...updated[index], [field]: value };
+
+      const box = parseFloat(field === 'no_of_box' ? value : row.no_of_box) || 0;
+      const perBox = parseFloat(field === 'qty_per_box' ? value : row.qty_per_box) || 0;
+      
+      let computedQty = row.total_qty;
+      if (field === 'no_of_box' || field === 'qty_per_box') {
+        if (box > 0 && perBox > 0) {
+          computedQty = String(box * perBox);
+        }
+      } else if (field === 'total_qty') {
+        computedQty = value;
+      }
+      row.total_qty = computedQty;
+
+      const qtyNum = parseFloat(computedQty) || (box * perBox) || 0;
+      const priceNum = parseFloat(field === 'unit_price' ? value : row.unit_price) || 0;
+      const subtotal = qtyNum * priceNum;
+      row.total_amount = subtotal > 0 ? subtotal.toFixed(2) : '';
+
+      updated[index] = row;
+      return updated;
+    });
+  };
+
+  const handlePartSelectForItem = (index, selectedVal) => {
     const found = parts.find(p => 
       p.part_name === selectedVal || 
       p.part_no === selectedVal || 
       `${p.part_name} (${p.part_no})` === selectedVal
     );
 
-    if (found) {
-      setFormData(prev => ({
-        ...prev,
-        part_name: found.part_name,
-        part_no: found.part_no || '',
-        qty_per_box: found.qty_per_box ? String(found.qty_per_box) : prev.qty_per_box,
-        unit_price: (found.price !== null && found.price !== undefined) ? String(found.price) : prev.unit_price
-      }));
-    } else {
-      setFormData(prev => ({ ...prev, part_name: selectedVal }));
+    setItems(prev => {
+      const updated = [...prev];
+      const row = { ...updated[index] };
+      if (found) {
+        row.part_name = found.part_name;
+        row.part_no = found.part_no || '';
+        if (found.qty_per_box) row.qty_per_box = String(found.qty_per_box);
+        if (found.price !== null && found.price !== undefined) row.unit_price = String(found.price);
+
+        const box = parseFloat(row.no_of_box) || 0;
+        const perBox = parseFloat(row.qty_per_box) || 0;
+        if (box > 0 && perBox > 0) {
+          row.total_qty = String(box * perBox);
+        }
+        const qtyNum = parseFloat(row.total_qty) || 0;
+        const priceNum = parseFloat(row.unit_price) || 0;
+        const subtotal = qtyNum * priceNum;
+        row.total_amount = subtotal > 0 ? subtotal.toFixed(2) : '';
+      } else {
+        row.part_name = selectedVal;
+      }
+      updated[index] = row;
+      return updated;
+    });
+  };
+
+  const addItemRow = () => {
+    setItems(prev => [...prev, createEmptyItem()]);
+  };
+
+  const removeItemRow = (index) => {
+    if (items.length <= 1) {
+      showWarning('Minimal harus ada 1 produk dalam invoice');
+      return;
     }
+    setItems(prev => prev.filter((_, idx) => idx !== index));
   };
 
   const handleSubmit = async (e) => {
@@ -187,12 +248,39 @@ export default function InvoiceModal({ isOpen, onClose, openPrintTab, onSuccess 
       return;
     }
 
+    const validItems = items.filter(it => it.part_name && it.part_name.trim());
+    if (validItems.length === 0) {
+      showWarning('Mohon isi minimal 1 Nama Produk / Part');
+      return;
+    }
+
+    for (let i = 0; i < validItems.length; i++) {
+      const it = validItems[i];
+      if (!it.no_of_box || parseFloat(it.no_of_box) <= 0) {
+        showWarning(`Mohon isi No of Box untuk produk ke-${i + 1} (${it.part_name})`);
+        return;
+      }
+    }
+
     setIsSubmitting(true);
     try {
+      const payload = {
+        ...formData,
+        items: validItems,
+        // Legacy flat columns fallback
+        part_name: validItems.length === 1 
+          ? validItems[0].part_name 
+          : `${validItems.length} Items: ${validItems.map(i => i.part_name).slice(0, 3).join(', ')}${validItems.length > 3 ? '...' : ''}`,
+        part_no: validItems[0]?.part_no || '',
+        unit_price: validItems[0]?.unit_price || 0,
+        qty_per_box: validItems[0]?.qty_per_box || 0,
+        customer_po_no: formData.customer_po_no || validItems.map(i => i.customer_po_no).filter(Boolean).join(', ')
+      };
+
       const postRes = await fetch('/api/invoices', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(formData)
+        body: JSON.stringify(payload)
       });
 
       if (!postRes.ok) {
@@ -201,7 +289,7 @@ export default function InvoiceModal({ isOpen, onClose, openPrintTab, onSuccess 
 
       const savedData = await postRes.json();
       setSubmittedDoc(savedData);
-      showSuccess('Invoice berhasil dibuat dan disimpan!');
+      showSuccess(`Invoice berhasil dibuat dengan ${validItems.length} item produk!`);
 
       confetti({
         particleCount: 80,
@@ -225,6 +313,7 @@ export default function InvoiceModal({ isOpen, onClose, openPrintTab, onSuccess 
 
   const resetForm = () => {
     setSubmittedDoc(null);
+    setItems([createEmptyItem()]);
     setFormData({
       invoice_number: '',
       invoice_date: new Date().toISOString().slice(0, 10),
@@ -236,18 +325,14 @@ export default function InvoiceModal({ isOpen, onClose, openPrintTab, onSuccess 
       terms_of_delivery: deliveryTerms[0]?.name || '',
       customer_po_no: '',
       hts_code: settings?.hts_code_invoice || '8504.40.90',
-      part_name: '',
-      part_no: '',
+      currency: 'USD',
+      vat_rate: 0.11,
+      vat_amount: '0.00',
+      total_amount: '0.00',
+      grand_total: '0.00',
       no_of_pallet: '',
       no_of_box: '',
-      qty_per_box: '',
       total_qty: '',
-      unit_price: '',
-      currency: 'USD',
-      total_amount: '',
-      vat_rate: 0.11,
-      vat_amount: '',
-      grand_total: '',
       notes: ''
     });
   };
@@ -492,144 +577,241 @@ export default function InvoiceModal({ isOpen, onClose, openPrintTab, onSuccess 
               </div>
             </div>
 
-            {/* Section 2: Data Produk & Kalkulasi Invoice (Kuning) */}
+            {/* Section 2: Data Produk Multi-Item & Kalkulasi Invoice */}
             <div className="bg-emerald-50/50 p-4 rounded-xl border border-emerald-200 space-y-4">
-              <div className="flex items-center gap-2 text-xs font-bold text-emerald-950 uppercase tracking-wider pb-2 border-b border-emerald-200">
-                <Package className="w-4 h-4 text-emerald-700" />
-                Data Produk, Jumlah Box & Harga (Perhitungan Otomatis)
+              <div className="flex items-center justify-between pb-2 border-b border-emerald-200">
+                <div className="flex items-center gap-2 text-xs font-bold text-emerald-950 uppercase tracking-wider">
+                  <Package className="w-4 h-4 text-emerald-700" />
+                  Daftar Produk & Part Tagihan ({items.length} Item)
+                </div>
+                <button
+                  type="button"
+                  onClick={addItemRow}
+                  className="inline-flex items-center gap-1.5 px-3 py-1 bg-emerald-700 hover:bg-emerald-800 text-white rounded-lg text-[11px] font-bold tracking-wide cursor-pointer transition-colors shadow-xs"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  <span>+ Tambah Produk</span>
+                </button>
               </div>
 
-              {/* Part Name & Number */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-[11px] font-bold text-slate-700 uppercase mb-1">
-                    PILIH DARI KATALOG PRODUK / PART NAME *
-                  </label>
-                  <input
-                    type="text"
-                    list="parts-list-invoice"
-                    placeholder="Pilih katalog atau ketik nama produk..."
-                    value={formData.part_name}
-                    onChange={handlePartSelect}
-                    className="w-full px-3 py-2 rounded-xl border border-emerald-300 bg-white text-xs font-semibold"
-                  />
-                  <datalist id="parts-list-invoice">
-                    {parts.map(p => (
-                      <option key={p.id} value={`${p.part_name} (${p.part_no})`}>
-                        {p.part_name} - {p.part_no} | {p.qty_per_box ? `${p.qty_per_box} pcs/box` : ''} | {p.price ? `$${p.price}` : ''}
-                      </option>
-                    ))}
-                  </datalist>
-                </div>
+              {/* Datalist parts catalog shared across rows */}
+              <datalist id="parts-list-invoice">
+                {parts.map(p => (
+                  <option key={p.id} value={`${p.part_name} (${p.part_no})`}>
+                    {p.part_name} - {p.part_no} | {p.qty_per_box ? `${p.qty_per_box} pcs/box` : ''} | {p.price ? `$${p.price}` : ''}
+                  </option>
+                ))}
+              </datalist>
 
-                <div>
-                  <label className="block text-[11px] font-bold text-slate-700 uppercase mb-1">
-                    PART NUMBER
-                  </label>
-                  <input
-                    type="text"
-                    placeholder="Contoh: FLG-CVR-202"
-                    value={formData.part_no}
-                    onChange={(e) => setFormData({ ...formData, part_no: e.target.value })}
-                    className="w-full px-3 py-2 rounded-xl border border-emerald-300 bg-white font-mono text-xs"
-                  />
-                </div>
-              </div>
+              {/* Item Cards List */}
+              <div className="space-y-3.5">
+                {items.map((item, index) => (
+                  <div 
+                    key={item.id || index}
+                    className="bg-white rounded-xl border border-emerald-200 shadow-xs p-3.5 space-y-3 relative group"
+                  >
+                    {/* Item Card Header */}
+                    <div className="flex items-center justify-between border-b border-slate-100 pb-2">
+                      <div className="flex items-center gap-2">
+                        <span className="px-2 py-0.5 rounded-md bg-emerald-100 text-emerald-800 font-bold text-[10px] tracking-wide uppercase">
+                          Produk #{index + 1}
+                        </span>
+                        {item.part_name && (
+                          <span className="text-xs font-bold text-slate-800 truncate max-w-[200px] sm:max-w-xs">
+                            {item.part_name}
+                          </span>
+                        )}
+                      </div>
 
-              {/* Quantities & Price Breakdown */}
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 bg-white p-3.5 rounded-xl border border-emerald-200">
-                <div>
-                  <label className="block text-[10px] font-bold text-slate-600 uppercase mb-1">
-                    NO OF PALLETE
-                  </label>
-                  <input
-                    type="number"
-                    min="0"
-                    placeholder="0"
-                    value={formData.no_of_pallet}
-                    onChange={(e) => setFormData({ ...formData, no_of_pallet: e.target.value })}
-                    className="w-full px-2.5 py-1.5 rounded-lg border border-slate-300 font-mono text-xs bg-white text-center"
-                  />
-                </div>
+                      {items.length > 1 && (
+                        <button
+                          type="button"
+                          onClick={() => removeItemRow(index)}
+                          className="text-slate-400 hover:text-red-600 p-1 rounded-md hover:bg-red-50 transition-colors cursor-pointer flex items-center gap-1 text-[11px] font-medium"
+                          title="Hapus baris produk ini"
+                        >
+                          <Trash2 className="w-3.5 h-3.5 text-red-500" />
+                          <span className="hidden sm:inline text-red-600">Hapus</span>
+                        </button>
+                      )}
+                    </div>
 
-                <div>
-                  <label className="block text-[10px] font-bold text-slate-600 uppercase mb-1">
-                    NO OF BOX <span className="text-red-500">*</span>
-                  </label>
-                  <input
-                    type="number"
-                    min="1"
-                    placeholder="Contoh: 10"
-                    value={formData.no_of_box}
-                    onChange={(e) => setFormData({ ...formData, no_of_box: e.target.value })}
-                    className="w-full px-2.5 py-1.5 rounded-lg border border-emerald-400 font-mono text-xs font-bold text-emerald-950 bg-white text-center"
-                  />
-                </div>
+                    {/* Row 1: Part Name, Part No, Cust PO No */}
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                      <div className="sm:col-span-1">
+                        <label className="block text-[10px] font-bold text-slate-700 uppercase mb-1">
+                          PILIH DARI KATALOG / PART NAME *
+                        </label>
+                        <input
+                          type="text"
+                          list="parts-list-invoice"
+                          placeholder="Pilih katalog / ketik nama part..."
+                          value={item.part_name}
+                          onChange={(e) => handlePartSelectForItem(index, e.target.value)}
+                          className="w-full px-2.5 py-1.5 rounded-lg border border-emerald-300 bg-white text-xs font-semibold focus:border-emerald-600"
+                        />
+                      </div>
 
-                <div>
-                  <label className="block text-[10px] font-bold text-slate-600 uppercase mb-1">
-                    QTY PER BOX (PCS)
-                  </label>
-                  <input
-                    type="number"
-                    min="1"
-                    placeholder="Contoh: 100"
-                    value={formData.qty_per_box}
-                    onChange={(e) => setFormData({ ...formData, qty_per_box: e.target.value })}
-                    className="w-full px-2.5 py-1.5 rounded-lg border border-emerald-400 font-mono text-xs font-bold text-emerald-950 bg-white text-center"
-                  />
-                </div>
+                      <div>
+                        <label className="block text-[10px] font-bold text-slate-700 uppercase mb-1">
+                          PART NUMBER
+                        </label>
+                        <input
+                          type="text"
+                          placeholder="Contoh: FLG-CVR-202"
+                          value={item.part_no}
+                          onChange={(e) => handleItemChange(index, 'part_no', e.target.value)}
+                          className="w-full px-2.5 py-1.5 rounded-lg border border-slate-300 bg-white font-mono text-xs focus:border-emerald-600"
+                        />
+                      </div>
 
-                <div>
-                  <label className="block text-[10px] font-bold text-slate-600 uppercase mb-1">
-                    TOTAL QTY (PCS)
-                  </label>
-                  <input
-                    type="number"
-                    placeholder="Auto (Box x Qty)"
-                    value={formData.total_qty}
-                    onChange={(e) => setFormData({ ...formData, total_qty: e.target.value })}
-                    className="w-full px-2.5 py-1.5 rounded-lg border border-slate-300 font-mono text-xs font-bold bg-slate-50 text-center"
-                  />
-                </div>
-              </div>
+                      <div>
+                        <label className="block text-[10px] font-bold text-slate-700 uppercase mb-1">
+                          CUST PO NO (OPSIONAL / PER ITEM)
+                        </label>
+                        <input
+                          type="text"
+                          placeholder={formData.customer_po_no || "Ikuti PO utama"}
+                          value={item.customer_po_no}
+                          onChange={(e) => handleItemChange(index, 'customer_po_no', e.target.value)}
+                          className="w-full px-2.5 py-1.5 rounded-lg border border-slate-300 bg-white font-mono text-xs focus:border-emerald-600"
+                        />
+                      </div>
+                    </div>
 
-              {/* Price & Summary Box */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 items-center pt-1">
-                <div>
-                  <label className="block text-[11px] font-bold text-slate-700 uppercase mb-1">
-                    UNIT PRICE (USD $) <span className="text-red-500">*</span>
-                  </label>
-                  <div className="relative">
-                    <span className="absolute inset-y-0 left-0 pl-3 flex items-center text-slate-400 font-bold">$</span>
-                    <input
-                      type="number"
-                      step="0.0001"
-                      min="0"
-                      placeholder="0.0000"
-                      value={formData.unit_price}
-                      onChange={(e) => setFormData({ ...formData, unit_price: e.target.value })}
-                      className="w-full pl-7 pr-3 py-2 rounded-xl border border-emerald-400 bg-white font-mono font-bold text-xs"
-                    />
+                    {/* Row 2: Quantities, Price & Subtotal */}
+                    <div className="grid grid-cols-2 sm:grid-cols-6 gap-2.5 pt-1">
+                      <div>
+                        <label className="block text-[9px] font-bold text-slate-600 uppercase mb-0.5">
+                          PALLET
+                        </label>
+                        <input
+                          type="number"
+                          min="0"
+                          placeholder="0"
+                          value={item.no_of_pallet}
+                          onChange={(e) => handleItemChange(index, 'no_of_pallet', e.target.value)}
+                          className="w-full px-2 py-1.5 rounded-lg border border-slate-300 font-mono text-xs bg-white text-center"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-[9px] font-bold text-slate-600 uppercase mb-0.5">
+                          BOX <span className="text-red-500">*</span>
+                        </label>
+                        <input
+                          type="number"
+                          min="1"
+                          placeholder="0"
+                          value={item.no_of_box}
+                          onChange={(e) => handleItemChange(index, 'no_of_box', e.target.value)}
+                          className="w-full px-2 py-1.5 rounded-lg border border-emerald-400 font-mono text-xs font-bold text-emerald-950 bg-white text-center"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-[9px] font-bold text-slate-600 uppercase mb-0.5">
+                          QTY / BOX
+                        </label>
+                        <input
+                          type="number"
+                          min="1"
+                          placeholder="Pcs"
+                          value={item.qty_per_box}
+                          onChange={(e) => handleItemChange(index, 'qty_per_box', e.target.value)}
+                          className="w-full px-2 py-1.5 rounded-lg border border-emerald-400 font-mono text-xs font-bold text-emerald-950 bg-white text-center"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-[9px] font-bold text-slate-600 uppercase mb-0.5">
+                          TOTAL QTY
+                        </label>
+                        <input
+                          type="number"
+                          placeholder="Auto"
+                          value={item.total_qty}
+                          onChange={(e) => handleItemChange(index, 'total_qty', e.target.value)}
+                          className="w-full px-2 py-1.5 rounded-lg border border-slate-300 font-mono text-xs font-bold bg-slate-50 text-center"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-[9px] font-bold text-slate-600 uppercase mb-0.5">
+                          UNIT PRICE ($)
+                        </label>
+                        <div className="relative">
+                          <span className="absolute inset-y-0 left-0 pl-2 flex items-center text-slate-400 font-bold text-[10px]">$</span>
+                          <input
+                            type="number"
+                            step="0.0001"
+                            min="0"
+                            placeholder="0.00"
+                            value={item.unit_price}
+                            onChange={(e) => handleItemChange(index, 'unit_price', e.target.value)}
+                            className="w-full pl-5 pr-1.5 py-1.5 rounded-lg border border-emerald-400 bg-white font-mono font-bold text-xs text-right"
+                          />
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="block text-[9px] font-bold text-slate-600 uppercase mb-0.5">
+                          SUBTOTAL ($)
+                        </label>
+                        <div className="px-2 py-1.5 rounded-lg bg-emerald-50 border border-emerald-200 font-mono font-bold text-xs text-emerald-900 text-right">
+                          ${item.total_amount || '0.00'}
+                        </div>
+                      </div>
+                    </div>
+
                   </div>
-                  <p className="text-[10px] text-slate-500 mt-1">
-                    Total Amount dihitung dari: Total Qty × Unit Price
-                  </p>
+                ))}
+              </div>
+
+              {/* Add Item Action Button */}
+              <button
+                type="button"
+                onClick={addItemRow}
+                className="w-full py-2.5 px-4 rounded-xl border-2 border-dashed border-emerald-300 hover:border-emerald-600 bg-white/70 hover:bg-emerald-50 text-emerald-800 font-bold text-xs flex items-center justify-center gap-2 transition-all cursor-pointer shadow-xs"
+              >
+                <Plus className="w-4 h-4" />
+                <span>+ Tambah Produk Ke-{items.length + 1}</span>
+              </button>
+
+              {/* Grand Totals Summary Card */}
+              <div className="bg-gradient-to-br from-slate-900 to-emerald-950 text-white p-4 rounded-xl shadow-md grid grid-cols-1 sm:grid-cols-2 gap-4 items-center">
+                <div className="space-y-1 text-xs">
+                  <div className="text-[11px] uppercase tracking-wider text-emerald-300 font-bold">
+                    Ringkasan Muatan & Kargo
+                  </div>
+                  <div className="grid grid-cols-3 gap-2 pt-1 font-mono text-xs">
+                    <div className="bg-white/10 rounded-lg p-2 text-center">
+                      <div className="text-[10px] text-slate-300">ITEMS</div>
+                      <div className="text-base font-black text-white">{items.length}</div>
+                    </div>
+                    <div className="bg-white/10 rounded-lg p-2 text-center">
+                      <div className="text-[10px] text-slate-300">TOTAL BOX</div>
+                      <div className="text-base font-black text-emerald-300">{formData.no_of_box || '0'}</div>
+                    </div>
+                    <div className="bg-white/10 rounded-lg p-2 text-center">
+                      <div className="text-[10px] text-slate-300">TOTAL PALLET</div>
+                      <div className="text-base font-black text-white">{formData.no_of_pallet || '0'}</div>
+                    </div>
+                  </div>
                 </div>
 
-                {/* Calculation summary banner */}
-                <div className="bg-gradient-to-br from-slate-900 to-emerald-950 text-white p-3.5 rounded-xl shadow-xs space-y-1.5">
+                <div className="space-y-1.5 border-t sm:border-t-0 sm:border-l border-slate-700 sm:pl-4">
                   <div className="flex justify-between text-xs">
-                    <span className="text-slate-300">TOTAL USD:</span>
+                    <span className="text-slate-300">SUBTOTAL (TOTAL USD):</span>
                     <span className="font-mono font-bold">$ {formData.total_amount || '0.00'}</span>
                   </div>
                   <div className="flex justify-between text-xs">
                     <span className="text-slate-300">VAT 11% USD:</span>
                     <span className="font-mono font-semibold text-emerald-300">$ {formData.vat_amount || '0.00'}</span>
                   </div>
-                  <div className="flex justify-between text-xs pt-1 border-t border-slate-700">
+                  <div className="flex justify-between text-xs pt-1.5 border-t border-slate-700">
                     <span className="font-bold text-white uppercase">TOTAL AMOUNT USD:</span>
-                    <span className="font-mono font-black text-emerald-400 text-sm">$ {formData.grand_total || '0.00'}</span>
+                    <span className="font-mono font-black text-emerald-400 text-base">$ {formData.grand_total || '0.00'}</span>
                   </div>
                 </div>
               </div>

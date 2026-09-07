@@ -51,6 +51,23 @@ export default function PrintPackingList({ id, onBack }) {
     );
   }
 
+  // Multi-item parsing
+  const items = Array.isArray(packingList.items)
+    ? packingList.items
+    : (typeof packingList.items === 'string' && packingList.items.trim().startsWith('[')
+        ? (() => { try { return JSON.parse(packingList.items); } catch(e) { return null; } })()
+        : null);
+
+  const hasMultipleItems = items && items.length > 0;
+
+  const totalBoxCount = hasMultipleItems
+    ? items.reduce((s, it) => s + (Number(it.no_of_box) || Number(it.box_qty) || 0), 0)
+    : (Number(packingList.box_qty) || 0);
+
+  const totalPalletCount = hasMultipleItems
+    ? items.reduce((s, it) => s + (Number(it.no_of_pallet) || Number(it.pallet_qty) || 0), 0)
+    : (Number(packingList.pallet_qty) || 0);
+
   // Calculate volume in CBM if dimensions in mm or cm
   const l = Number(packingList.length) || 0;
   const w = Number(packingList.width) || 0;
@@ -193,25 +210,58 @@ export default function PrintPackingList({ id, onBack }) {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-300">
-              <tr>
-                <td className="border border-slate-300 px-3 py-4 text-center font-mono">1</td>
-                <td className="border border-slate-300 px-3 py-4 font-semibold text-slate-900">
-                  <div className="text-sm font-bold text-slate-900">{packingList.part_name || 'Component Cargo Batch'}</div>
-                  <div className="text-[11px] text-slate-500 font-mono mt-0.5">PO Ref: {packingList.customer_po_no || '-'}</div>
-                </td>
-                <td className="border border-slate-300 px-3 py-4 text-center font-mono font-bold text-sm">
-                  {packingList.box_qty || 0}
-                </td>
-                <td className="border border-slate-300 px-3 py-4 text-center font-mono font-bold text-sm">
-                  {packingList.pallet_qty || 0}
-                </td>
-                <td className="border border-slate-300 px-3 py-4 text-center font-mono font-semibold text-xs text-slate-800">
-                  {l > 0 ? `${l} x ${w} x ${h} ${unit}` : '-'}
-                </td>
-                <td className="border border-slate-300 px-3 py-4 text-right font-mono text-xs text-slate-800">
-                  {cbm > 0 ? `${cbm.toFixed(3)} CBM` : '-'}
-                </td>
-              </tr>
+              {hasMultipleItems ? (
+                items.map((item, idx) => {
+                  const itemBox = Number(item.no_of_box) || Number(item.box_qty) || 0;
+                  const itemPallet = Number(item.no_of_pallet) || Number(item.pallet_qty) || 0;
+                  return (
+                    <tr key={idx}>
+                      <td className="border border-slate-300 px-3 py-3 text-center font-mono">{idx + 1}</td>
+                      <td className="border border-slate-300 px-3 py-3 font-semibold text-slate-900">
+                        <div className="text-sm font-bold text-slate-900">{item.part_name || 'Component Cargo'}</div>
+                        {(item.part_no || item.customer_po_no || packingList.customer_po_no) && (
+                          <div className="text-[11px] text-slate-500 font-mono mt-0.5 flex items-center gap-3">
+                            {item.part_no && <span>Part No: {item.part_no}</span>}
+                            <span>PO Ref: {item.customer_po_no || packingList.customer_po_no || '-'}</span>
+                          </div>
+                        )}
+                      </td>
+                      <td className="border border-slate-300 px-3 py-3 text-center font-mono font-bold text-sm">
+                        {itemBox}
+                      </td>
+                      <td className="border border-slate-300 px-3 py-3 text-center font-mono font-bold text-sm">
+                        {itemPallet}
+                      </td>
+                      <td className="border border-slate-300 px-3 py-3 text-center font-mono font-semibold text-xs text-slate-800">
+                        {l > 0 ? `${l} x ${w} x ${h} ${unit}` : '-'}
+                      </td>
+                      <td className="border border-slate-300 px-3 py-3 text-right font-mono text-xs text-slate-800">
+                        {cbm > 0 ? `${(cbm * (itemBox || 1)).toFixed(3)} CBM` : '-'}
+                      </td>
+                    </tr>
+                  );
+                })
+              ) : (
+                <tr>
+                  <td className="border border-slate-300 px-3 py-4 text-center font-mono">1</td>
+                  <td className="border border-slate-300 px-3 py-4 font-semibold text-slate-900">
+                    <div className="text-sm font-bold text-slate-900">{packingList.part_name || 'Component Cargo Batch'}</div>
+                    <div className="text-[11px] text-slate-500 font-mono mt-0.5">PO Ref: {packingList.customer_po_no || '-'}</div>
+                  </td>
+                  <td className="border border-slate-300 px-3 py-4 text-center font-mono font-bold text-sm">
+                    {packingList.box_qty || 0}
+                  </td>
+                  <td className="border border-slate-300 px-3 py-4 text-center font-mono font-bold text-sm">
+                    {packingList.pallet_qty || 0}
+                  </td>
+                  <td className="border border-slate-300 px-3 py-4 text-center font-mono font-semibold text-xs text-slate-800">
+                    {l > 0 ? `${l} x ${w} x ${h} ${unit}` : '-'}
+                  </td>
+                  <td className="border border-slate-300 px-3 py-4 text-right font-mono text-xs text-slate-800">
+                    {cbm > 0 ? `${cbm.toFixed(3)} CBM` : '-'}
+                  </td>
+                </tr>
+              )}
             </tbody>
             <tfoot className="bg-slate-100 font-bold">
               <tr>
@@ -219,13 +269,13 @@ export default function PrintPackingList({ id, onBack }) {
                   TOTAL CARGO:
                 </td>
                 <td className="border border-slate-300 px-3 py-2.5 text-center font-mono text-sm font-black">
-                  {packingList.box_qty || 0} Box
+                  {totalBoxCount} Box
                 </td>
                 <td className="border border-slate-300 px-3 py-2.5 text-center font-mono text-sm font-black">
-                  {packingList.pallet_qty || 0} Pallet
+                  {totalPalletCount} Pallet
                 </td>
                 <td colSpan={2} className="border border-slate-300 px-3 py-2.5 text-right font-mono text-xs text-slate-600">
-                  {cbm > 0 ? `Total CBM: ${(cbm * (Number(packingList.box_qty) || 1)).toFixed(3)} m³` : 'Standard Package'}
+                  {cbm > 0 ? `Total CBM: ${(cbm * (totalBoxCount || 1)).toFixed(3)} m³` : 'Standard Package'}
                 </td>
               </tr>
             </tfoot>

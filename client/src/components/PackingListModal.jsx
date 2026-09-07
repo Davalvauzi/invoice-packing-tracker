@@ -122,7 +122,8 @@ export default function PackingListModal({ isOpen, onClose, openPrintTab, onSucc
       part_name: inv.part_name || '',
       terms_of_delivery: inv.terms_of_delivery || '',
       box_qty: inv.no_of_box || '',
-      pallet_qty: inv.no_of_pallet || ''
+      pallet_qty: inv.no_of_pallet || '',
+      items: inv.items || null
     }));
   };
 

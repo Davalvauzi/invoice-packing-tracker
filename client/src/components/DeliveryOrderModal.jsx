@@ -103,7 +103,8 @@ export default function DeliveryOrderModal({ isOpen, onClose, onSuccess }) {
         customer_po_no: found.customer_po_no || prev.customer_po_no,
         part_name: found.part_name || prev.part_name,
         box_qty: found.no_of_box || prev.box_qty,
-        pallet_qty: found.no_of_pallet || prev.pallet_qty
+        pallet_qty: found.no_of_pallet || prev.pallet_qty,
+        items: found.items || null
       }));
     } else {
       setFormData(prev => ({ ...prev, invoice_number: invNum }));

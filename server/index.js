@@ -805,25 +805,70 @@ app.post('/api/invoices', (req, res) => {
       currency,
       hts_code,
       image_url,
-      notes
+      notes,
+      items
     } = req.body;
 
-    const numBoxes = Number(no_of_box) || 0;
-    const numQtyPerBox = Number(qty_per_box) || 0;
-    const computedTotalQty = Number(total_qty) || (numBoxes * numQtyPerBox);
-    const numUnitPrice = Number(unit_price) || 0;
-    const computedTotalAmount = Number(total_amount) || (computedTotalQty * numUnitPrice);
+    // Multi-item handling
+    let parsedItems = null;
+    if (Array.isArray(items) && items.length > 0) {
+      parsedItems = items;
+    } else if (typeof items === 'string' && items.trim().startsWith('[')) {
+      try {
+        parsedItems = JSON.parse(items);
+      } catch (e) {
+        parsedItems = null;
+      }
+    }
+
+    let finalPartName = part_name || '';
+    let finalPoNo = customer_po_no || '';
+    let numPallets = Number(no_of_pallet) || 0;
+    let numBoxes = Number(no_of_box) || 0;
+    let numQtyPerBox = Number(qty_per_box) || 0;
+    let computedTotalQty = Number(total_qty) || 0;
+    let numUnitPrice = Number(unit_price) || 0;
+    let computedTotalAmount = Number(total_amount) || 0;
     const numVatRate = vat_rate !== undefined ? Number(vat_rate) : 11;
+
+    if (parsedItems && parsedItems.length > 0) {
+      // Calculate sums across items
+      numPallets = parsedItems.reduce((acc, it) => acc + (Number(it.no_of_pallet) || 0), 0);
+      numBoxes = parsedItems.reduce((acc, it) => acc + (Number(it.no_of_box) || 0), 0);
+      computedTotalQty = parsedItems.reduce((acc, it) => {
+        const itemBoxes = Number(it.no_of_box) || 0;
+        const itemPerBox = Number(it.qty_per_box) || 0;
+        return acc + (Number(it.total_qty) || (itemBoxes * itemPerBox));
+      }, 0);
+      computedTotalAmount = parsedItems.reduce((acc, it) => acc + (Number(it.total_amount) || 0), 0);
+      
+      finalPartName = parsedItems.length === 1
+        ? (parsedItems[0].part_name || '')
+        : `${parsedItems.length} Items: ${parsedItems.map(i => i.part_name).filter(Boolean).slice(0, 3).join(', ')}${parsedItems.length > 3 ? '...' : ''}`;
+      
+      const distinctPo = [...new Set(parsedItems.map(i => i.customer_po_no).filter(Boolean))];
+      if (distinctPo.length > 0) {
+        finalPoNo = distinctPo.join(', ');
+      }
+      
+      numUnitPrice = parsedItems[0]?.unit_price ? Number(parsedItems[0].unit_price) : numUnitPrice;
+      numQtyPerBox = parsedItems[0]?.qty_per_box ? Number(parsedItems[0].qty_per_box) : numQtyPerBox;
+    } else {
+      computedTotalQty = computedTotalQty || (numBoxes * numQtyPerBox);
+      computedTotalAmount = computedTotalAmount || (computedTotalQty * numUnitPrice);
+    }
+
     const computedVatAmount = Number(vat_amount) || (computedTotalAmount * (numVatRate / 100));
     const computedGrandTotal = Number(grand_total) || (computedTotalAmount + computedVatAmount);
+    const itemsJson = parsedItems ? JSON.stringify(parsedItems) : null;
 
     const stmt = db.prepare(`
       INSERT INTO invoices (
         invoice_number, invoice_date, customer_name, customer_id, bill_to, ship_to,
         payment_term, terms_of_delivery, customer_po_no, part_name, no_of_pallet, no_of_box,
         qty_per_box, total_qty, unit_price, total_amount, vat_rate, vat_amount, grand_total, currency,
-        hts_code, image_url, notes
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        hts_code, image_url, notes, items
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
 
     const info = stmt.run(
@@ -835,9 +880,9 @@ app.post('/api/invoices', (req, res) => {
       ship_to || '',
       payment_term || '',
       terms_of_delivery || '',
-      customer_po_no || '',
-      part_name || '',
-      Number(no_of_pallet) || 0,
+      finalPoNo,
+      finalPartName,
+      numPallets,
       numBoxes,
       numQtyPerBox,
       computedTotalQty,
@@ -849,7 +894,8 @@ app.post('/api/invoices', (req, res) => {
       currency || 'USD',
       hts_code || '',
       image_url || '',
-      notes || ''
+      notes || '',
+      itemsJson
     );
 
     const refId = info.lastInsertRowid;
@@ -858,9 +904,9 @@ app.post('/api/invoices', (req, res) => {
     const loggerStmt = db.prepare(`
       INSERT INTO data_logger (
         doc_type, doc_number, doc_date, customer_name, customer_id, po_no,
-        part_name, box_qty, pallet_qty, terms_of_delivery, payment_term, dimensions, image_url, notes, ref_id,
+        part_name, box_qty, pallet_qty, terms_of_delivery, payment_term, dimensions, image_url, notes, items, ref_id,
         grand_total, unit_price, currency
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
     loggerStmt.run(
       'INVOICE',
@@ -868,15 +914,16 @@ app.post('/api/invoices', (req, res) => {
       invoice_date || new Date().toISOString().slice(0, 10),
       customer_name || '',
       customer_id || '',
-      customer_po_no || '',
-      part_name || '',
+      finalPoNo,
+      finalPartName,
       numBoxes,
-      Number(no_of_pallet) || 0,
+      numPallets,
       terms_of_delivery || '',
       payment_term || '',
       null,
       image_url || '',
       notes || '',
+      itemsJson,
       refId,
       computedGrandTotal,
       numUnitPrice,
@@ -915,17 +962,57 @@ app.put('/api/invoices/:id', (req, res) => {
       grand_total,
       currency,
       hts_code,
-      notes
+      notes,
+      items
     } = req.body;
 
-    const numBoxes = Number(no_of_box) || 0;
-    const numQtyPerBox = Number(qty_per_box) || 0;
-    const computedTotalQty = Number(total_qty) || (numBoxes * numQtyPerBox);
-    const numUnitPrice = Number(unit_price) || 0;
-    const computedTotalAmount = Number(total_amount) || (computedTotalQty * numUnitPrice);
+    let parsedItems = null;
+    if (Array.isArray(items) && items.length > 0) {
+      parsedItems = items;
+    } else if (typeof items === 'string' && items.trim().startsWith('[')) {
+      try {
+        parsedItems = JSON.parse(items);
+      } catch (e) {
+        parsedItems = null;
+      }
+    }
+
+    let finalPartName = part_name || '';
+    let finalPoNo = customer_po_no || '';
+    let numPallets = Number(no_of_pallet) || 0;
+    let numBoxes = Number(no_of_box) || 0;
+    let numQtyPerBox = Number(qty_per_box) || 0;
+    let computedTotalQty = Number(total_qty) || 0;
+    let numUnitPrice = Number(unit_price) || 0;
+    let computedTotalAmount = Number(total_amount) || 0;
     const numVatRate = vat_rate !== undefined ? Number(vat_rate) : 11;
+
+    if (parsedItems && parsedItems.length > 0) {
+      numPallets = parsedItems.reduce((acc, it) => acc + (Number(it.no_of_pallet) || 0), 0);
+      numBoxes = parsedItems.reduce((acc, it) => acc + (Number(it.no_of_box) || 0), 0);
+      computedTotalQty = parsedItems.reduce((acc, it) => {
+        const itemBoxes = Number(it.no_of_box) || 0;
+        const itemPerBox = Number(it.qty_per_box) || 0;
+        return acc + (Number(it.total_qty) || (itemBoxes * itemPerBox));
+      }, 0);
+      computedTotalAmount = parsedItems.reduce((acc, it) => acc + (Number(it.total_amount) || 0), 0);
+      
+      finalPartName = parsedItems.length === 1
+        ? (parsedItems[0].part_name || '')
+        : `${parsedItems.length} Items: ${parsedItems.map(i => i.part_name).filter(Boolean).slice(0, 3).join(', ')}${parsedItems.length > 3 ? '...' : ''}`;
+      
+      const distinctPo = [...new Set(parsedItems.map(i => i.customer_po_no).filter(Boolean))];
+      if (distinctPo.length > 0) {
+        finalPoNo = distinctPo.join(', ');
+      }
+    } else {
+      computedTotalQty = computedTotalQty || (numBoxes * numQtyPerBox);
+      computedTotalAmount = computedTotalAmount || (computedTotalQty * numUnitPrice);
+    }
+
     const computedVatAmount = Number(vat_amount) || (computedTotalAmount * (numVatRate / 100));
     const computedGrandTotal = Number(grand_total) || (computedTotalAmount + computedVatAmount);
+    const itemsJson = parsedItems ? JSON.stringify(parsedItems) : null;
 
     db.prepare(`
       UPDATE invoices
@@ -933,7 +1020,7 @@ app.put('/api/invoices/:id', (req, res) => {
           bill_to = ?, ship_to = ?, payment_term = ?, terms_of_delivery = ?, customer_po_no = ?, part_name = ?,
           no_of_pallet = ?, no_of_box = ?, qty_per_box = ?, total_qty = ?, unit_price = ?,
           total_amount = ?, vat_rate = ?, vat_amount = ?, grand_total = ?, currency = ?,
-          hts_code = ?, notes = ?
+          hts_code = ?, notes = ?, items = ?
       WHERE id = ?
     `).run(
       invoice_number || '',
@@ -944,9 +1031,9 @@ app.put('/api/invoices/:id', (req, res) => {
       ship_to || '',
       payment_term || '',
       terms_of_delivery || '',
-      customer_po_no || '',
-      part_name || '',
-      Number(no_of_pallet) || 0,
+      finalPoNo,
+      finalPartName,
+      numPallets,
       numBoxes,
       numQtyPerBox,
       computedTotalQty,
@@ -958,6 +1045,7 @@ app.put('/api/invoices/:id', (req, res) => {
       currency || 'USD',
       hts_code || '',
       notes || '',
+      itemsJson,
       req.params.id
     );
 
@@ -966,7 +1054,7 @@ app.put('/api/invoices/:id', (req, res) => {
       UPDATE data_logger
       SET doc_number = ?, doc_date = ?, customer_name = ?, customer_id = ?,
           po_no = ?, part_name = ?, box_qty = ?, pallet_qty = ?,
-          terms_of_delivery = ?, payment_term = ?, notes = ?,
+          terms_of_delivery = ?, payment_term = ?, notes = ?, items = ?,
           grand_total = ?, unit_price = ?, currency = ?
       WHERE doc_type = 'INVOICE' AND ref_id = ?
     `).run(
@@ -974,13 +1062,14 @@ app.put('/api/invoices/:id', (req, res) => {
       invoice_date || '',
       customer_name || '',
       customer_id || '',
-      customer_po_no || '',
-      part_name || '',
+      finalPoNo,
+      finalPartName,
       numBoxes,
-      Number(no_of_pallet) || 0,
+      numPallets,
       terms_of_delivery || '',
       payment_term || '',
       notes || '',
+      itemsJson,
       computedGrandTotal,
       numUnitPrice,
       currency || 'USD',
@@ -1032,32 +1121,66 @@ app.post('/api/packing-lists', (req, res) => {
       height,
       unit_note,
       image_url,
-      notes
+      notes,
+      items
     } = req.body;
+
+    let parsedItems = null;
+    if (Array.isArray(items) && items.length > 0) {
+      parsedItems = items;
+    } else if (typeof items === 'string' && items.trim().startsWith('[')) {
+      try {
+        parsedItems = JSON.parse(items);
+      } catch (e) {
+        parsedItems = null;
+      }
+    }
+
+    let finalPartName = part_name || '';
+    let finalPoNo = customer_po_no || '';
+    let numBoxes = Number(box_qty) || 0;
+    let numPallets = Number(pallet_qty) || 0;
+
+    if (parsedItems && parsedItems.length > 0) {
+      numBoxes = parsedItems.reduce((acc, it) => acc + (Number(it.no_of_box) || Number(it.box_qty) || 0), 0) || numBoxes;
+      numPallets = parsedItems.reduce((acc, it) => acc + (Number(it.no_of_pallet) || Number(it.pallet_qty) || 0), 0) || numPallets;
+      if (!part_name) {
+        finalPartName = parsedItems.length === 1
+          ? (parsedItems[0].part_name || '')
+          : `${parsedItems.length} Items: ${parsedItems.map(i => i.part_name).filter(Boolean).slice(0, 3).join(', ')}${parsedItems.length > 3 ? '...' : ''}`;
+      }
+      if (!customer_po_no) {
+        const distinctPo = [...new Set(parsedItems.map(i => i.customer_po_no || i.po_no).filter(Boolean))];
+        if (distinctPo.length > 0) finalPoNo = distinctPo.join(', ');
+      }
+    }
+
+    const itemsJson = parsedItems ? JSON.stringify(parsedItems) : null;
 
     const stmt = db.prepare(`
       INSERT INTO packing_lists (
         invoice_number, invoice_date, customer_name, customer_po_no, part_name,
         terms_of_delivery, box_qty, pallet_qty, length, width, height,
-        unit_note, image_url, notes
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        unit_note, image_url, notes, items
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
 
     const info = stmt.run(
       invoice_number || '',
       invoice_date || new Date().toISOString().slice(0, 10),
       customer_name || '',
-      customer_po_no || '',
-      part_name || '',
+      finalPoNo,
+      finalPartName,
       terms_of_delivery || '',
-      Number(box_qty) || 0,
-      Number(pallet_qty) || 0,
+      numBoxes,
+      numPallets,
       Number(length) || 0,
       Number(width) || 0,
       Number(height) || 0,
       unit_note || 'mm',
       image_url || '',
-      notes || ''
+      notes || '',
+      itemsJson
     );
 
     const refId = info.lastInsertRowid;
@@ -1070,8 +1193,8 @@ app.post('/api/packing-lists', (req, res) => {
     const loggerStmt = db.prepare(`
       INSERT INTO data_logger (
         doc_type, doc_number, doc_date, customer_name, customer_id, po_no,
-        part_name, box_qty, pallet_qty, terms_of_delivery, payment_term, dimensions, image_url, notes, ref_id
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        part_name, box_qty, pallet_qty, terms_of_delivery, payment_term, dimensions, image_url, notes, items, ref_id
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
     loggerStmt.run(
       'PACKING_LIST',
@@ -1079,15 +1202,16 @@ app.post('/api/packing-lists', (req, res) => {
       invoice_date || new Date().toISOString().slice(0, 10),
       customer_name || '',
       null,
-      customer_po_no || '',
-      part_name || '',
-      Number(box_qty) || 0,
-      Number(pallet_qty) || 0,
+      finalPoNo,
+      finalPartName,
+      numBoxes,
+      numPallets,
       terms_of_delivery || '',
       null,
       dimStr,
       image_url || '',
       notes || '',
+      itemsJson,
       refId
     );
 
@@ -1114,29 +1238,63 @@ app.put('/api/packing-lists/:id', (req, res) => {
       width,
       height,
       unit_note,
-      notes
+      notes,
+      items
     } = req.body;
+
+    let parsedItems = null;
+    if (Array.isArray(items) && items.length > 0) {
+      parsedItems = items;
+    } else if (typeof items === 'string' && items.trim().startsWith('[')) {
+      try {
+        parsedItems = JSON.parse(items);
+      } catch (e) {
+        parsedItems = null;
+      }
+    }
+
+    let finalPartName = part_name || '';
+    let finalPoNo = customer_po_no || '';
+    let numBoxes = Number(box_qty) || 0;
+    let numPallets = Number(pallet_qty) || 0;
+
+    if (parsedItems && parsedItems.length > 0) {
+      numBoxes = parsedItems.reduce((acc, it) => acc + (Number(it.no_of_box) || Number(it.box_qty) || 0), 0) || numBoxes;
+      numPallets = parsedItems.reduce((acc, it) => acc + (Number(it.no_of_pallet) || Number(it.pallet_qty) || 0), 0) || numPallets;
+      if (!part_name) {
+        finalPartName = parsedItems.length === 1
+          ? (parsedItems[0].part_name || '')
+          : `${parsedItems.length} Items: ${parsedItems.map(i => i.part_name).filter(Boolean).slice(0, 3).join(', ')}${parsedItems.length > 3 ? '...' : ''}`;
+      }
+      if (!customer_po_no) {
+        const distinctPo = [...new Set(parsedItems.map(i => i.customer_po_no || i.po_no).filter(Boolean))];
+        if (distinctPo.length > 0) finalPoNo = distinctPo.join(', ');
+      }
+    }
+
+    const itemsJson = parsedItems ? JSON.stringify(parsedItems) : null;
 
     db.prepare(`
       UPDATE packing_lists
       SET invoice_number = ?, invoice_date = ?, customer_name = ?, customer_po_no = ?,
           part_name = ?, terms_of_delivery = ?, box_qty = ?, pallet_qty = ?,
-          length = ?, width = ?, height = ?, unit_note = ?, notes = ?
+          length = ?, width = ?, height = ?, unit_note = ?, notes = ?, items = ?
       WHERE id = ?
     `).run(
       invoice_number || '',
       invoice_date || '',
       customer_name || '',
-      customer_po_no || '',
-      part_name || '',
+      finalPoNo,
+      finalPartName,
       terms_of_delivery || '',
-      Number(box_qty) || 0,
-      Number(pallet_qty) || 0,
+      numBoxes,
+      numPallets,
       Number(length) || 0,
       Number(width) || 0,
       Number(height) || 0,
       unit_note || 'mm',
       notes || '',
+      itemsJson,
       req.params.id
     );
 
@@ -1149,19 +1307,20 @@ app.put('/api/packing-lists/:id', (req, res) => {
       UPDATE data_logger
       SET doc_number = ?, doc_date = ?, customer_name = ?,
           po_no = ?, part_name = ?, box_qty = ?, pallet_qty = ?,
-          terms_of_delivery = ?, dimensions = ?, notes = ?
+          terms_of_delivery = ?, dimensions = ?, notes = ?, items = ?
       WHERE doc_type = 'PACKING_LIST' AND ref_id = ?
     `).run(
       invoice_number || '',
       invoice_date || '',
       customer_name || '',
-      customer_po_no || '',
-      part_name || '',
-      Number(box_qty) || 0,
-      Number(pallet_qty) || 0,
+      finalPoNo,
+      finalPartName,
+      numBoxes,
+      numPallets,
       terms_of_delivery || '',
       dimStr,
       notes || '',
+      itemsJson,
       req.params.id
     );
 
@@ -1206,14 +1365,47 @@ app.post('/api/delivery-orders', (req, res) => {
       part_name,
       pallet_qty,
       box_qty,
-      notes
+      notes,
+      items
     } = req.body;
+
+    let parsedItems = null;
+    if (Array.isArray(items) && items.length > 0) {
+      parsedItems = items;
+    } else if (typeof items === 'string' && items.trim().startsWith('[')) {
+      try {
+        parsedItems = JSON.parse(items);
+      } catch (e) {
+        parsedItems = null;
+      }
+    }
+
+    let finalPartName = part_name || '';
+    let finalPoNo = customer_po_no || '';
+    let numBoxes = Number(box_qty) || 0;
+    let numPallets = Number(pallet_qty) || 0;
+
+    if (parsedItems && parsedItems.length > 0) {
+      numBoxes = parsedItems.reduce((acc, it) => acc + (Number(it.no_of_box) || Number(it.box_qty) || 0), 0) || numBoxes;
+      numPallets = parsedItems.reduce((acc, it) => acc + (Number(it.no_of_pallet) || Number(it.pallet_qty) || 0), 0) || numPallets;
+      if (!part_name) {
+        finalPartName = parsedItems.length === 1
+          ? (parsedItems[0].part_name || '')
+          : `${parsedItems.length} Items: ${parsedItems.map(i => i.part_name).filter(Boolean).slice(0, 3).join(', ')}${parsedItems.length > 3 ? '...' : ''}`;
+      }
+      if (!customer_po_no) {
+        const distinctPo = [...new Set(parsedItems.map(i => i.customer_po_no || i.po_no).filter(Boolean))];
+        if (distinctPo.length > 0) finalPoNo = distinctPo.join(', ');
+      }
+    }
+
+    const itemsJson = parsedItems ? JSON.stringify(parsedItems) : null;
 
     const stmt = db.prepare(`
       INSERT INTO delivery_orders (
         do_number, do_date, invoice_number, customer_name, customer_id,
-        customer_po_no, part_name, pallet_qty, box_qty, notes
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        customer_po_no, part_name, pallet_qty, box_qty, notes, items
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
 
     const info = stmt.run(
@@ -1222,11 +1414,12 @@ app.post('/api/delivery-orders', (req, res) => {
       invoice_number || '',
       customer_name || '',
       customer_id || '',
-      customer_po_no || '',
-      part_name || '',
-      Number(pallet_qty) || 0,
-      Number(box_qty) || 0,
-      notes || ''
+      finalPoNo,
+      finalPartName,
+      numPallets,
+      numBoxes,
+      notes || '',
+      itemsJson
     );
 
     const refId = info.lastInsertRowid;
@@ -1235,8 +1428,8 @@ app.post('/api/delivery-orders', (req, res) => {
     const loggerStmt = db.prepare(`
       INSERT INTO data_logger (
         doc_type, doc_number, doc_date, customer_name, customer_id, po_no,
-        part_name, box_qty, pallet_qty, terms_of_delivery, payment_term, dimensions, image_url, notes, ref_id
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        part_name, box_qty, pallet_qty, terms_of_delivery, payment_term, dimensions, image_url, notes, items, ref_id
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
     loggerStmt.run(
       'DELIVERY_ORDER',
@@ -1244,15 +1437,16 @@ app.post('/api/delivery-orders', (req, res) => {
       do_date || new Date().toISOString().slice(0, 10),
       customer_name || '',
       customer_id || '',
-      customer_po_no || '',
-      part_name || '',
-      Number(box_qty) || 0,
-      Number(pallet_qty) || 0,
+      finalPoNo,
+      finalPartName,
+      numBoxes,
+      numPallets,
       invoice_number ? `Ref Inv: ${invoice_number}` : '',
       null,
       null,
       null,
       notes || '',
+      itemsJson,
       refId
     );
 
@@ -1276,14 +1470,47 @@ app.put('/api/delivery-orders/:id', (req, res) => {
       part_name,
       pallet_qty,
       box_qty,
-      notes
+      notes,
+      items
     } = req.body;
+
+    let parsedItems = null;
+    if (Array.isArray(items) && items.length > 0) {
+      parsedItems = items;
+    } else if (typeof items === 'string' && items.trim().startsWith('[')) {
+      try {
+        parsedItems = JSON.parse(items);
+      } catch (e) {
+        parsedItems = null;
+      }
+    }
+
+    let finalPartName = part_name || '';
+    let finalPoNo = customer_po_no || '';
+    let numBoxes = Number(box_qty) || 0;
+    let numPallets = Number(pallet_qty) || 0;
+
+    if (parsedItems && parsedItems.length > 0) {
+      numBoxes = parsedItems.reduce((acc, it) => acc + (Number(it.no_of_box) || Number(it.box_qty) || 0), 0) || numBoxes;
+      numPallets = parsedItems.reduce((acc, it) => acc + (Number(it.no_of_pallet) || Number(it.pallet_qty) || 0), 0) || numPallets;
+      if (!part_name) {
+        finalPartName = parsedItems.length === 1
+          ? (parsedItems[0].part_name || '')
+          : `${parsedItems.length} Items: ${parsedItems.map(i => i.part_name).filter(Boolean).slice(0, 3).join(', ')}${parsedItems.length > 3 ? '...' : ''}`;
+      }
+      if (!customer_po_no) {
+        const distinctPo = [...new Set(parsedItems.map(i => i.customer_po_no || i.po_no).filter(Boolean))];
+        if (distinctPo.length > 0) finalPoNo = distinctPo.join(', ');
+      }
+    }
+
+    const itemsJson = parsedItems ? JSON.stringify(parsedItems) : null;
 
     db.prepare(`
       UPDATE delivery_orders
       SET do_number = ?, do_date = ?, invoice_number = ?, customer_name = ?,
           customer_id = ?, customer_po_no = ?, part_name = ?, pallet_qty = ?,
-          box_qty = ?, notes = ?
+          box_qty = ?, notes = ?, items = ?
       WHERE id = ?
     `).run(
       do_number || '',
@@ -1291,11 +1518,12 @@ app.put('/api/delivery-orders/:id', (req, res) => {
       invoice_number || '',
       customer_name || '',
       customer_id || '',
-      customer_po_no || '',
-      part_name || '',
-      Number(pallet_qty) || 0,
-      Number(box_qty) || 0,
+      finalPoNo,
+      finalPartName,
+      numPallets,
+      numBoxes,
       notes || '',
+      itemsJson,
       req.params.id
     );
 
@@ -1304,19 +1532,20 @@ app.put('/api/delivery-orders/:id', (req, res) => {
       UPDATE data_logger
       SET doc_number = ?, doc_date = ?, customer_name = ?, customer_id = ?,
           po_no = ?, part_name = ?, box_qty = ?, pallet_qty = ?,
-          terms_of_delivery = ?, notes = ?
+          terms_of_delivery = ?, notes = ?, items = ?
       WHERE doc_type = 'DELIVERY_ORDER' AND ref_id = ?
     `).run(
       do_number || '',
       do_date || '',
       customer_name || '',
       customer_id || '',
-      customer_po_no || '',
-      part_name || '',
-      Number(box_qty) || 0,
-      Number(pallet_qty) || 0,
+      finalPoNo,
+      finalPartName,
+      numBoxes,
+      numPallets,
       invoice_number ? `Ref Inv: ${invoice_number}` : '',
       notes || '',
+      itemsJson,
       req.params.id
     );
 

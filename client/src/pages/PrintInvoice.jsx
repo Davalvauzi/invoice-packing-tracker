@@ -62,12 +62,32 @@ export default function PrintInvoice({ id, onBack }) {
     );
   }
 
+  // Multi-item parsing
+  const items = Array.isArray(invoice.items)
+    ? invoice.items
+    : (typeof invoice.items === 'string' && invoice.items.trim().startsWith('[')
+        ? (() => { try { return JSON.parse(invoice.items); } catch (e) { return null; } })()
+        : null);
+
+  const hasMultipleItems = items && items.length > 0;
+
   // Quantities & Calculations
-  const boxQty = Number(invoice.no_of_box) || 0;
+  const boxQty = hasMultipleItems
+    ? items.reduce((sum, it) => sum + (Number(it.no_of_box) || 0), 0)
+    : (Number(invoice.no_of_box) || 0);
+
   const qtyPerBox = Number(invoice.qty_per_box) || 0;
-  const totalQty = Number(invoice.total_qty) || (boxQty > 0 && qtyPerBox > 0 ? boxQty * qtyPerBox : boxQty);
-  const unitPrice = Number(invoice.unit_price) || 0;
-  const totalAmount = Number(invoice.total_amount) || (unitPrice > 0 && totalQty > 0 ? totalQty * unitPrice : 0);
+
+  const totalQty = hasMultipleItems
+    ? items.reduce((sum, it) => sum + (Number(it.total_qty) || ((Number(it.no_of_box) || 0) * (Number(it.qty_per_box) || 0))), 0)
+    : (Number(invoice.total_qty) || (boxQty > 0 && qtyPerBox > 0 ? boxQty * qtyPerBox : boxQty));
+
+  const unitPrice = Number(invoice.unit_price) || (hasMultipleItems ? Number(items[0]?.unit_price) || 0 : 0);
+
+  const totalAmount = hasMultipleItems
+    ? items.reduce((sum, it) => sum + (Number(it.total_amount) || 0), 0)
+    : (Number(invoice.total_amount) || (unitPrice > 0 && totalQty > 0 ? totalQty * unitPrice : 0));
+
   const vatAmount = Number(invoice.vat_amount) || (totalAmount * 0.11);
   const grandTotal = Number(invoice.grand_total) || (totalAmount + vatAmount);
 
@@ -362,42 +382,87 @@ export default function PrintInvoice({ id, onBack }) {
 
             {/* Table Body */}
             <tbody>
-              {/* Product Row 1 */}
-              <tr className="align-top">
-                <td className="pt-1.5 px-0.5 text-center font-mono">1</td>
-                <td className="pt-1.5 px-1 text-left">
-                  <div className="font-normal">{invoice.part_name || ''}</div>
-                  {invoice.part_no && (
-                    <div className="text-[7pt] font-mono text-black">
-                      {invoice.part_no}
-                    </div>
-                  )}
-                </td>
-                <td className="pt-1.5 px-0.5 text-center font-mono">
-                  {invoice.customer_po_no || ''}
-                </td>
-                <td className="pt-1.5 px-0.5 text-center font-mono">
-                  {invoice.no_of_pallet || ''}
-                </td>
-                <td className="pt-1.5 px-0.5 text-center font-mono">
-                  {invoice.no_of_box || ''}
-                </td>
-                <td className="pt-1.5 px-0.5 text-center font-mono">
-                  {invoice.qty_per_box ? formatMoney(invoice.qty_per_box, 0) : ''}
-                </td>
-                <td className="pt-1.5 px-0.5 text-center font-mono">
-                  {totalQty ? formatMoney(totalQty, 0) : ''}
-                </td>
-                <td className="pt-1.5 px-0.5 text-right font-mono">
-                  {unitPrice > 0 ? formatMoney(unitPrice, 4) : ''}
-                </td>
-                <td className="pt-1.5 px-0.5 text-right font-mono">
-                  {totalAmount > 0 ? formatMoney(totalAmount, 2) : ''}
-                </td>
-              </tr>
+              {hasMultipleItems ? (
+                items.map((item, idx) => {
+                  const itemBox = Number(item.no_of_box) || 0;
+                  const itemQtyPerBox = Number(item.qty_per_box) || 0;
+                  const itemTotalQty = Number(item.total_qty) || (itemBox * itemQtyPerBox) || 0;
+                  const itemPrice = Number(item.unit_price) || 0;
+                  const itemAmount = Number(item.total_amount) || (itemTotalQty * itemPrice) || 0;
+
+                  return (
+                    <tr key={idx} className="align-top border-b border-slate-200/50">
+                      <td className="pt-1.5 pb-1 px-0.5 text-center font-mono">{idx + 1}</td>
+                      <td className="pt-1.5 pb-1 px-1 text-left">
+                        <div className="font-normal">{item.part_name || ''}</div>
+                        {item.part_no && (
+                          <div className="text-[7pt] font-mono text-black">
+                            {item.part_no}
+                          </div>
+                        )}
+                      </td>
+                      <td className="pt-1.5 pb-1 px-0.5 text-center font-mono">
+                        {item.customer_po_no || invoice.customer_po_no || ''}
+                      </td>
+                      <td className="pt-1.5 pb-1 px-0.5 text-center font-mono">
+                        {item.no_of_pallet || ''}
+                      </td>
+                      <td className="pt-1.5 pb-1 px-0.5 text-center font-mono">
+                        {item.no_of_box || ''}
+                      </td>
+                      <td className="pt-1.5 pb-1 px-0.5 text-center font-mono">
+                        {itemQtyPerBox > 0 ? formatMoney(itemQtyPerBox, 0) : ''}
+                      </td>
+                      <td className="pt-1.5 pb-1 px-0.5 text-center font-mono">
+                        {itemTotalQty > 0 ? formatMoney(itemTotalQty, 0) : ''}
+                      </td>
+                      <td className="pt-1.5 pb-1 px-0.5 text-right font-mono">
+                        {itemPrice > 0 ? formatMoney(itemPrice, 4) : ''}
+                      </td>
+                      <td className="pt-1.5 pb-1 px-0.5 text-right font-mono">
+                        {itemAmount > 0 ? formatMoney(itemAmount, 2) : ''}
+                      </td>
+                    </tr>
+                  );
+                })
+              ) : (
+                /* Legacy Single Item Fallback */
+                <tr className="align-top">
+                  <td className="pt-1.5 px-0.5 text-center font-mono">1</td>
+                  <td className="pt-1.5 px-1 text-left">
+                    <div className="font-normal">{invoice.part_name || ''}</div>
+                    {invoice.part_no && (
+                      <div className="text-[7pt] font-mono text-black">
+                        {invoice.part_no}
+                      </div>
+                    )}
+                  </td>
+                  <td className="pt-1.5 px-0.5 text-center font-mono">
+                    {invoice.customer_po_no || ''}
+                  </td>
+                  <td className="pt-1.5 px-0.5 text-center font-mono">
+                    {invoice.no_of_pallet || ''}
+                  </td>
+                  <td className="pt-1.5 px-0.5 text-center font-mono">
+                    {invoice.no_of_box || ''}
+                  </td>
+                  <td className="pt-1.5 px-0.5 text-center font-mono">
+                    {invoice.qty_per_box ? formatMoney(invoice.qty_per_box, 0) : ''}
+                  </td>
+                  <td className="pt-1.5 px-0.5 text-center font-mono">
+                    {totalQty ? formatMoney(totalQty, 0) : ''}
+                  </td>
+                  <td className="pt-1.5 px-0.5 text-right font-mono">
+                    {unitPrice > 0 ? formatMoney(unitPrice, 4) : ''}
+                  </td>
+                  <td className="pt-1.5 px-0.5 text-right font-mono">
+                    {totalAmount > 0 ? formatMoney(totalAmount, 2) : ''}
+                  </td>
+                </tr>
+              )}
 
               {/* Natural empty space */}
-              <tr style={{ height: '70px' }}>
+              <tr style={{ height: `${Math.max(15, 70 - (hasMultipleItems ? (items.length - 1) * 22 : 0))}px` }}>
                 <td colSpan={9}></td>
               </tr>
             </tbody>

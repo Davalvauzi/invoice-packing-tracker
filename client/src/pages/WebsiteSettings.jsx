@@ -62,8 +62,14 @@ export default function WebsiteSettings({ refreshTrigger }) {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
-  const [activeTab, setActiveTab] = useState('company');
+  const [activeTab, setActiveTab] = useState(() => {
+    return sessionStorage.getItem('docutrack_settings_tab') || 'company';
+  });
   const [uploadingField, setUploadingField] = useState(null);
+
+  useEffect(() => {
+    sessionStorage.setItem('docutrack_settings_tab', activeTab);
+  }, [activeTab]);
 
   useEffect(() => {
     fetchSettings();

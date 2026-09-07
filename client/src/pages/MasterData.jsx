@@ -25,7 +25,13 @@ import { useNotification } from '../context/NotificationContext';
 
 export default function MasterData({ setActiveView }) {
   const { showSuccess, showError, showWarning, confirmDialog } = useNotification();
-  const [activeTab, setActiveTab] = useState('customers'); // 'customers' | 'payment' | 'delivery' | 'parts'
+  const [activeTab, setActiveTab] = useState(() => {
+    return sessionStorage.getItem('docutrack_master_tab') || 'customers';
+  }); // 'customers' | 'payment' | 'delivery' | 'parts'
+
+  useEffect(() => {
+    sessionStorage.setItem('docutrack_master_tab', activeTab);
+  }, [activeTab]);
   
   // Data States
   const [customers, setCustomers] = useState([]);

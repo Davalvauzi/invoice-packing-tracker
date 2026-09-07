@@ -12,8 +12,14 @@ import DeliveryOrderModal from './components/DeliveryOrderModal';
 import { NotificationProvider } from './context/NotificationContext';
 
 function AppContent() {
-  const [activeView, setActiveView] = useState('dashboard');
+  const [activeView, setActiveView] = useState(() => {
+    return sessionStorage.getItem('docutrack_active_view') || 'dashboard';
+  });
   const [printDoc, setPrintDoc] = useState(null);
+
+  useEffect(() => {
+    sessionStorage.setItem('docutrack_active_view', activeView);
+  }, [activeView]);
 
   // Modal Overlay States
   const [isInvoiceModalOpen, setIsInvoiceModalOpen] = useState(false);

@@ -12,8 +12,10 @@ import {
   Copy
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
+import { useNotification } from '../context/NotificationContext';
 
 export default function PackingListForm({ setActiveView, openPrintTab }) {
+  const { showSuccess, showError, showWarning } = useNotification();
   const [customers, setCustomers] = useState([]);
   const [deliveryTerms, setDeliveryTerms] = useState([]);
   const [parts, setParts] = useState([]);
@@ -128,11 +130,11 @@ export default function PackingListForm({ setActiveView, openPrintTab }) {
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!formData.invoice_number.trim()) {
-      alert('Mohon isi INVOICE NUMBER');
+      showWarning('Mohon isi INVOICE NUMBER');
       return;
     }
     if (!formData.customer_name.trim()) {
-      alert('Mohon pilih CUSTOMER NAME');
+      showWarning('Mohon pilih CUSTOMER NAME');
       return;
     }
 
@@ -169,6 +171,7 @@ export default function PackingListForm({ setActiveView, openPrintTab }) {
 
       const savedData = await postRes.json();
       setSubmittedDoc(savedData);
+      showSuccess('Packing List berhasil dibuat dan disimpan!');
 
       // Trigger Confetti
       confetti({
@@ -181,7 +184,7 @@ export default function PackingListForm({ setActiveView, openPrintTab }) {
       openPrintTab('print-packing-list', savedData.id);
 
     } catch (err) {
-      alert('Terjadi kesalahan: ' + err.message);
+      showError('Terjadi kesalahan: ' + err.message);
     } finally {
       setIsSubmitting(false);
     }

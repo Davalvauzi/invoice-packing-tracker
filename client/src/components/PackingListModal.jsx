@@ -9,8 +9,10 @@ import {
   Copy
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
+import { useNotification } from '../context/NotificationContext';
 
 export default function PackingListModal({ isOpen, onClose, openPrintTab, onSuccess }) {
+  const { showSuccess, showError, showWarning } = useNotification();
   const [customers, setCustomers] = useState([]);
   const [deliveryTerms, setDeliveryTerms] = useState([]);
   const [parts, setParts] = useState([]);
@@ -127,11 +129,11 @@ export default function PackingListModal({ isOpen, onClose, openPrintTab, onSucc
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!formData.invoice_number.trim()) {
-      alert('Mohon isi INVOICE NUMBER');
+      showWarning('Mohon isi INVOICE NUMBER');
       return;
     }
     if (!formData.customer_name.trim()) {
-      alert('Mohon pilih CUSTOMER NAME');
+      showWarning('Mohon pilih CUSTOMER NAME');
       return;
     }
 
@@ -149,6 +151,7 @@ export default function PackingListModal({ isOpen, onClose, openPrintTab, onSucc
 
       const savedData = await postRes.json();
       setSubmittedDoc(savedData);
+      showSuccess('Packing List berhasil dibuat dan disimpan!');
 
       confetti({
         particleCount: 80,
@@ -163,7 +166,7 @@ export default function PackingListModal({ isOpen, onClose, openPrintTab, onSucc
       }
 
     } catch (err) {
-      alert('Terjadi kesalahan: ' + err.message);
+      showError('Terjadi kesalahan: ' + err.message);
     } finally {
       setIsSubmitting(false);
     }
@@ -187,6 +190,18 @@ export default function PackingListModal({ isOpen, onClose, openPrintTab, onSucc
       notes: ''
     });
   };
+
+  // Handle ESC key to close modal
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape') {
+        onClose();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, onClose]);
 
   if (!isOpen) return null;
 

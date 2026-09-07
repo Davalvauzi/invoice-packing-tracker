@@ -8,8 +8,10 @@ import {
   Link as LinkIcon
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
+import { useNotification } from '../context/NotificationContext';
 
 export default function DeliveryOrderModal({ isOpen, onClose, onSuccess }) {
+  const { showSuccess, showError, showWarning } = useNotification();
   const [customers, setCustomers] = useState([]);
   const [parts, setParts] = useState([]);
   const [recentInvoices, setRecentInvoices] = useState([]);
@@ -111,11 +113,11 @@ export default function DeliveryOrderModal({ isOpen, onClose, onSuccess }) {
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!formData.do_number.trim()) {
-      alert('Mohon isi DELIVERY ORDER NUMBER');
+      showWarning('Mohon isi DELIVERY ORDER NUMBER');
       return;
     }
     if (!formData.customer_name.trim()) {
-      alert('Mohon pilih CUSTOMER NAME');
+      showWarning('Mohon pilih CUSTOMER NAME');
       return;
     }
 
@@ -133,6 +135,7 @@ export default function DeliveryOrderModal({ isOpen, onClose, onSuccess }) {
 
       const savedData = await postRes.json();
       setSubmittedDoc(savedData);
+      showSuccess('Delivery Order berhasil dibuat dan disimpan!');
 
       confetti({
         particleCount: 80,
@@ -145,7 +148,7 @@ export default function DeliveryOrderModal({ isOpen, onClose, onSuccess }) {
       }
 
     } catch (err) {
-      alert('Terjadi kesalahan: ' + err.message);
+      showError('Terjadi kesalahan: ' + err.message);
     } finally {
       setIsSubmitting(false);
     }
@@ -166,6 +169,18 @@ export default function DeliveryOrderModal({ isOpen, onClose, onSuccess }) {
       notes: ''
     });
   };
+
+  // Handle ESC key to close modal
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape') {
+        onClose();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, onClose]);
 
   if (!isOpen) return null;
 

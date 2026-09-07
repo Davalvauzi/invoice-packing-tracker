@@ -3,13 +3,15 @@ import Navbar from './components/Navbar';
 import Dashboard from './pages/Dashboard';
 import DataLogger from './pages/DataLogger';
 import MasterData from './pages/MasterData';
+import WebsiteSettings from './pages/WebsiteSettings';
 import PrintInvoice from './pages/PrintInvoice';
 import PrintPackingList from './pages/PrintPackingList';
 import InvoiceModal from './components/InvoiceModal';
 import PackingListModal from './components/PackingListModal';
 import DeliveryOrderModal from './components/DeliveryOrderModal';
+import { NotificationProvider } from './context/NotificationContext';
 
-export default function App() {
+function AppContent() {
   const [activeView, setActiveView] = useState('dashboard');
   const [printDoc, setPrintDoc] = useState(null);
 
@@ -109,6 +111,12 @@ export default function App() {
             setActiveView={setActiveView} 
           />
         )}
+
+        {activeView === 'website-settings' && (
+          <WebsiteSettings 
+            setActiveView={setActiveView} 
+          />
+        )}
       </main>
 
       {/* Global Invoice Form Modal */}
@@ -140,5 +148,13 @@ export default function App() {
       </footer>
 
     </div>
+  );
+}
+
+export default function App() {
+  return (
+    <NotificationProvider>
+      <AppContent />
+    </NotificationProvider>
   );
 }

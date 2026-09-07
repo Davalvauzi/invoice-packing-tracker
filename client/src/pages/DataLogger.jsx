@@ -25,6 +25,7 @@ import {
   List,
   CornerDownRight
 } from 'lucide-react';
+import { useNotification } from '../context/NotificationContext';
 
 export default function DataLogger({ 
   openPrintTab, 
@@ -33,6 +34,7 @@ export default function DataLogger({
   onOpenDeliveryOrderModal,
   refreshTrigger 
 }) {
+  const { showSuccess, showError, showWarning, confirmDialog } = useNotification();
   const [logs, setLogs] = useState([]);
   const [customers, setCustomers] = useState([]);
   const [deliveryTerms, setDeliveryTerms] = useState([]);
@@ -167,11 +169,11 @@ export default function DataLogger({
   const handleSaveEdit = async (e) => {
     e.preventDefault();
     if (!editForm.doc_number?.trim()) {
-      alert('Nomor dokumen tidak boleh kosong');
+      showWarning('Nomor dokumen tidak boleh kosong');
       return;
     }
     if (!editForm.customer_name?.trim()) {
-      alert('Nama customer tidak boleh kosong');
+      showWarning('Nama customer tidak boleh kosong');
       return;
     }
 
@@ -197,9 +199,10 @@ export default function DataLogger({
         setSelectedLog(updatedLog);
       }
 
+      showSuccess('Data log dokumen berhasil diperbarui');
       setEditingLog(null);
     } catch (err) {
-      alert('Gagal mengupdate data: ' + err.message);
+      showError('Gagal mengupdate data: ' + err.message);
     } finally {
       setIsSavingEdit(false);
     }
@@ -239,15 +242,25 @@ export default function DataLogger({
   };
 
   const handleDelete = async (id) => {
-    if (!confirm('Apakah Anda yakin ingin menghapus data log ini?')) return;
+    const confirmed = await confirmDialog({
+      title: 'Hapus Log Dokumen',
+      message: 'Apakah Anda yakin ingin menghapus data log ini? Tindakan ini tidak dapat dibatalkan.',
+      confirmText: 'Ya, Hapus',
+      type: 'danger'
+    });
+    if (!confirmed) return;
+
     try {
       const res = await fetch(`/api/data-logger/${id}`, { method: 'DELETE' });
       if (res.ok) {
         setLogs(logs.filter(l => l.id !== id));
         if (selectedLog?.id === id) setSelectedLog(null);
+        showSuccess('Data log dokumen berhasil dihapus');
+      } else {
+        showError('Gagal menghapus log');
       }
     } catch (err) {
-      alert('Gagal menghapus log');
+      showError('Gagal menghapus log: ' + err.message);
     }
   };
 
@@ -334,7 +347,7 @@ export default function DataLogger({
   // Enhanced CSV Export
   const exportToCsv = () => {
     if (logs.length === 0) {
-      alert('Tidak ada data untuk diekspor');
+      showWarning('Tidak ada data untuk diekspor');
       return;
     }
 
@@ -386,6 +399,7 @@ export default function DataLogger({
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
+    showSuccess('Data log berhasil diekspor ke format CSV');
   };
 
   return (
@@ -780,7 +794,7 @@ export default function DataLogger({
                                 {isExpanded ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
                               </button>
                             ) : (
-                              <span className="text-[11px] text-slate-300 font-mono">#{idx + 1}</span>
+                              <span className="text-[12px] text-slate-300 font-bold select-none" title="Invoice tunggal (belum ada dokumen turunan PL / DO)">—</span>
                             )}
                           </td>
                           <td className="px-3 py-3 font-medium whitespace-nowrap">

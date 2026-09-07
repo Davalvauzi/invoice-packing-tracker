@@ -461,8 +461,8 @@ export default function PrintInvoice({ id, onBack }) {
                 </tr>
               )}
 
-              {/* Natural empty space */}
-              <tr style={{ height: `${Math.max(15, 70 - (hasMultipleItems ? (items.length - 1) * 22 : 0))}px` }}>
+              {/* Space kosong konsisten setara 3 baris produk (~96px) baik 1 produk maupun 2+ produk */}
+              <tr style={{ height: `${(hasMultipleItems && items.length > 5) ? Math.max(40, 96 - (items.length - 5) * 15) : 96}px` }}>
                 <td colSpan={9}></td>
               </tr>
             </tbody>

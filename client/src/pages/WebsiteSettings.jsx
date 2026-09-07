@@ -1122,7 +1122,7 @@ export default function WebsiteSettings({ refreshTrigger }) {
                 >
                   
                   {/* Header Modal */}
-                  <div className="px-7 py-4.5 bg-slate-50 border-b border-slate-100 flex items-center justify-between shrink-0">
+                  <div className="px-7 py-4 bg-slate-50 border-b border-slate-100 flex items-center justify-between shrink-0">
                     <div className="flex items-center gap-3">
                       <span className="p-2.5 bg-emerald-100 text-emerald-800 rounded-xl shadow-xs">
                         <Sliders className="w-5 h-5" />
@@ -1143,12 +1143,12 @@ export default function WebsiteSettings({ refreshTrigger }) {
                   </div>
 
                   {/* Body Modal (2 Columns Wide Layout) */}
-                  <div className="p-7 overflow-y-auto grid grid-cols-1 md:grid-cols-2 gap-7">
+                  <div className="p-7 overflow-y-auto grid grid-cols-1 md:grid-cols-2 gap-6">
                     
                     {/* Kolom Kiri: Kuantitas & Rentang Waktu */}
                     <div className="space-y-6">
                       {/* Parameter 1: Jumlah Data Faktur */}
-                      <div className="bg-slate-50/80 p-4.5 rounded-2xl border border-slate-200/80 space-y-3">
+                      <div className="bg-slate-50/90 p-5 sm:p-6 rounded-2xl border border-slate-200 shadow-xs space-y-3.5">
                         <label className="text-xs font-bold text-slate-800 uppercase tracking-wide flex items-center justify-between">
                           <span className="flex items-center gap-1.5">
                             <span className="w-2 h-2 rounded-full bg-emerald-600"></span>
@@ -1191,7 +1191,7 @@ export default function WebsiteSettings({ refreshTrigger }) {
                       </div>
 
                       {/* Parameter 2: Rentang Waktu Tanggal */}
-                      <div className="bg-slate-50/80 p-4.5 rounded-2xl border border-slate-200/80 space-y-3">
+                      <div className="bg-slate-50/90 p-5 sm:p-6 rounded-2xl border border-slate-200 shadow-xs space-y-3.5">
                         <label className="text-xs font-bold text-slate-800 uppercase tracking-wide flex items-center gap-1.5">
                           <span className="w-2 h-2 rounded-full bg-emerald-600"></span>
                           Rentang Waktu Tanggal Dokumen
@@ -1225,7 +1225,7 @@ export default function WebsiteSettings({ refreshTrigger }) {
                     {/* Kolom Kanan: Mata Uang & Relasi Tree View */}
                     <div className="space-y-6">
                       {/* Parameter 3: Variasi Mata Uang */}
-                      <div className="bg-slate-50/80 p-4.5 rounded-2xl border border-slate-200/80 space-y-3">
+                      <div className="bg-slate-50/90 p-5 sm:p-6 rounded-2xl border border-slate-200 shadow-xs space-y-3.5">
                         <label className="text-xs font-bold text-slate-800 uppercase tracking-wide flex items-center gap-1.5">
                           <span className="w-2 h-2 rounded-full bg-emerald-600"></span>
                           Mata Uang yang Diacak
@@ -1269,13 +1269,13 @@ export default function WebsiteSettings({ refreshTrigger }) {
                       </div>
 
                       {/* Parameter 4: Relasi Dokumen Turunan */}
-                      <div className="bg-slate-50/80 p-4.5 rounded-2xl border border-slate-200/80 space-y-3">
+                      <div className="bg-slate-50/90 p-5 sm:p-6 rounded-2xl border border-slate-200 shadow-xs space-y-3.5">
                         <label className="text-xs font-bold text-slate-800 uppercase tracking-wide flex items-center gap-1.5">
                           <span className="w-2 h-2 rounded-full bg-emerald-600"></span>
                           Dokumen Turunan Otomatis (Hierarki Tree View)
                         </label>
 
-                        <div className="space-y-2">
+                        <div className="space-y-2.5">
                           <label className="flex items-start gap-3 p-3 rounded-xl border border-slate-200 bg-white hover:border-emerald-300 hover:bg-emerald-50/30 transition-colors cursor-pointer shadow-2xs">
                             <input
                               type="checkbox"

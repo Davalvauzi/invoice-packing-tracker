@@ -220,13 +220,13 @@ app.post('/api/settings/upload-logo', upload.single('logo'), (req, res) => {
 
 app.get('/api/dummy-data/stats', (req, res) => {
   try {
-    const dummyCust = db.prepare(`SELECT COUNT(*) as c FROM customers WHERE is_dummy = 1 OR customer_id IN ('120077', 'CUST-001', 'CUST-002', 'CUST-004')`).get().c;
+    const dummyCust = db.prepare('SELECT COUNT(*) as c FROM customers WHERE is_dummy = 1').get().c;
     const totalCust = db.prepare('SELECT COUNT(*) as c FROM customers').get().c;
-    const dummyParts = db.prepare(`SELECT COUNT(*) as c FROM parts WHERE is_dummy = 1 OR part_no IN ('105110195', 'BKT-ENG-001', 'CVR-SD-102', 'HSG-CL-880', 'SHF-AX-554')`).get().c;
+    const dummyParts = db.prepare('SELECT COUNT(*) as c FROM parts WHERE is_dummy = 1').get().c;
     const totalParts = db.prepare('SELECT COUNT(*) as c FROM parts').get().c;
-    const dummyInv = db.prepare(`SELECT COUNT(*) as c FROM invoices WHERE is_dummy = 1 OR invoice_number IN ('10-26010002', 'INV/2026/09/001', 'INV/2026/09/002')`).get().c;
+    const dummyInv = db.prepare('SELECT COUNT(*) as c FROM invoices WHERE is_dummy = 1').get().c;
     const totalInv = db.prepare('SELECT COUNT(*) as c FROM invoices').get().c;
-    const dummyPL = db.prepare(`SELECT COUNT(*) as c FROM packing_lists WHERE is_dummy = 1 OR invoice_number IN ('10-26010002', 'INV/2026/09/001', 'INV/2026/09/002')`).get().c;
+    const dummyPL = db.prepare('SELECT COUNT(*) as c FROM packing_lists WHERE is_dummy = 1').get().c;
     const totalPL = db.prepare('SELECT COUNT(*) as c FROM packing_lists').get().c;
 
     res.json({
@@ -300,12 +300,12 @@ app.post('/api/dummy-data/clear', (req, res) => {
 
       db.prepare(`
         DELETE FROM customers 
-        WHERE is_dummy = 1 OR customer_id IN ('120077', 'CUST-001', 'CUST-002', 'CUST-004')
+        WHERE is_dummy = 1 OR customer_id = '120077'
       `).run();
 
       db.prepare(`
         DELETE FROM parts 
-        WHERE is_dummy = 1 OR part_no IN ('105110195', 'BKT-ENG-001', 'CVR-SD-102', 'HSG-CL-880', 'SHF-AX-554')
+        WHERE is_dummy = 1 OR part_no = '105110195'
       `).run();
 
       return res.json({

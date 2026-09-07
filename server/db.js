@@ -197,14 +197,14 @@ for (const sql of migrationColumns) {
   }
 }
 
-// Retroactively flag known sample records as dummy
+// Ensure 100% removal of PPC Moulding Services and sample part 105110195
 try {
   db.exec(`
-    UPDATE customers SET is_dummy = 1 WHERE customer_id IN ('120077', 'CUST-001', 'CUST-002', 'CUST-004');
-    UPDATE parts SET is_dummy = 1 WHERE part_no IN ('105110195', 'BKT-ENG-001', 'CVR-SD-102', 'HSG-CL-880', 'SHF-AX-554');
-    UPDATE invoices SET is_dummy = 1 WHERE invoice_number IN ('10-26010002', 'INV/2026/09/001', 'INV/2026/09/002');
-    UPDATE packing_lists SET is_dummy = 1 WHERE invoice_number IN ('10-26010002', 'INV/2026/09/001', 'INV/2026/09/002');
-    UPDATE data_logger SET is_dummy = 1 WHERE doc_number IN ('10-26010002', 'INV/2026/09/001', 'INV/2026/09/002');
+    DELETE FROM customers WHERE customer_id = '120077' OR customer_name LIKE '%PPC Moulding%';
+    DELETE FROM parts WHERE part_no = '105110195' OR part_name LIKE '%Stator Flex Cable%';
+    DELETE FROM invoices WHERE invoice_number = '10-26010002' OR customer_name LIKE '%PPC Moulding%';
+    DELETE FROM packing_lists WHERE invoice_number = '10-26010002';
+    DELETE FROM data_logger WHERE doc_number = '10-26010002' OR customer_name LIKE '%PPC Moulding%';
   `);
 } catch (err) {
   // Ignore
@@ -235,8 +235,8 @@ function seedIfEmpty() {
   const customerCount = db.prepare('SELECT COUNT(*) as count FROM customers').get().count;
   if (customerCount === 0) {
     const insertCustomer = db.prepare(`
-      INSERT INTO customers (customer_id, customer_name, address, bill_to, ship_to, contact_person, phone)
-      VALUES (?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO customers (customer_id, customer_name, address, bill_to, ship_to, contact_person, phone, is_dummy)
+      VALUES (?, ?, ?, ?, ?, ?, ?, 1)
     `);
     insertCustomer.run(
       'CUST-001', 
@@ -290,8 +290,8 @@ function seedIfEmpty() {
   const partCount = db.prepare('SELECT COUNT(*) as count FROM parts').get().count;
   if (partCount === 0) {
     const insertPart = db.prepare(`
-      INSERT INTO parts (part_name, part_no, length, width, height, unit, qty_per_box, price)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO parts (part_name, part_no, length, width, height, unit, qty_per_box, price, is_dummy)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1)
     `);
     insertPart.run('Bracket Engine Mount RH', 'BKT-ENG-001', 450, 300, 250, 'mm', 50, 4.50);
     insertPart.run('Cover Side Upper LH', 'CVR-SD-102', 600, 200, 150, 'mm', 100, 2.75);

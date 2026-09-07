@@ -107,14 +107,14 @@ const SAMPLE_COMPANIES = [
     phone: '+62 21 8981150'
   },
   {
-    prefix: 'PPC',
-    customer_id: '120077',
-    customer_name: 'PPC Moulding Services (Malaysia) Sdn Bhd.',
-    address: 'No. 14/No. 21, Jalan I-ParkSAC 3, Taman Perindustrian I-Park SAC, 81400 Senai, Malaysia',
-    bill_to: 'PPC Moulding Services (Malaysia) Sdn Bhd.\nNo. 14/No. 21, Jalan I-ParkSAC 3,\nTaman Perindustrian I-Park SAC,\n81400 Senai, Johor, Malaysia\nTel: +60 7 5959 698',
-    ship_to: 'PPC Moulding Services (Malaysia) Sdn Bhd.\nNo. 14/No. 21, Jalan I-ParkSAC 3,\nTaman Perindustrian I-Park SAC,\n81400 Senai, Johor, Malaysia',
-    contact_person: 'Mr. Tan / Purchasing Department',
-    phone: '+60 19774 8955'
+    prefix: 'KOMATSU',
+    customer_id: 'CUST-KMT-11',
+    customer_name: 'PT. Komatsu Indonesia',
+    address: 'Jl. Raya Bekasi Km. 22, Cakung, Jakarta Timur 13910',
+    bill_to: 'PT. Komatsu Indonesia\nFinance & Accounting Department\nJl. Raya Bekasi Km. 22, Cakung, Jakarta Timur 13910',
+    ship_to: 'PT. Komatsu Indonesia - Main Manufacturing Plant\nJl. Raya Bekasi Km. 22, Cakung, Jakarta Timur 13910',
+    contact_person: 'Tri Haryanto / Component Purchasing',
+    phone: '+62 21 4603950'
   },
   {
     prefix: 'MITSUBISHI',
@@ -130,7 +130,7 @@ const SAMPLE_COMPANIES = [
 
 // 2. Kamus Katalog Produk & Part Presisi Manufaktur
 const SAMPLE_PARTS = [
-  { part_name: '010-0504-09/9 Stator Flex Cable Assy', part_no: '105110195', qty_per_box: 98, price_usd: 4.5027, length: 450, width: 300, height: 250, unit: 'mm' },
+  { part_name: 'Pinion Gear Transmission Planetary Type', part_no: 'GR-PIN-902', qty_per_box: 60, price_usd: 6.4500, length: 350, width: 250, height: 200, unit: 'mm' },
   { part_name: 'Bracket Engine Mount RH High-Tensile', part_no: 'BKT-ENG-001', qty_per_box: 50, price_usd: 5.2500, length: 400, width: 250, height: 200, unit: 'mm' },
   { part_name: 'Cover Side Upper LH - Matte Black Spec', part_no: 'CVR-SD-102', qty_per_box: 80, price_usd: 2.8500, length: 500, width: 220, height: 160, unit: 'mm' },
   { part_name: 'Housing Clutch Outer Stamping Spec A', part_no: 'HSG-CL-880', qty_per_box: 40, price_usd: 8.4500, length: 320, width: 320, height: 180, unit: 'mm' },

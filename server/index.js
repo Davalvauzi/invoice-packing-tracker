@@ -333,6 +333,7 @@ app.post('/api/dummy-data/clear', (req, res) => {
       db.prepare('DELETE FROM packing_lists').run();
       db.prepare('DELETE FROM delivery_orders').run();
       db.prepare('DELETE FROM data_logger').run();
+      db.prepare('DELETE FROM part_price_history').run();
       db.prepare('DELETE FROM customers').run();
       db.prepare('DELETE FROM parts').run();
       db.prepare('DELETE FROM payment_terms').run();

@@ -190,6 +190,20 @@ export default function WebsiteSettings({ refreshTrigger }) {
     }
   };
 
+  const selectFirstNCompanies = (num) => {
+    const list = masterTemplates.companies
+      .filter(c => companySectorFilter === 'all' || c.sector === companySectorFilter);
+    const count = Math.min(num, list.length);
+    setSelectedCompanies(list.slice(0, count).map(c => c.customer_id));
+  };
+
+  const selectFirstNParts = (num) => {
+    const list = masterTemplates.parts
+      .filter(p => partCategoryFilter === 'all' || p.category === partCategoryFilter);
+    const count = Math.min(num, list.length);
+    setSelectedParts(list.slice(0, count).map(p => p.part_no));
+  };
+
   const [seederConfig, setSeederConfig] = useState({
     count: 10,
     dateRangeMonths: 6,
@@ -1324,8 +1338,40 @@ export default function WebsiteSettings({ refreshTrigger }) {
                         </div>
                       </div>
 
-                      {/* Customer Cards List */}
-                      <div className="h-72 overflow-y-auto space-y-2 pr-1">
+                      {/* Quick Quantity Chips Customer */}
+                      <div className="flex items-center justify-between gap-2 p-2 bg-white rounded-xl border border-slate-200 shadow-2xs">
+                        <span className="text-[11px] font-bold text-slate-700 whitespace-nowrap">Pilih Kuantitas:</span>
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          {[3, 5, 10].map(val => (
+                            <button
+                              key={val}
+                              type="button"
+                              onClick={() => selectFirstNCompanies(val)}
+                              className={`px-2.5 py-1 rounded-lg text-[11px] font-bold border transition-all cursor-pointer ${
+                                selectedCompanies.length === val
+                                  ? 'bg-blue-700 text-white border-blue-700 shadow-2xs ring-1 ring-blue-700'
+                                  : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-blue-50 hover:text-blue-800 hover:border-blue-300'
+                              }`}
+                            >
+                              {val} Data
+                            </button>
+                          ))}
+                          <button
+                            type="button"
+                            onClick={() => setSelectedCompanies(masterTemplates.companies.map(c => c.customer_id))}
+                            className={`px-2.5 py-1 rounded-lg text-[11px] font-bold border transition-all cursor-pointer ${
+                              selectedCompanies.length === masterTemplates.companies.length && masterTemplates.companies.length > 0
+                                ? 'bg-blue-700 text-white border-blue-700 shadow-2xs ring-1 ring-blue-700'
+                                : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-blue-50 hover:text-blue-800 hover:border-blue-300'
+                            }`}
+                          >
+                            Semua ({masterTemplates.companies.length})
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Customer Cards List (Expands to fill height, no blank space) */}
+                      <div className="flex-1 min-h-[380px] max-h-[500px] overflow-y-auto space-y-2 pr-1">
                         {loadingTemplates ? (
                           <div className="h-full flex items-center justify-center text-xs text-slate-400">
                             <RefreshCw className="w-4 h-4 animate-spin mr-2 text-blue-600" />
@@ -1437,8 +1483,40 @@ export default function WebsiteSettings({ refreshTrigger }) {
                           </div>
                         </div>
 
+                        {/* Quick Quantity Chips Part */}
+                        <div className="flex items-center justify-between gap-2 p-2 bg-white rounded-xl border border-slate-200 shadow-2xs">
+                          <span className="text-[11px] font-bold text-slate-700 whitespace-nowrap">Pilih Kuantitas:</span>
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            {[5, 10].map(val => (
+                              <button
+                                key={val}
+                                type="button"
+                                onClick={() => selectFirstNParts(val)}
+                                className={`px-2.5 py-1 rounded-lg text-[11px] font-bold border transition-all cursor-pointer ${
+                                  selectedParts.length === val
+                                    ? 'bg-blue-700 text-white border-blue-700 shadow-2xs ring-1 ring-blue-700'
+                                    : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-blue-50 hover:text-blue-800 hover:border-blue-300'
+                                }`}
+                              >
+                                {val} Data
+                              </button>
+                            ))}
+                            <button
+                              type="button"
+                              onClick={() => setSelectedParts(masterTemplates.parts.map(p => p.part_no))}
+                              className={`px-2.5 py-1 rounded-lg text-[11px] font-bold border transition-all cursor-pointer ${
+                                selectedParts.length === masterTemplates.parts.length && masterTemplates.parts.length > 0
+                                  ? 'bg-blue-700 text-white border-blue-700 shadow-2xs ring-1 ring-blue-700'
+                                  : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-blue-50 hover:text-blue-800 hover:border-blue-300'
+                              }`}
+                            >
+                              Semua ({masterTemplates.parts.length})
+                            </button>
+                          </div>
+                        </div>
+
                         {/* Part Cards List */}
-                        <div className="h-44 overflow-y-auto space-y-2 pr-1">
+                        <div className="h-60 overflow-y-auto space-y-2 pr-1">
                           {loadingTemplates ? (
                             <div className="h-full flex items-center justify-center text-xs text-slate-400">
                               <RefreshCw className="w-4 h-4 animate-spin mr-2 text-blue-600" />

@@ -5,7 +5,7 @@ const path = require('path');
 const fs = require('fs');
 const os = require('os');
 const db = require('./db');
-const { runProceduralSeeder } = require('./seeder');
+const { seedMasterTemplate, generateTransactionsOnly, runProceduralSeeder } = require('./seeder');
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -220,17 +220,26 @@ app.post('/api/settings/upload-logo', upload.single('logo'), (req, res) => {
 
 app.get('/api/dummy-data/stats', (req, res) => {
   try {
-    const dummyCust = db.prepare('SELECT COUNT(*) as c FROM customers WHERE is_dummy = 1').get().c;
     const totalCust = db.prepare('SELECT COUNT(*) as c FROM customers').get().c;
-    const dummyParts = db.prepare('SELECT COUNT(*) as c FROM parts WHERE is_dummy = 1').get().c;
     const totalParts = db.prepare('SELECT COUNT(*) as c FROM parts').get().c;
-    const dummyInv = db.prepare('SELECT COUNT(*) as c FROM invoices WHERE is_dummy = 1').get().c;
     const totalInv = db.prepare('SELECT COUNT(*) as c FROM invoices').get().c;
-    const dummyPL = db.prepare('SELECT COUNT(*) as c FROM packing_lists WHERE is_dummy = 1').get().c;
     const totalPL = db.prepare('SELECT COUNT(*) as c FROM packing_lists').get().c;
+    const totalDO = db.prepare('SELECT COUNT(*) as c FROM delivery_orders').get().c;
+    const totalLog = db.prepare('SELECT COUNT(*) as c FROM data_logger').get().c;
 
     res.json({
-      dummy: { customers: dummyCust, parts: dummyParts, invoices: dummyInv, packing_lists: dummyPL },
+      master: {
+        customers: totalCust,
+        parts: totalParts
+      },
+      transactions: {
+        invoices: totalInv,
+        packing_lists: totalPL,
+        delivery_orders: totalDO,
+        data_logger: totalLog
+      },
+      // Backward compatibility fields
+      dummy: { customers: totalCust, parts: totalParts, invoices: totalInv, packing_lists: totalPL },
       total: { customers: totalCust, parts: totalParts, invoices: totalInv, packing_lists: totalPL }
     });
   } catch (err) {
@@ -238,6 +247,21 @@ app.get('/api/dummy-data/stats', (req, res) => {
   }
 });
 
+// Endpoint Khusus: Inisialisasi Template Master Data (Customer & Produk)
+app.post('/api/dummy-data/seed-master', (req, res) => {
+  try {
+    const result = seedMasterTemplate(db);
+    res.json({
+      success: true,
+      message: `Berhasil menginisialisasi template Master Data! Total aktif: ${result.totalCustomers} Customer, ${result.totalParts} Part/Produk.`,
+      result
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Endpoint Khusus: Generate Transaksi Saja (Invoices, PL, DO)
 app.post('/api/dummy-data/generate', (req, res) => {
   try {
     const {
@@ -248,7 +272,7 @@ app.post('/api/dummy-data/generate', (req, res) => {
       currencies = ['USD', 'IDR', 'JPY']
     } = req.body || {};
 
-    const stats = runProceduralSeeder(db, {
+    const stats = generateTransactionsOnly(db, {
       count: Math.max(1, Math.min(100, Number(count) || 10)),
       dateRangeMonths: Math.max(1, Math.min(24, Number(dateRangeMonths) || 6)),
       includePL: includePL !== false,
@@ -258,64 +282,20 @@ app.post('/api/dummy-data/generate', (req, res) => {
 
     res.json({
       success: true,
-      message: `Berhasil men-generate ${stats.insertedInvoices} faktur sintetis, ${stats.insertedPLs} packing list, dan ${stats.insertedDOs} delivery order!`,
+      message: `Berhasil men-generate ${stats.insertedInvoices} faktur sintetis, ${stats.insertedPLs} packing list, dan ${stats.insertedDOs} delivery order dari Master Data yang ada!`,
       summary: stats
     });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    res.status(400).json({ error: err.message });
   }
 });
 
 app.post('/api/dummy-data/clear', (req, res) => {
   try {
-    const { mode = 'dummy_only' } = req.body;
+    const { mode = 'transactions' } = req.body;
 
-    if (mode === 'dummy_only') {
-      // DELETE ONLY DUMMY DATA - REAL USER DATA IS PRESERVED
-      db.prepare(`
-        DELETE FROM data_logger 
-        WHERE is_dummy = 1 OR doc_number IN ('10-26010002', 'INV/2026/09/001', 'INV/2026/09/002')
-      `).run();
-
-      db.prepare(`
-        DELETE FROM invoices 
-        WHERE is_dummy = 1 OR invoice_number IN ('10-26010002', 'INV/2026/09/001', 'INV/2026/09/002')
-      `).run();
-
-      db.prepare(`
-        DELETE FROM packing_lists 
-        WHERE is_dummy = 1 OR invoice_number IN ('10-26010002', 'INV/2026/09/001', 'INV/2026/09/002')
-      `).run();
-
-      db.prepare(`
-        DELETE FROM delivery_orders 
-        WHERE is_dummy = 1
-      `).run();
-
-      // Clean up price history for dummy parts before deleting parts
-      db.prepare(`
-        DELETE FROM part_price_history 
-        WHERE part_id IN (SELECT id FROM parts WHERE is_dummy = 1)
-      `).run();
-
-      db.prepare(`
-        DELETE FROM customers 
-        WHERE is_dummy = 1 OR customer_id = '120077'
-      `).run();
-
-      db.prepare(`
-        DELETE FROM parts 
-        WHERE is_dummy = 1 OR part_no = '105110195'
-      `).run();
-
-      return res.json({
-        success: true,
-        message: 'Data dummy dan seeder berhasil dibersihkan! Seluruh data asli / manual Anda tetap aman tersimpan.'
-      });
-    }
-
-    if (mode === 'transactions') {
-      // Clear ALL transaction records (real + dummy), but keep master data
+    if (mode === 'transactions' || mode === 'dummy_only') {
+      // 1. Hapus Hanya Transaksi (Invoices, PL, DO, Logs) - Master Data 100% AMAN
       db.prepare('DELETE FROM invoices').run();
       db.prepare('DELETE FROM packing_lists').run();
       db.prepare('DELETE FROM delivery_orders').run();
@@ -323,12 +303,26 @@ app.post('/api/dummy-data/clear', (req, res) => {
 
       return res.json({
         success: true,
-        message: 'Seluruh riwayat transaksi (invoices, packing lists, delivery orders, data logger) berhasil dibersihkan!'
+        message: 'Seluruh riwayat transaksi (Invoices, Packing Lists, Delivery Orders, dan Logs) berhasil dibersihkan! Master Customer & Part tetap aman tersimpan.'
+      });
+    }
+
+    if (mode === 'master_only') {
+      // 2. Hapus Hanya Master Data (Customers, Parts, Price History, Terms)
+      db.prepare('DELETE FROM part_price_history').run();
+      db.prepare('DELETE FROM customers').run();
+      db.prepare('DELETE FROM parts').run();
+      db.prepare('DELETE FROM payment_terms').run();
+      db.prepare('DELETE FROM delivery_terms').run();
+
+      return res.json({
+        success: true,
+        message: 'Seluruh Master Data (Customer, Katalog Part, Riwayat Harga, dan Termin) berhasil dibersihkan!'
       });
     }
 
     if (mode === 'all') {
-      // Full database wipe
+      // 3. Reset Total Database (Kosongkan Seluruh Tabel)
       db.prepare('DELETE FROM invoices').run();
       db.prepare('DELETE FROM packing_lists').run();
       db.prepare('DELETE FROM delivery_orders').run();
@@ -341,7 +335,7 @@ app.post('/api/dummy-data/clear', (req, res) => {
 
       return res.json({
         success: true,
-        message: 'Seluruh database (transaksi & master data) telah berhasil direset ke kondisi awal!'
+        message: 'Seluruh database (transaksi & master data) telah berhasil direset total ke titik nol!'
       });
     }
 

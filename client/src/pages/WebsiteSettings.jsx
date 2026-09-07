@@ -24,7 +24,9 @@ import {
   X,
   CheckSquare,
   Square,
-  Info
+  Info,
+  Boxes,
+  Layers
 } from 'lucide-react';
 import { useNotification } from '../context/NotificationContext';
 
@@ -137,6 +139,7 @@ export default function WebsiteSettings({ refreshTrigger }) {
     }
   };
 
+  const [seedingMaster, setSeedingMaster] = useState(false);
   const [generatingDummy, setGeneratingDummy] = useState(false);
   const [clearingDummy, setClearingDummy] = useState(false);
   const [dummyStats, setDummyStats] = useState(null);
@@ -184,12 +187,46 @@ export default function WebsiteSettings({ refreshTrigger }) {
     }
   }, [activeTab]);
 
+  const handleSeedMaster = async () => {
+    const ok = await confirmDialog({
+      title: 'Inisialisasi Master Data Template',
+      message: 'Sistem akan memasukkan 12 Master Customer Industri manufaktur dan 15 Katalog Part Presisi lengkap dengan harga, termin, dan mata uang acuan.\n\nData template yang sudah ada tidak akan diduplikasi (aman/idempotent). Lanjutkan?',
+      confirmText: 'Ya, Inisialisasi Master Data',
+      type: 'info'
+    });
+    if (!ok) return;
+
+    setSeedingMaster(true);
+    try {
+      const res = await fetch('/api/dummy-data/seed-master', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' }
+      });
+      const data = await res.json();
+      if (res.ok) {
+        showSuccess(data.message, 'Master Data Diinisialisasi');
+        fetchDummyStats();
+      } else {
+        showError(data.error || 'Gagal menginisialisasi master data');
+      }
+    } catch (err) {
+      showError(err.message);
+    } finally {
+      setSeedingMaster(false);
+    }
+  };
+
   const handleGenerateDummy = async (isCustom = false) => {
+    if (!dummyStats?.master?.customers || dummyStats.master.customers === 0) {
+      showError('Master Data masih kosong! Silakan klik tombol "Inisialisasi Master Data" terlebih dahulu sebelum men-generate transaksi.', 'Master Data Diperlukan');
+      return;
+    }
+
     if (!isCustom) {
       const ok = await confirmDialog({
-        title: 'Jalankan Database Seeder (Preset 10 Faktur)',
-        message: 'Apakah Anda yakin ingin men-generate 10 transaksi faktur sintetis murni acak lengkap dengan master customer industri, katalog part, harga, tanggal tersebar 6 bulan terakhir, serta dokumen turunan (Packing List & DO)?',
-        confirmText: 'Ya, Jalankan Seeder',
+        title: 'Jalankan Generator Transaksi (Preset 10 Faktur)',
+        message: 'Sistem akan men-generate 10 transaksi faktur acak beserta Packing List dan DO menggunakan Master Data aktif yang telah terdaftar.\n\nMaster Customer dan Part TIDAK akan bertambah/diduplikasi. Lanjutkan?',
+        confirmText: 'Ya, Jalankan Generator',
         type: 'info'
       });
       if (!ok) return;
@@ -210,12 +247,12 @@ export default function WebsiteSettings({ refreshTrigger }) {
       });
       const data = await res.json();
       if (res.ok) {
-        showSuccess(data.message, 'Database Seeder Berhasil');
+        showSuccess(data.message, 'Transaksi Berhasil Di-generate');
         if (isCustom) setIsCustomModalOpen(false);
         fetchSettings();
         fetchDummyStats();
       } else {
-        showError(data.error || 'Terjadi kesalahan saat generate data');
+        showError(data.error || 'Terjadi kesalahan saat generate transaksi');
       }
     } catch (err) {
       showError(err.message);
@@ -224,28 +261,28 @@ export default function WebsiteSettings({ refreshTrigger }) {
     }
   };
 
-  const handleClearDummy = async (modeInput = 'dummy_only') => {
-    const mode = typeof modeInput === 'string' ? modeInput : 'dummy_only';
+  const handleClearDummy = async (modeInput = 'transactions') => {
+    const mode = typeof modeInput === 'string' ? modeInput : 'transactions';
     let title = 'Konfirmasi Pembersihan';
     let msg = '';
     let confirmType = 'warning';
     let confirmBtnText = 'Ya, Bersihkan';
 
-    if (mode === 'dummy_only') {
-      title = 'Hapus Data Dummy Saja';
-      msg = 'Hanya data bertanda DUMMY (Customer sampel, Produk sampel, dan Dokumen contoh) yang akan dihapus.\n\nData asli/manual buatan Anda dijamin TETAP AMAN tersimpan.\n\nLanjutkan pembersihan data dummy?';
+    if (mode === 'transactions') {
+      title = 'Hapus Seluruh Data Transaksi Saja';
+      msg = 'Apakah Anda yakin ingin MENGHAPUS SEMUA TRANSAKSI (Invoice, Packing List, Delivery Order, dan Data Logger)?\n\nSeluruh Master Data Customer, Katalog Part, Riwayat Harga, dan Termin dijamin TETAP AMAN tersimpan.';
       confirmType = 'warning';
-      confirmBtnText = 'Hapus Dummy Saja';
-    } else if (mode === 'transactions') {
-      title = 'Reset Seluruh Transaksi';
-      msg = 'Apakah Anda yakin ingin MENGHAPUS SEMUA TRANSAKSI (Invoice, Packing List, Delivery Order, dan Data Logger)?\n\nMaster data customer dan katalog produk tetap aman tersimpan.';
-      confirmType = 'danger';
       confirmBtnText = 'Hapus Semua Transaksi';
+    } else if (mode === 'master_only') {
+      title = 'PERINGATAN: Hapus Master Data Saja';
+      msg = 'PERINGATAN: Anda akan MENGOSONGKAN SELURUH MASTER DATA (Customer, Ship To/Bill To, Katalog Part, Riwayat Harga, dan Termin).\n\nRiwayat transaksi yang sudah ada tidak dihapus, namun tidak lagi memiliki referensi master data aktif. Lanjutkan?';
+      confirmType = 'danger';
+      confirmBtnText = 'Ya, Hapus Master Data';
     } else if (mode === 'all') {
       title = 'PERINGATAN KERAS: Reset Total Database';
-      msg = 'PERINGATAN KERAS: Seluruh database (transaksi & master data) akan dikosongkan total kembali seperti baru!\n\nTindakan ini tidak dapat dibatalkan.\n\nApakah Anda benar-benar yakin?';
+      msg = 'PERINGATAN KERAS: Seluruh database (Semua Transaksi Faktur, PL, DO, Logs, serta Master Customer & Part) akan dikosongkan total ke titik nol!\n\nTindakan ini bersifat permanen dan tidak dapat dibatalkan.\n\nApakah Anda benar-benar yakin?';
       confirmType = 'danger';
-      confirmBtnText = 'Ya, Kosongkan Total';
+      confirmBtnText = 'Ya, Reset Total Database';
     }
 
     const ok = await confirmDialog({
@@ -265,7 +302,7 @@ export default function WebsiteSettings({ refreshTrigger }) {
       });
       const data = await res.json();
       if (res.ok) {
-        showSuccess(data.message, 'Database Bersih!');
+        showSuccess(data.message, 'Pembersihan Selesai');
         fetchDummyStats();
       } else {
         showError(data.error || 'Terjadi kesalahan saat pembersihan');
@@ -951,21 +988,32 @@ export default function WebsiteSettings({ refreshTrigger }) {
             
             {/* Bar Status Ringkas */}
             <div className="bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 flex flex-wrap items-center justify-between gap-3 text-xs">
-              <div className="flex items-center gap-2 flex-wrap">
-                <Database className="w-4 h-4 text-slate-500" />
-                <span className="font-bold text-slate-700">Status Data:</span>
+              <div className="flex items-center gap-3 flex-wrap">
+                <div className="flex items-center gap-1.5 font-bold text-slate-700">
+                  <Database className="w-4 h-4 text-slate-500" />
+                  <span>Status Database:</span>
+                </div>
                 {dummyStats ? (
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <span className={`px-2 py-0.5 rounded-full font-medium ${dummyStats.dummy.customers > 0 || dummyStats.dummy.invoices > 0 ? 'bg-amber-100 text-amber-800' : 'bg-emerald-100 text-emerald-800'}`}>
-                      {dummyStats.dummy.customers > 0 || dummyStats.dummy.invoices > 0 ? (
-                        <>● Dummy Aktif: <strong>{dummyStats.dummy.customers}</strong> Cust, <strong>{dummyStats.dummy.parts}</strong> Part, <strong>{dummyStats.dummy.invoices}</strong> Faktur</>
-                      ) : (
-                        <>✓ Database Bersih dari Data Dummy</>
-                      )}
-                    </span>
+                  <div className="flex items-center gap-2 flex-wrap text-xs">
+                    {dummyStats.master?.customers > 0 ? (
+                      <span className="px-2.5 py-0.5 rounded-full font-semibold bg-blue-100 text-blue-800 border border-blue-200 flex items-center gap-1">
+                        <Building2 className="w-3 h-3" />
+                        Master: <strong>{dummyStats.master.customers}</strong> Cust, <strong>{dummyStats.master.parts}</strong> Part
+                      </span>
+                    ) : (
+                      <span className="px-2.5 py-0.5 rounded-full font-semibold bg-amber-100 text-amber-800 border border-amber-200 flex items-center gap-1">
+                        ⚠️ Master Data Kosong
+                      </span>
+                    )}
+
                     <span className="text-slate-300">|</span>
-                    <span className="text-slate-600">
-                      Total Data: <strong>{dummyStats.total.customers}</strong> Cust, <strong>{dummyStats.total.parts}</strong> Part, <strong>{dummyStats.total.invoices}</strong> Faktur
+
+                    <span className={`px-2.5 py-0.5 rounded-full font-semibold ${
+                      dummyStats.transactions?.invoices > 0 
+                        ? 'bg-emerald-100 text-emerald-800 border border-emerald-200' 
+                        : 'bg-slate-100 text-slate-600 border border-slate-200'
+                    }`}>
+                      Transaksi: <strong>{dummyStats.transactions?.invoices || 0}</strong> Faktur, <strong>{dummyStats.transactions?.packing_lists || 0}</strong> PL, <strong>{dummyStats.transactions?.delivery_orders || 0}</strong> DO
                     </span>
                   </div>
                 ) : (
@@ -977,7 +1025,7 @@ export default function WebsiteSettings({ refreshTrigger }) {
                 onClick={fetchDummyStats}
                 disabled={statsLoading}
                 className="inline-flex items-center gap-1 text-slate-500 hover:text-slate-800 font-medium cursor-pointer transition-colors"
-                title="Perbarui status data dummy"
+                title="Perbarui status database"
               >
                 <RefreshCw className={`w-3.5 h-3.5 ${statsLoading ? 'animate-spin' : ''}`} />
                 <span>Refresh Status</span>
@@ -987,7 +1035,44 @@ export default function WebsiteSettings({ refreshTrigger }) {
             {/* Compact 3-Card Grid */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-stretch">
               
-              {/* Card 1: Input Data Dummy (Procedural Seeder) */}
+              {/* Card 1: Master Data Template */}
+              <div className="bg-white rounded-xl border border-blue-200 p-4 shadow-xs flex flex-col justify-between hover:border-blue-300 transition-colors">
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <span className="p-1.5 bg-blue-100 text-blue-800 rounded-lg">
+                        <Building2 className="w-4 h-4" />
+                      </span>
+                      <h3 className="font-bold text-slate-900 text-sm">Master Data Template</h3>
+                    </div>
+                    <span className="text-[10px] font-semibold bg-blue-50 text-blue-700 px-2 py-0.5 rounded-full border border-blue-100">
+                      Master Acuan
+                    </span>
+                  </div>
+                  <p className="text-xs text-slate-500 leading-relaxed">
+                    Inisialisasi template master customer industri dan katalog part presisi sebagai acuan data statis perusahaan.
+                  </p>
+                  <div className="text-[11px] text-slate-600 bg-slate-50 rounded-lg p-2.5 space-y-1 border border-slate-100">
+                    <div>• <strong>12 Profil Industri</strong> (MM2100, KIIC, Jababeka, EJIP)</div>
+                    <div>• <strong>15 Part Presisi</strong> + Riwayat Harga & Termin</div>
+                    <div>• <strong>Idempotent</strong> (Aman jika dijalankan ulang)</div>
+                  </div>
+                </div>
+
+                <div className="pt-3 mt-3 border-t border-slate-100">
+                  <button
+                    type="button"
+                    onClick={handleSeedMaster}
+                    disabled={seedingMaster}
+                    className="w-full inline-flex items-center justify-center gap-1.5 py-2.5 px-3 bg-blue-700 hover:bg-blue-800 text-white rounded-lg text-xs font-bold shadow-xs transition-all disabled:opacity-50 cursor-pointer"
+                  >
+                    {seedingMaster ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Building2 className="w-3.5 h-3.5" />}
+                    <span>{seedingMaster ? 'Menginisialisasi...' : '🏢 Inisialisasi Master Data'}</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Card 2: Generator Transaksi Acak */}
               <div className="bg-white rounded-xl border border-emerald-200 p-4 shadow-xs flex flex-col justify-between hover:border-emerald-300 transition-colors">
                 <div className="space-y-2">
                   <div className="flex items-center justify-between">
@@ -995,17 +1080,17 @@ export default function WebsiteSettings({ refreshTrigger }) {
                       <span className="p-1.5 bg-emerald-100 text-emerald-800 rounded-lg">
                         <Sparkles className="w-4 h-4" />
                       </span>
-                      <h3 className="font-bold text-slate-900 text-sm">Database Seeder</h3>
+                      <h3 className="font-bold text-slate-900 text-sm">Generator Transaksi</h3>
                     </div>
                     <span className="text-[10px] font-semibold bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded-full border border-emerald-100">
-                      Procedural
+                      Transaksi Acak
                     </span>
                   </div>
                   <p className="text-xs text-slate-500 leading-relaxed">
-                    Generate transaksi acak sintetis (Customer, Part, Tanggal tersebar, Multi-kurs, serta Packing List & DO terkait).
+                    Generate transaksi faktur murni acak menggunakan Master Data yang telah terdaftar tanpa menduplikasi data master.
                   </p>
                   <div className="text-[11px] text-slate-600 bg-slate-50 rounded-lg p-2.5 space-y-1 border border-slate-100">
-                    <div>• <strong>Murni Acak & Realistis</strong> (Bukan template kaku)</div>
+                    <div>• <strong>Menggunakan Master Data</strong> terdaftar aktif</div>
                     <div>• <strong>Multi-Currency</strong> (USD, IDR, JPY) & PPN</div>
                     <div>• <strong>Auto Link Tree View</strong> (Invoice → PL → DO)</div>
                   </div>
@@ -1015,104 +1100,80 @@ export default function WebsiteSettings({ refreshTrigger }) {
                   <button
                     type="button"
                     onClick={() => handleGenerateDummy(false)}
-                    disabled={generatingDummy}
+                    disabled={generatingDummy || seedingMaster}
                     className="inline-flex items-center justify-center gap-1.5 py-2 px-3 bg-emerald-800 hover:bg-emerald-900 text-white rounded-lg text-xs font-bold shadow-xs transition-all disabled:opacity-50 cursor-pointer"
                   >
                     {generatingDummy ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />}
-                    <span>{generatingDummy ? 'Mengisi...' : '⚡ Preset (10 Data)'}</span>
+                    <span>{generatingDummy ? 'Mengisi...' : '⚡ Preset (10 Transaksi)'}</span>
                   </button>
                   <button
                     type="button"
                     onClick={() => setIsCustomModalOpen(true)}
-                    disabled={generatingDummy}
+                    disabled={generatingDummy || seedingMaster}
                     className="inline-flex items-center justify-center gap-1.5 py-2 px-3 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 rounded-lg text-xs font-bold transition-all disabled:opacity-50 cursor-pointer"
                   >
                     <Sliders className="w-3.5 h-3.5" />
-                    <span>Custom Seeder...</span>
+                    <span>Custom Transaksi...</span>
                   </button>
                 </div>
               </div>
 
-              {/* Card 2: Hapus Data Dummy Saja */}
-              <div className="bg-white rounded-xl border border-amber-200 p-4 shadow-xs flex flex-col justify-between hover:border-amber-300 transition-colors">
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <span className="p-1.5 bg-amber-100 text-amber-800 rounded-lg">
-                        <Eraser className="w-4 h-4" />
-                      </span>
-                      <h3 className="font-bold text-slate-900 text-sm">Hapus Data Dummy Saja</h3>
-                    </div>
-                    <span className="text-[10px] font-semibold bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded-full border border-emerald-100 flex items-center gap-1">
-                      <ShieldCheck className="w-3 h-3 text-emerald-600" />
-                      Aman
-                    </span>
-                  </div>
-                  <p className="text-xs text-slate-500 leading-relaxed">
-                    Menghapus <strong>HANYA</strong> data bertanda dummy / hasil seeder. Master customer dan invoice riil yang Anda buat manual <strong>tetap utuh</strong>.
-                  </p>
-                  <div className="text-[11px] text-emerald-800 bg-emerald-50/60 rounded-lg p-2 space-y-0.5 border border-emerald-100">
-                    <div className="font-semibold flex items-center gap-1">
-                      <Check className="w-3.5 h-3.5 text-emerald-600" /> Proteksi Data Asli Aktif
-                    </div>
-                    <div className="text-[10px] text-slate-500">Cocok digunakan setelah demo pengujian selesai tanpa risiko menghapus data penting buatan sendiri.</div>
-                  </div>
-                </div>
-
-                <div className="pt-3 mt-3 border-t border-slate-100">
-                  <button
-                    type="button"
-                    onClick={() => handleClearDummy('dummy_only')}
-                    disabled={clearingDummy}
-                    className="w-full inline-flex items-center justify-center gap-1.5 py-2 px-3 bg-amber-700 hover:bg-amber-800 text-white rounded-lg text-xs font-bold shadow-xs transition-all disabled:opacity-50 cursor-pointer"
-                  >
-                    {clearingDummy ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Eraser className="w-3.5 h-3.5" />}
-                    <span>{clearingDummy ? 'Membersihkan...' : 'Hapus Data Dummy Saja'}</span>
-                  </button>
-                </div>
-              </div>
-
-              {/* Card 3: Pembersihan Total */}
+              {/* Card 3: Pembersihan Database Fleksibel */}
               <div className="bg-white rounded-xl border border-rose-200 p-4 shadow-xs flex flex-col justify-between hover:border-rose-300 transition-colors">
                 <div className="space-y-2">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
                       <span className="p-1.5 bg-rose-100 text-rose-800 rounded-lg">
-                        <AlertTriangle className="w-4 h-4" />
+                        <Trash2 className="w-4 h-4" />
                       </span>
-                      <h3 className="font-bold text-slate-900 text-sm">Pembersihan Total</h3>
+                      <h3 className="font-bold text-slate-900 text-sm">Pembersihan Fleksibel</h3>
                     </div>
                     <span className="text-[10px] font-semibold bg-rose-50 text-rose-700 px-2 py-0.5 rounded-full border border-rose-100">
-                      Permanen
+                      Granular Reset
                     </span>
                   </div>
                   <p className="text-xs text-slate-500 leading-relaxed">
-                    Pilihan pembersihan massal untuk mereset riwayat transaksi atau mengosongkan seluruh isi database.
+                    Pilihan pembersihan selektif untuk menghapus transaksi saja, master data saja, atau reset total database.
                   </p>
-                  <div className="text-[11px] text-slate-600 bg-slate-50 rounded-lg p-2 space-y-1 border border-slate-100">
-                    <div>• <strong>Reset Transaksi</strong>: Hapus invoice, PL & log (Master customer & part aman).</div>
-                    <div>• <strong>Reset Total</strong>: Kosongkan seluruh tabel database.</div>
+                  <div className="text-[11px] text-slate-600 bg-slate-50 rounded-lg p-2.5 space-y-1 border border-slate-100">
+                    <div>• <strong>Hapus Transaksi</strong>: Invoice, PL, DO & Log (Master aman).</div>
+                    <div>• <strong>Hapus Master</strong>: Customer & part dikosongkan.</div>
+                    <div>• <strong>Reset Total</strong>: Kosongkan seluruh isi database.</div>
                   </div>
                 </div>
 
-                <div className="pt-3 mt-3 border-t border-slate-100 grid grid-cols-2 gap-2">
-                  <button
-                    type="button"
-                    onClick={() => handleClearDummy('transactions')}
-                    disabled={clearingDummy}
-                    className="inline-flex items-center justify-center gap-1.5 py-2 px-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-bold transition-all disabled:opacity-50 cursor-pointer"
-                  >
-                    <Trash2 className="w-3.5 h-3.5" />
-                    <span>Reset Transaksi</span>
-                  </button>
+                <div className="pt-3 mt-3 border-t border-slate-100 space-y-2">
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => handleClearDummy('transactions')}
+                      disabled={clearingDummy}
+                      className="inline-flex items-center justify-center gap-1.5 py-2 px-2 bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-300 rounded-lg text-xs font-bold transition-all disabled:opacity-50 cursor-pointer"
+                      title="Hapus Invoice, Packing List, Delivery Order & Logs (Master Data tetap aman)"
+                    >
+                      <Trash2 className="w-3.5 h-3.5 text-amber-700" />
+                      <span>Hapus Transaksi</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleClearDummy('master_only')}
+                      disabled={clearingDummy}
+                      className="inline-flex items-center justify-center gap-1.5 py-2 px-2 bg-slate-100 hover:bg-slate-200 text-slate-800 border border-slate-300 rounded-lg text-xs font-bold transition-all disabled:opacity-50 cursor-pointer"
+                      title="Kosongkan Customer, Part, Termin & Harga"
+                    >
+                      <Boxes className="w-3.5 h-3.5 text-slate-600" />
+                      <span>Hapus Master</span>
+                    </button>
+                  </div>
                   <button
                     type="button"
                     onClick={() => handleClearDummy('all')}
                     disabled={clearingDummy}
-                    className="inline-flex items-center justify-center gap-1.5 py-2 px-2 bg-rose-700 hover:bg-rose-800 text-white rounded-lg text-xs font-bold shadow-xs transition-all disabled:opacity-50 cursor-pointer"
+                    className="w-full inline-flex items-center justify-center gap-1.5 py-2 px-3 bg-rose-700 hover:bg-rose-800 text-white rounded-lg text-xs font-bold shadow-xs transition-all disabled:opacity-50 cursor-pointer"
+                    title="Kosongkan seluruh tabel database ke titik nol"
                   >
                     <AlertTriangle className="w-3.5 h-3.5" />
-                    <span>Reset Total</span>
+                    <span>Reset Total (Hapus Keduanya)</span>
                   </button>
                 </div>
               </div>
@@ -1137,8 +1198,8 @@ export default function WebsiteSettings({ refreshTrigger }) {
                         <Sliders className="w-5 h-5" />
                       </span>
                       <div>
-                        <h3 className="text-base font-bold text-slate-900">Custom Database Seeder</h3>
-                        <p className="text-xs text-slate-500">Atur parameter dan kuantitas data transaksi sintetis dengan leluasa</p>
+                        <h3 className="text-base font-bold text-slate-900">Custom Generator Transaksi</h3>
+                        <p className="text-xs text-slate-500">Atur parameter dan kuantitas transaksi sintetis berdasarkan Master Data aktif</p>
                       </div>
                     </div>
                     <button
@@ -1345,7 +1406,7 @@ export default function WebsiteSettings({ refreshTrigger }) {
                         className="inline-flex items-center gap-2 px-6 py-2.5 bg-emerald-800 hover:bg-emerald-900 text-white rounded-xl text-xs font-bold shadow-md shadow-emerald-800/20 transition-all disabled:opacity-50 cursor-pointer"
                       >
                         {generatingDummy ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />}
-                        <span>{generatingDummy ? 'Sedang Men-generate...' : `🚀 Generate ${seederConfig.count} Data Sekarang`}</span>
+                        <span>{generatingDummy ? 'Sedang Men-generate...' : `🚀 Generate ${seederConfig.count} Transaksi Sekarang`}</span>
                       </button>
                     </div>
                   </div>

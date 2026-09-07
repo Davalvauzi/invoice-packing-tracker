@@ -171,26 +171,15 @@ function getRandomPastDate(monthsBack = 6) {
 }
 
 /**
- * Main procedural seeder function
+ * 1. Seed Master Data Templates ONLY (Customers, Parts, Price History, Terms)
+ * Tidak membuat transaksi invoice, packing list, atau DO.
  * @param {object} db - SQLite database instance
- * @param {object} options - Seeder configuration options
  */
-function runProceduralSeeder(db, options = {}) {
-  const {
-    count = 10,
-    dateRangeMonths = 6,
-    includePL = true,
-    includeDO = true,
-    currencies = ['USD', 'IDR', 'JPY']
-  } = options;
-
+function seedMasterTemplate(db) {
   let insertedCustomers = 0;
   let insertedParts = 0;
-  let insertedInvoices = 0;
-  let insertedPLs = 0;
-  let insertedDOs = 0;
 
-  // 1. Seed Payment & Delivery Terms if not present
+  // A. Seed Payment & Delivery Terms if not present
   PAYMENT_TERMS.forEach(name => {
     const ex = db.prepare('SELECT id FROM payment_terms WHERE name = ?').get(name);
     if (!ex) db.prepare('INSERT INTO payment_terms (name, description) VALUES (?, ?)').run(name, `Ketentuan pembayaran ${name}`);
@@ -200,7 +189,7 @@ function runProceduralSeeder(db, options = {}) {
     if (!ex) db.prepare('INSERT INTO delivery_terms (name, description) VALUES (?, ?)').run(name, `Ketentuan pengiriman ${name}`);
   });
 
-  // 2. Seed Master Customers (randomize or ensure all sample companies exist)
+  // B. Seed Master Customers (12 Companies)
   const insertCust = db.prepare(`
     INSERT INTO customers (customer_id, customer_name, address, bill_to, ship_to, contact_person, phone, is_dummy)
     VALUES (?, ?, ?, ?, ?, ?, ?, 1)
@@ -214,10 +203,7 @@ function runProceduralSeeder(db, options = {}) {
     }
   });
 
-  // Get all active customers for sampling
-  const allCustomers = db.prepare('SELECT * FROM customers').all();
-
-  // 3. Seed Master Parts (randomize or ensure sample parts exist)
+  // C. Seed Master Parts (15 Precision Parts)
   const insertPart = db.prepare(`
     INSERT INTO parts (part_name, part_no, length, width, height, unit, qty_per_box, price, is_dummy)
     VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1)
@@ -250,9 +236,49 @@ function runProceduralSeeder(db, options = {}) {
     }
   });
 
+  const totalCustomers = db.prepare('SELECT COUNT(*) as c FROM customers').get().c;
+  const totalParts = db.prepare('SELECT COUNT(*) as c FROM parts').get().c;
+
+  return {
+    insertedCustomers,
+    insertedParts,
+    totalCustomers,
+    totalParts
+  };
+}
+
+/**
+ * 2. Generate Transactions ONLY (Invoices, Packing Lists, Delivery Orders, Data Logger)
+ * Menggunakan Customer dan Part yang SUDAH ADA di database.
+ * TIDAK MENAMBAH customer atau part baru.
+ * @param {object} db - SQLite database instance
+ * @param {object} options - Seeder configuration options
+ */
+function generateTransactionsOnly(db, options = {}) {
+  const {
+    count = 10,
+    dateRangeMonths = 6,
+    includePL = true,
+    includeDO = true,
+    currencies = ['USD', 'IDR', 'JPY']
+  } = options;
+
+  // Ambil data customer dan part yang sudah ada di database
+  const allCustomers = db.prepare('SELECT * FROM customers').all();
   const allParts = db.prepare('SELECT * FROM parts').all();
 
-  // 4. Generate Procedural Invoices
+  if (allCustomers.length === 0) {
+    throw new Error('Master Customer masih kosong! Silakan inisialisasi Template Master Data terlebih dahulu.');
+  }
+  if (allParts.length === 0) {
+    throw new Error('Katalog Produk & Part masih kosong! Silakan inisialisasi Template Master Data terlebih dahulu.');
+  }
+
+  let insertedInvoices = 0;
+  let insertedPLs = 0;
+  let insertedDOs = 0;
+
+  // Generate Procedural Invoices
   // To keep dates realistic and sequential, generate dates first, sort them chronologically
   const generatedDates = [];
   for (let i = 0; i < count; i++) {
@@ -403,15 +429,27 @@ function runProceduralSeeder(db, options = {}) {
   }
 
   return {
-    insertedCustomers,
-    insertedParts,
     insertedInvoices,
     insertedPLs,
     insertedDOs
   };
 }
 
+/**
+ * Backward-compatible wrapper
+ */
+function runProceduralSeeder(db, options = {}) {
+  const custCount = db.prepare('SELECT COUNT(*) as c FROM customers').get().c;
+  const partCount = db.prepare('SELECT COUNT(*) as c FROM parts').get().c;
+  if (custCount === 0 || partCount === 0) {
+    seedMasterTemplate(db);
+  }
+  return generateTransactionsOnly(db, options);
+}
+
 module.exports = {
+  seedMasterTemplate,
+  generateTransactionsOnly,
   runProceduralSeeder,
   SAMPLE_COMPANIES,
   SAMPLE_PARTS

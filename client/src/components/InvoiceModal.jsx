@@ -226,7 +226,10 @@ export default function InvoiceModal({ isOpen, onClose, openPrintTab, onSuccess 
   };
 
   const addItemRow = () => {
-    setItems(prev => [...prev, createEmptyItem()]);
+    const lastPo = items[items.length - 1]?.customer_po_no || '';
+    const newItem = createEmptyItem();
+    if (lastPo) newItem.customer_po_no = lastPo;
+    setItems(prev => [...prev, newItem]);
   };
 
   const removeItemRow = (index) => {
@@ -528,8 +531,8 @@ export default function InvoiceModal({ isOpen, onClose, openPrintTab, onSuccess 
                 </div>
               </div>
 
-              {/* Row 4: Terms & PO No */}
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              {/* Row 4: Terms of Payment & Delivery */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-[11px] font-bold text-slate-700 uppercase mb-1">
                     PAYMENT TERM
@@ -560,19 +563,6 @@ export default function InvoiceModal({ isOpen, onClose, openPrintTab, onSuccess 
                       <option key={term.id} value={term.name}>{term.name}</option>
                     ))}
                   </select>
-                </div>
-
-                <div>
-                  <label className="block text-[11px] font-bold text-slate-700 uppercase mb-1">
-                    CUSTOMER PO NO
-                  </label>
-                  <input
-                    type="text"
-                    placeholder="Contoh: PO-AHM-2026-99"
-                    value={formData.customer_po_no}
-                    onChange={(e) => setFormData({ ...formData, customer_po_no: e.target.value })}
-                    className="w-full px-3 py-2 rounded-xl border border-slate-300 focus:border-emerald-600 font-mono text-xs bg-white"
-                  />
                 </div>
               </div>
             </div>
@@ -667,11 +657,11 @@ export default function InvoiceModal({ isOpen, onClose, openPrintTab, onSuccess 
 
                       <div>
                         <label className="block text-[10px] font-bold text-slate-700 uppercase mb-1">
-                          CUST PO NO (OPSIONAL / PER ITEM)
+                          CUST PO NO
                         </label>
                         <input
                           type="text"
-                          placeholder={formData.customer_po_no || "Ikuti PO utama"}
+                          placeholder="Contoh: 726890 - 1 - 22"
                           value={item.customer_po_no}
                           onChange={(e) => handleItemChange(index, 'customer_po_no', e.target.value)}
                           className="w-full px-2.5 py-1.5 rounded-lg border border-slate-300 bg-white font-mono text-xs focus:border-emerald-600"

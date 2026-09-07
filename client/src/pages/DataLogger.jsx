@@ -724,9 +724,14 @@ export default function DataLogger({
           <table className="w-full text-left text-xs text-slate-700">
             <thead className="bg-slate-50 text-slate-500 uppercase tracking-wider font-semibold border-b border-slate-200 select-none">
               <tr>
-                <th className="px-3 py-3.5 w-14 text-center">
-                  {viewMode === 'tree' ? 'Tree' : 'No'}
-                </th>
+                {viewMode === 'tree' ? (
+                  <>
+                    <th className="px-2.5 py-3.5 w-12 text-center">No</th>
+                    <th className="px-2 py-3.5 w-10 text-center">Tree</th>
+                  </>
+                ) : (
+                  <th className="px-3 py-3.5 w-14 text-center">No</th>
+                )}
                 <th className="px-3 py-3.5 cursor-pointer hover:text-slate-800" onClick={() => toggleSort('doc_type')}>
                   <div className="flex items-center gap-1">Tipe <ArrowUpDown className="w-3 h-3" /></div>
                 </th>
@@ -739,29 +744,21 @@ export default function DataLogger({
                 <th className="px-4 py-3.5 cursor-pointer hover:text-slate-800" onClick={() => toggleSort('customer_name')}>
                   <div className="flex items-center gap-1">Customer <ArrowUpDown className="w-3 h-3" /></div>
                 </th>
-                <th className="px-3 py-3.5">PO Number</th>
-                <th className="px-4 py-3.5">Part Specification</th>
                 <th className="px-3 py-3.5">Terms / Delivery</th>
-                <th className="px-3 py-3.5 text-center cursor-pointer hover:text-slate-800" onClick={() => toggleSort('box_qty')}>
-                  <div className="flex items-center justify-center gap-1">Box <ArrowUpDown className="w-3 h-3" /></div>
-                </th>
-                <th className="px-3 py-3.5 text-center cursor-pointer hover:text-slate-800" onClick={() => toggleSort('pallet_qty')}>
-                  <div className="flex items-center justify-center gap-1">Pallet <ArrowUpDown className="w-3 h-3" /></div>
-                </th>
                 <th className="px-4 py-3.5 text-right">Aksi</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
               {loading ? (
                 <tr>
-                  <td colSpan={11} className="px-6 py-12 text-center text-slate-400">
+                  <td colSpan={viewMode === 'tree' ? 8 : 7} className="px-6 py-12 text-center text-slate-400">
                     <RefreshCw className="w-6 h-6 animate-spin mx-auto mb-2 text-emerald-700" />
                     Memuat data logger...
                   </td>
                 </tr>
               ) : logs.length === 0 ? (
                 <tr>
-                  <td colSpan={11} className="px-6 py-12 text-center text-slate-400">
+                  <td colSpan={viewMode === 'tree' ? 8 : 7} className="px-6 py-12 text-center text-slate-400">
                     Tidak ada transaksi yang cocok dengan filter yang dipilih.
                   </td>
                 </tr>
@@ -782,6 +779,9 @@ export default function DataLogger({
                           className="bg-white hover:bg-emerald-50/40 transition-colors cursor-pointer group"
                           onClick={() => setSelectedLog(inv)}
                         >
+                          <td className="px-2.5 py-3 text-center text-slate-500 font-mono text-[11px] font-bold">
+                            {idx + 1}
+                          </td>
                           <td className="px-2 py-3 text-center" onClick={(e) => { e.stopPropagation(); toggleRow(inv.doc_number); }}>
                             {hasChildren ? (
                               <button
@@ -824,7 +824,7 @@ export default function DataLogger({
                           <td className="px-3 py-3 text-slate-500 whitespace-nowrap">
                             {inv.doc_date}
                           </td>
-                          <td className="px-4 py-3 font-semibold text-slate-800 max-w-[180px] truncate">
+                          <td className="px-4 py-3 font-semibold text-slate-800 max-w-[220px] truncate">
                             {inv.customer_name}
                             {inv.customer_id && (
                               <span className="block text-[10px] text-slate-400 font-mono font-normal">
@@ -832,25 +832,8 @@ export default function DataLogger({
                               </span>
                             )}
                           </td>
-                          <td className="px-3 py-3 font-mono text-slate-600 whitespace-nowrap">
-                            {inv.po_no || '-'}
-                          </td>
-                          <td className="px-4 py-3 text-slate-700 max-w-[200px]">
-                            <div className="truncate font-medium">{inv.part_name || '-'}</div>
-                            {inv.dimensions && (
-                              <span className="text-[10px] text-slate-400 font-mono">
-                                Dim: {inv.dimensions}
-                              </span>
-                            )}
-                          </td>
                           <td className="px-3 py-3 text-slate-600 text-[11px] whitespace-nowrap">
                             {inv.terms_of_delivery || inv.payment_term || '-'}
-                          </td>
-                          <td className="px-3 py-3 text-center font-mono font-bold text-slate-900">
-                            {inv.box_qty || 0}
-                          </td>
-                          <td className="px-3 py-3 text-center font-mono font-bold text-slate-900">
-                            {inv.pallet_qty || 0}
                           </td>
                           <td className="px-4 py-3 text-right whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
                             <div className="flex items-center justify-end gap-1.5">
@@ -888,14 +871,17 @@ export default function DataLogger({
                         </tr>
 
                         {/* Child Rows (Packing List & Delivery Order) */}
-                        {isExpanded && group.children.map((child) => (
+                        {isExpanded && group.children.map((child, cIdx) => (
                           <tr 
                             key={`child-${child.id}`}
                             className="bg-slate-50/70 hover:bg-slate-100/90 transition-colors cursor-pointer border-l-4 border-l-emerald-600"
                             onClick={() => setSelectedLog(child)}
                           >
+                            <td className="px-2.5 py-2.5 text-center text-slate-400 font-mono text-[10px] select-none">
+                              {idx + 1}.{cIdx + 1}
+                            </td>
                             <td className="px-2 py-2.5 text-center text-slate-400">
-                              <CornerDownRight className="w-3.5 h-3.5 ml-auto mr-1 text-slate-400" />
+                              <CornerDownRight className="w-3.5 h-3.5 mx-auto text-slate-400" />
                             </td>
                             <td className="px-3 py-2.5 font-medium whitespace-nowrap">
                               <span className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-extrabold tracking-wide ${
@@ -913,23 +899,11 @@ export default function DataLogger({
                             <td className="px-3 py-2.5 text-slate-500 whitespace-nowrap">
                               {child.doc_date}
                             </td>
-                            <td className="px-4 py-2.5 font-semibold text-slate-700 max-w-[180px] truncate">
+                            <td className="px-4 py-2.5 font-semibold text-slate-700 max-w-[220px] truncate">
                               {child.customer_name}
-                            </td>
-                            <td className="px-3 py-2.5 font-mono text-slate-500 whitespace-nowrap">
-                              {child.po_no || '-'}
-                            </td>
-                            <td className="px-4 py-2.5 text-slate-600 max-w-[200px]">
-                              <div className="truncate font-medium">{child.part_name || '-'}</div>
                             </td>
                             <td className="px-3 py-2.5 text-slate-500 text-[11px] whitespace-nowrap">
                               {child.terms_of_delivery || child.payment_term || '-'}
-                            </td>
-                            <td className="px-3 py-2.5 text-center font-mono font-bold text-slate-700">
-                              {child.box_qty || 0}
-                            </td>
-                            <td className="px-3 py-2.5 text-center font-mono font-bold text-slate-700">
-                              {child.pallet_qty || 0}
                             </td>
                             <td className="px-4 py-2.5 text-right whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
                               <div className="flex items-center justify-end gap-1.5">
@@ -976,7 +950,7 @@ export default function DataLogger({
                   {treeData.orphans.length > 0 && (
                     <>
                       <tr className="bg-slate-100/80 border-t-2 border-slate-300">
-                        <td colSpan={11} className="px-4 py-2 font-bold text-slate-600 text-[11px] uppercase tracking-wider">
+                        <td colSpan={viewMode === 'tree' ? 8 : 7} className="px-4 py-2 font-bold text-slate-600 text-[11px] uppercase tracking-wider">
                           📁 Dokumen Lainnya / Tanpa Induk Invoice Terhubung ({treeData.orphans.length})
                         </td>
                       </tr>
@@ -986,8 +960,11 @@ export default function DataLogger({
                           className="hover:bg-slate-50/80 transition-colors cursor-pointer group"
                           onClick={() => setSelectedLog(orphan)}
                         >
-                          <td className="px-3 py-3 text-center text-slate-400 font-mono text-[11px]">
-                            {oIdx + 1}
+                          <td className="px-2.5 py-3 text-center text-slate-500 font-mono text-[11px] font-bold">
+                            {treeData.invoiceTrees.length + oIdx + 1}
+                          </td>
+                          <td className="px-2 py-3 text-center text-slate-300 select-none">
+                            —
                           </td>
                           <td className="px-3 py-3 font-medium whitespace-nowrap">
                             <span className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-extrabold tracking-wide ${
@@ -1004,23 +981,11 @@ export default function DataLogger({
                           <td className="px-3 py-3 text-slate-500 whitespace-nowrap">
                             {orphan.doc_date}
                           </td>
-                          <td className="px-4 py-3 font-semibold text-slate-800 max-w-[180px] truncate">
+                          <td className="px-4 py-3 font-semibold text-slate-800 max-w-[220px] truncate">
                             {orphan.customer_name}
-                          </td>
-                          <td className="px-3 py-3 font-mono text-slate-600 whitespace-nowrap">
-                            {orphan.po_no || '-'}
-                          </td>
-                          <td className="px-4 py-3 text-slate-700 max-w-[200px]">
-                            <div className="truncate font-medium">{orphan.part_name || '-'}</div>
                           </td>
                           <td className="px-3 py-3 text-slate-600 text-[11px] whitespace-nowrap">
                             {orphan.terms_of_delivery || orphan.payment_term || '-'}
-                          </td>
-                          <td className="px-3 py-3 text-center font-mono font-bold text-slate-900">
-                            {orphan.box_qty || 0}
-                          </td>
-                          <td className="px-3 py-3 text-center font-mono font-bold text-slate-900">
-                            {orphan.pallet_qty || 0}
                           </td>
                           <td className="px-4 py-3 text-right whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
                             <div className="flex items-center justify-end gap-1.5">
@@ -1070,7 +1035,7 @@ export default function DataLogger({
                     className="hover:bg-slate-50/80 transition-colors cursor-pointer group"
                     onClick={() => setSelectedLog(log)}
                   >
-                    <td className="px-3 py-3 text-center text-slate-400 font-mono text-[11px]">
+                    <td className="px-3 py-3 text-center text-slate-500 font-mono text-[11px] font-semibold">
                       {index + 1}
                     </td>
                     <td className="px-3 py-3 font-medium whitespace-nowrap">
@@ -1090,7 +1055,7 @@ export default function DataLogger({
                     <td className="px-3 py-3 text-slate-500 whitespace-nowrap">
                       {log.doc_date}
                     </td>
-                    <td className="px-4 py-3 font-semibold text-slate-800 max-w-[180px] truncate">
+                    <td className="px-4 py-3 font-semibold text-slate-800 max-w-[220px] truncate">
                       {log.customer_name}
                       {log.customer_id && (
                         <span className="block text-[10px] text-slate-400 font-mono font-normal">
@@ -1098,25 +1063,8 @@ export default function DataLogger({
                         </span>
                       )}
                     </td>
-                    <td className="px-3 py-3 font-mono text-slate-600 whitespace-nowrap">
-                      {log.po_no || '-'}
-                    </td>
-                    <td className="px-4 py-3 text-slate-700 max-w-[200px]">
-                      <div className="truncate font-medium">{log.part_name || '-'}</div>
-                      {log.dimensions && (
-                        <span className="text-[10px] text-slate-400 font-mono">
-                          Dim: {log.dimensions}
-                        </span>
-                      )}
-                    </td>
                     <td className="px-3 py-3 text-slate-600 text-[11px] whitespace-nowrap">
                       {log.terms_of_delivery || log.payment_term || '-'}
-                    </td>
-                    <td className="px-3 py-3 text-center font-mono font-bold text-slate-900">
-                      {log.box_qty || 0}
-                    </td>
-                    <td className="px-3 py-3 text-center font-mono font-bold text-slate-900">
-                      {log.pallet_qty || 0}
                     </td>
                     <td className="px-4 py-3 text-right whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
                       <div className="flex items-center justify-end gap-1.5">
@@ -1231,6 +1179,51 @@ export default function DataLogger({
                   <p className="text-slate-500 font-mono mt-0.5">Dimensi (L x W x H): {selectedLog.dimensions}</p>
                 )}
               </div>
+
+              {/* Multi-item Table if items exist and length > 1 */}
+              {(() => {
+                let parsedItems = [];
+                try {
+                  if (selectedLog.items) {
+                    parsedItems = typeof selectedLog.items === 'string' ? JSON.parse(selectedLog.items) : selectedLog.items;
+                  }
+                } catch (e) {}
+
+                if (Array.isArray(parsedItems) && parsedItems.length > 1) {
+                  return (
+                    <div className="p-3 bg-white border border-slate-200 rounded-lg overflow-x-auto">
+                      <span className="text-[10px] text-slate-500 font-bold block mb-2 uppercase tracking-wider">
+                        Rincian Multi-Item Produk ({parsedItems.length} Produk)
+                      </span>
+                      <table className="w-full text-left text-xs border border-slate-100 rounded">
+                        <thead className="bg-slate-50 text-[10px] text-slate-500 font-semibold uppercase">
+                          <tr>
+                            <th className="p-1.5 border-b text-center w-8">No</th>
+                            <th className="p-1.5 border-b">Cust PO No</th>
+                            <th className="p-1.5 border-b">Part Name / Specification</th>
+                            <th className="p-1.5 border-b text-right">Qty</th>
+                            <th className="p-1.5 border-b text-center">Box</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100">
+                          {parsedItems.map((item, itIdx) => (
+                            <tr key={itIdx} className="hover:bg-slate-50/80">
+                              <td className="p-1.5 text-slate-400 font-mono text-center">{itIdx + 1}</td>
+                              <td className="p-1.5 font-mono font-bold text-slate-800">{item.po_no || '-'}</td>
+                              <td className="p-1.5 font-medium text-slate-700">{item.part_name || '-'}</td>
+                              <td className="p-1.5 text-right font-mono font-semibold text-slate-900">
+                                {item.qty != null ? Number(item.qty).toLocaleString() : '-'} {item.unit || 'PCS'}
+                              </td>
+                              <td className="p-1.5 text-center font-mono font-bold text-slate-800">{item.box_qty || '-'}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  );
+                }
+                return null;
+              })()}
 
               <div className="grid grid-cols-2 gap-3">
                 <div className="p-3 bg-slate-50 border border-slate-200 rounded-lg text-center">

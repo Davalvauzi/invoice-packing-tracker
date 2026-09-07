@@ -8,11 +8,17 @@ import {
   X, 
   PlusCircle, 
   AlertCircle,
-  Printer
+  Printer,
+  DollarSign,
+  Clock,
+  Calculator,
+  CheckCircle2
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
+import { useNotification } from '../context/NotificationContext';
 
 export default function InvoiceForm({ setActiveView, openPrintTab }) {
+  const { showSuccess, showError, showWarning } = useNotification();
   const [customers, setCustomers] = useState([]);
   const [paymentTerms, setPaymentTerms] = useState([]);
   const [deliveryTerms, setDeliveryTerms] = useState([]);
@@ -30,9 +36,20 @@ export default function InvoiceForm({ setActiveView, openPrintTab }) {
     part_name: '',
     no_of_pallet: '',
     no_of_box: '',
+    qty_per_box: '',
+    total_qty: '',
+    unit_price: '',
+    total_amount: '',
+    vat_rate: 11,
+    vat_amount: '',
+    grand_total: '',
+    currency: 'USD',
     notes: '',
     image_url: ''
   });
+
+  const [effectivePriceInfo, setEffectivePriceInfo] = useState(null);
+  const [loadingPrice, setLoadingPrice] = useState(false);
 
   const [selectedFile, setSelectedFile] = useState(null);
   const [previewUrl, setPreviewUrl] = useState('');
@@ -82,9 +99,94 @@ export default function InvoiceForm({ setActiveView, openPrintTab }) {
     }));
   };
 
+  const recalculateFinancials = (boxes, qtyPerB, unitP, vatR) => {
+    const numBoxes = Number(boxes) || 0;
+    const numQtyBox = Number(qtyPerB) || 0;
+    const computedTotalQty = numBoxes * numQtyBox;
+    const numPrice = Number(unitP) || 0;
+    const computedTotalAmount = computedTotalQty * numPrice;
+    const numVatRate = vatR !== undefined ? Number(vatR) : 11;
+    const computedVatAmount = computedTotalAmount * (numVatRate / 100);
+    const computedGrandTotal = computedTotalAmount + computedVatAmount;
+
+    return {
+      total_qty: computedTotalQty > 0 ? computedTotalQty : '',
+      total_amount: computedTotalAmount > 0 ? computedTotalAmount.toFixed(2) : '',
+      vat_amount: computedVatAmount > 0 ? computedVatAmount.toFixed(2) : '',
+      grand_total: computedGrandTotal > 0 ? computedGrandTotal.toFixed(2) : ''
+    };
+  };
+
+  const lookupPriceForPart = async (partInput, dateInput) => {
+    if (!partInput) {
+      setEffectivePriceInfo(null);
+      return;
+    }
+    const matched = parts.find(p => 
+      `${p.part_name} (${p.part_no})`.toLowerCase() === partInput.toLowerCase() ||
+      p.part_name.toLowerCase() === partInput.toLowerCase() ||
+      p.part_no.toLowerCase() === partInput.toLowerCase()
+    );
+
+    if (matched) {
+      setLoadingPrice(true);
+      try {
+        const curDate = dateInput || formData.invoice_date || new Date().toISOString().slice(0, 10);
+        const res = await fetch(`/api/parts/${matched.id}/price-at-date?date=${curDate}`);
+        const data = await res.json();
+        setEffectivePriceInfo({ ...data, part_name: matched.part_name, part_no: matched.part_no });
+
+        setFormData(prev => {
+          const qBox = matched.qty_per_box || prev.qty_per_box;
+          const uPrice = data.price !== undefined ? data.price : prev.unit_price;
+          const fin = recalculateFinancials(prev.no_of_box, qBox, uPrice, prev.vat_rate);
+          return {
+            ...prev,
+            part_name: `${matched.part_name} (${matched.part_no})`,
+            qty_per_box: qBox,
+            unit_price: uPrice,
+            currency: data.currency || prev.currency || 'USD',
+            ...fin
+          };
+        });
+      } catch (err) {
+        console.error('Failed to lookup price:', err);
+      } finally {
+        setLoadingPrice(false);
+      }
+    }
+  };
+
+  const handleDateChange = (e) => {
+    const newDate = e.target.value;
+    setFormData(prev => ({ ...prev, invoice_date: newDate }));
+    if (formData.part_name) {
+      lookupPriceForPart(formData.part_name, newDate);
+    }
+  };
+
   const handlePartChange = (e) => {
     const val = e.target.value;
     setFormData(prev => ({ ...prev, part_name: val }));
+    lookupPriceForPart(val, formData.invoice_date);
+  };
+
+  const handleBoxChange = (e) => {
+    const val = e.target.value;
+    const fin = recalculateFinancials(val, formData.qty_per_box, formData.unit_price, formData.vat_rate);
+    setFormData(prev => ({ ...prev, no_of_box: val, ...fin }));
+  };
+
+  const handleQtyPerBoxChange = (e) => {
+    const val = e.target.value;
+    const fin = recalculateFinancials(formData.no_of_box, val, formData.unit_price, formData.vat_rate);
+    setFormData(prev => ({ ...prev, qty_per_box: val, ...fin }));
+  };
+
+  const handleUnitPriceChange = (e) => {
+    const val = e.target.value;
+    const fin = recalculateFinancials(formData.no_of_box, formData.qty_per_box, val, formData.vat_rate);
+    setFormData(prev => ({ ...prev, unit_price: val, ...fin }));
   };
 
   const handleFileChange = (e) => {
@@ -104,11 +206,11 @@ export default function InvoiceForm({ setActiveView, openPrintTab }) {
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!formData.invoice_number.trim()) {
-      alert('Mohon isi INVOICE NUMBER');
+      showWarning('Mohon isi INVOICE NUMBER');
       return;
     }
     if (!formData.customer_name.trim()) {
-      alert('Mohon pilih CUSTOMER NAME');
+      showWarning('Mohon pilih CUSTOMER NAME');
       return;
     }
 
@@ -146,6 +248,7 @@ export default function InvoiceForm({ setActiveView, openPrintTab }) {
 
       const savedData = await postRes.json();
       setSubmittedDoc(savedData);
+      showSuccess('Invoice berhasil dibuat dan disimpan!');
 
       // Trigger Confetti
       confetti({
@@ -158,7 +261,7 @@ export default function InvoiceForm({ setActiveView, openPrintTab }) {
       openPrintTab('print-invoice', savedData.id);
 
     } catch (err) {
-      alert('Terjadi kesalahan: ' + err.message);
+      showError('Terjadi kesalahan: ' + err.message);
     } finally {
       setIsSubmitting(false);
     }
@@ -285,7 +388,7 @@ export default function InvoiceForm({ setActiveView, openPrintTab }) {
                 type="date"
                 required
                 value={formData.invoice_date}
-                onChange={(e) => setFormData({ ...formData, invoice_date: e.target.value })}
+                onChange={handleDateChange}
                 className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 focus:border-emerald-600 focus:ring-2 focus:ring-emerald-600/20 text-sm transition-all"
               />
             </div>
@@ -425,9 +528,141 @@ export default function InvoiceForm({ setActiveView, openPrintTab }) {
                 min="0"
                 placeholder="0"
                 value={formData.no_of_box}
-                onChange={(e) => setFormData({ ...formData, no_of_box: e.target.value })}
+                onChange={handleBoxChange}
                 className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 focus:border-emerald-600 focus:ring-2 focus:ring-emerald-600/20 font-mono text-sm bg-white transition-all"
               />
+            </div>
+          </div>
+
+          {/* Row 5.5: Kalkulasi Keuangan & Riwayat Harga Barang */}
+          <div className="bg-emerald-50/50 p-5 rounded-2xl border border-emerald-200/80 space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-emerald-200/60 pb-3">
+              <div className="flex items-center gap-2 text-emerald-900 font-extrabold text-xs uppercase tracking-wider">
+                <Calculator className="w-4 h-4 text-emerald-700" />
+                <span>Kalkulasi Keuangan & Riwayat Harga Aktif</span>
+              </div>
+              {effectivePriceInfo ? (
+                <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-100 text-emerald-800 text-[11px] font-semibold border border-emerald-300">
+                  <Clock className="w-3.5 h-3.5 text-emerald-600" />
+                  <span>
+                    Harga aktif per {formData.invoice_date}: <strong>{effectivePriceInfo.currency || 'USD'} {Number(effectivePriceInfo.price).toFixed(4)}</strong>
+                  </span>
+                </div>
+              ) : (
+                <span className="text-[11px] text-slate-500 italic">
+                  Pilih part untuk melihat harga aktif dari Master Data
+                </span>
+              )}
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
+              {/* Qty Per Box */}
+              <div>
+                <label className="block text-[11px] font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                  QTY / BOX
+                </label>
+                <input
+                  type="number"
+                  min="0"
+                  placeholder="0"
+                  value={formData.qty_per_box}
+                  onChange={handleQtyPerBoxChange}
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 focus:border-emerald-600 focus:ring-2 focus:ring-emerald-600/20 font-mono text-sm bg-white transition-all"
+                />
+                <span className="text-[10px] text-slate-400 mt-1 block">Pcs per kotak</span>
+              </div>
+
+              {/* Total Qty */}
+              <div>
+                <label className="block text-[11px] font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                  TOTAL QUANTITY (PCS)
+                </label>
+                <input
+                  type="number"
+                  readOnly
+                  placeholder="0"
+                  value={formData.total_qty}
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 font-mono font-bold text-sm bg-slate-100 text-slate-800"
+                />
+                <span className="text-[10px] text-slate-400 mt-1 block">Box × Qty/Box (Otomatis)</span>
+              </div>
+
+              {/* Currency & Unit Price */}
+              <div>
+                <div className="flex items-center justify-between mb-1.5">
+                  <label className="text-[11px] font-bold text-slate-700 uppercase tracking-wider">
+                    UNIT PRICE
+                  </label>
+                  <select
+                    value={formData.currency}
+                    onChange={(e) => {
+                      const newCurr = e.target.value;
+                      setFormData(prev => ({ ...prev, currency: newCurr }));
+                    }}
+                    className="text-[10px] font-bold py-0.5 px-1.5 bg-emerald-100/60 border border-emerald-300 text-emerald-900 rounded"
+                  >
+                    <option value="USD">USD ($)</option>
+                    <option value="IDR">IDR (Rp)</option>
+                    <option value="JPY">JPY (¥)</option>
+                    <option value="EUR">EUR (€)</option>
+                    <option value="SGD">SGD (S$)</option>
+                  </select>
+                </div>
+                <div className="relative">
+                  <span className="absolute inset-y-0 left-0 pl-3 flex items-center text-slate-400 font-bold text-xs">
+                    {formData.currency === 'USD' ? '$' : formData.currency === 'IDR' ? 'Rp' : formData.currency}
+                  </span>
+                  <input
+                    type="number"
+                    step="0.0001"
+                    min="0"
+                    placeholder="0.0000"
+                    value={formData.unit_price}
+                    onChange={handleUnitPriceChange}
+                    className="w-full pl-9 pr-3 py-2.5 rounded-xl border border-emerald-300 focus:border-emerald-600 focus:ring-2 focus:ring-emerald-600/20 font-mono font-bold text-sm bg-white text-emerald-950 transition-all"
+                  />
+                </div>
+                <span className="text-[10px] text-emerald-700 mt-1 block">
+                  {effectivePriceInfo ? '✓ Sinkron Riwayat Harga' : 'Dapat diisi manual'}
+                </span>
+              </div>
+
+              {/* Total Amount (Subtotal) */}
+              <div>
+                <label className="block text-[11px] font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                  TOTAL AMOUNT ({formData.currency})
+                </label>
+                <input
+                  type="text"
+                  readOnly
+                  placeholder="0.00"
+                  value={formData.total_amount ? `${formData.currency} ${Number(formData.total_amount).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '-'}
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 font-mono font-bold text-sm bg-slate-100 text-slate-900"
+                />
+                <span className="text-[10px] text-slate-400 mt-1 block">Total Qty × Unit Price</span>
+              </div>
+            </div>
+
+            {/* Subtotal summary bar */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-3 border-t border-emerald-200/50">
+              <div className="bg-white/80 p-3 rounded-xl border border-emerald-200 flex items-center justify-between">
+                <span className="text-[11px] text-slate-600 font-medium">Subtotal</span>
+                <span className="font-mono font-bold text-slate-900 text-xs">
+                  {formData.currency} {Number(formData.total_amount || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                </span>
+              </div>
+              <div className="bg-white/80 p-3 rounded-xl border border-emerald-200 flex items-center justify-between">
+                <span className="text-[11px] text-slate-600 font-medium">PPN / VAT ({formData.vat_rate}%)</span>
+                <span className="font-mono font-bold text-slate-900 text-xs">
+                  {formData.currency} {Number(formData.vat_amount || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                </span>
+              </div>
+              <div className="bg-emerald-800 text-white p-3 rounded-xl shadow-xs flex items-center justify-between">
+                <span className="text-[11px] font-extrabold uppercase tracking-wide">Grand Total</span>
+                <span className="font-mono font-black text-sm text-emerald-200">
+                  {formData.currency} {Number(formData.grand_total || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                </span>
+              </div>
             </div>
           </div>
 

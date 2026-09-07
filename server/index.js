@@ -5,7 +5,7 @@ const path = require('path');
 const fs = require('fs');
 const os = require('os');
 const db = require('./db');
-const { seedMasterTemplate, generateTransactionsOnly, runProceduralSeeder } = require('./seeder');
+const { seedMasterTemplate, generateTransactionsOnly, runProceduralSeeder, SAMPLE_COMPANIES, SAMPLE_PARTS } = require('./seeder');
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -247,13 +247,37 @@ app.get('/api/dummy-data/stats', (req, res) => {
   }
 });
 
+// Endpoint: Mendapatkan Daftar Template Master Data beserta Kategori & Sektor
+app.get('/api/dummy-data/master-templates', (req, res) => {
+  try {
+    res.json({
+      companies: SAMPLE_COMPANIES,
+      parts: SAMPLE_PARTS,
+      sectors: [
+        { id: 'all', label: 'Semua Sektor' },
+        { id: 'automotive_oem', label: 'Otomotif & Alat Berat (OEM)' },
+        { id: 'components_tier1', label: 'Komponen Presisi (Tier-1)' },
+        { id: 'electronics_precision', label: 'Elektronik & Perangkat Industri' }
+      ],
+      categories: [
+        { id: 'all', label: 'Semua Kategori' },
+        { id: 'stamping_mechanical', label: 'Stamping & Mekanikal' },
+        { id: 'electrical_sensor', label: 'Elektrikal & Sensor' },
+        { id: 'gasket_seals_cases', label: 'Gasket, Seal & Casing' }
+      ]
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // Endpoint Khusus: Inisialisasi Template Master Data (Customer & Produk)
 app.post('/api/dummy-data/seed-master', (req, res) => {
   try {
-    const result = seedMasterTemplate(db);
+    const result = seedMasterTemplate(db, req.body || {});
     res.json({
       success: true,
-      message: `Berhasil menginisialisasi template Master Data! Total aktif: ${result.totalCustomers} Customer, ${result.totalParts} Part/Produk.`,
+      message: `Berhasil menginisialisasi template Master Data! (+${result.insertedCustomers} Customer baru, +${result.insertedParts} Part baru). Total aktif: ${result.totalCustomers} Customer, ${result.totalParts} Part.`,
       result
     });
   } catch (err) {

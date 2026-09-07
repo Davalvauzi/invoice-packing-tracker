@@ -146,17 +146,49 @@ export default function WebsiteSettings({ refreshTrigger }) {
   const [statsLoading, setStatsLoading] = useState(false);
   const [isCustomModalOpen, setIsCustomModalOpen] = useState(false);
 
-  // Handle ESC key to close custom dummy modal
+  // Master Template Customization States
+  const [isCustomMasterModalOpen, setIsCustomMasterModalOpen] = useState(false);
+  const [masterTemplates, setMasterTemplates] = useState({ companies: [], parts: [], sectors: [], categories: [] });
+  const [selectedCompanies, setSelectedCompanies] = useState([]);
+  const [selectedParts, setSelectedParts] = useState([]);
+  const [companySectorFilter, setCompanySectorFilter] = useState('all');
+  const [partCategoryFilter, setPartCategoryFilter] = useState('all');
+  const [includePriceHistory, setIncludePriceHistory] = useState(true);
+  const [includeTerms, setIncludeTerms] = useState(true);
+  const [loadingTemplates, setLoadingTemplates] = useState(false);
+
+  // Handle ESC key to close modals
   useEffect(() => {
-    if (!isCustomModalOpen) return;
+    if (!isCustomModalOpen && !isCustomMasterModalOpen) return;
     const handleKeyDown = (e) => {
       if (e.key === 'Escape') {
         setIsCustomModalOpen(false);
+        setIsCustomMasterModalOpen(false);
       }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isCustomModalOpen]);
+  }, [isCustomModalOpen, isCustomMasterModalOpen]);
+
+  const openCustomMasterModal = async () => {
+    setIsCustomMasterModalOpen(true);
+    if (masterTemplates.companies.length === 0) {
+      setLoadingTemplates(true);
+      try {
+        const res = await fetch('/api/dummy-data/master-templates');
+        if (res.ok) {
+          const data = await res.json();
+          setMasterTemplates(data);
+          setSelectedCompanies(data.companies.map(c => c.customer_id));
+          setSelectedParts(data.parts.map(p => p.part_no));
+        }
+      } catch (err) {
+        console.error('Failed to load master templates:', err);
+      } finally {
+        setLoadingTemplates(false);
+      }
+    }
+  };
 
   const [seederConfig, setSeederConfig] = useState({
     count: 10,
@@ -187,24 +219,34 @@ export default function WebsiteSettings({ refreshTrigger }) {
     }
   }, [activeTab]);
 
-  const handleSeedMaster = async () => {
-    const ok = await confirmDialog({
-      title: 'Inisialisasi Master Data Template',
-      message: 'Sistem akan memasukkan 12 Master Customer Industri manufaktur dan 15 Katalog Part Presisi lengkap dengan harga, termin, dan mata uang acuan.\n\nData template yang sudah ada tidak akan diduplikasi (aman/idempotent). Lanjutkan?',
-      confirmText: 'Ya, Inisialisasi Master Data',
-      type: 'info'
-    });
-    if (!ok) return;
+  const handleSeedMaster = async (customPayload = null) => {
+    if (!customPayload) {
+      const ok = await confirmDialog({
+        title: 'Inisialisasi Master Data Template (Preset Lengkap)',
+        message: 'Sistem akan memasukkan seluruh 12 Master Customer Industri manufaktur dan 15 Katalog Part Presisi lengkap dengan harga, termin, dan mata uang acuan.\n\nData template yang sudah ada tidak akan diduplikasi (aman/idempotent). Lanjutkan?',
+        confirmText: 'Ya, Inisialisasi Semua',
+        type: 'info'
+      });
+      if (!ok) return;
+    } else {
+      if ((!customPayload.customerIds || customPayload.customerIds.length === 0) && 
+          (!customPayload.partNos || customPayload.partNos.length === 0)) {
+        showError('Pilih minimal 1 Customer atau 1 Part untuk diinisialisasi.', 'Seleksi Kosong');
+        return;
+      }
+    }
 
     setSeedingMaster(true);
     try {
       const res = await fetch('/api/dummy-data/seed-master', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' }
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(customPayload || {})
       });
       const data = await res.json();
       if (res.ok) {
-        showSuccess(data.message, 'Master Data Diinisialisasi');
+        showSuccess(data.message, 'Master Data Berhasil Diinisialisasi');
+        if (customPayload) setIsCustomMasterModalOpen(false);
         fetchDummyStats();
       } else {
         showError(data.error || 'Gagal menginisialisasi master data');
@@ -1059,15 +1101,25 @@ export default function WebsiteSettings({ refreshTrigger }) {
                   </div>
                 </div>
 
-                <div className="pt-3 mt-3 border-t border-slate-100">
+                <div className="pt-3 mt-3 border-t border-slate-100 grid grid-cols-2 gap-2">
                   <button
                     type="button"
-                    onClick={handleSeedMaster}
+                    onClick={() => handleSeedMaster(null)}
                     disabled={seedingMaster}
-                    className="w-full inline-flex items-center justify-center gap-1.5 py-2.5 px-3 bg-blue-700 hover:bg-blue-800 text-white rounded-lg text-xs font-bold shadow-xs transition-all disabled:opacity-50 cursor-pointer"
+                    className="inline-flex items-center justify-center gap-1.5 py-2 px-3 bg-blue-700 hover:bg-blue-800 text-white rounded-lg text-xs font-bold shadow-xs transition-all disabled:opacity-50 cursor-pointer"
+                    title="Inisialisasi semua 12 customer dan 15 part template secara cepat"
                   >
                     {seedingMaster ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Building2 className="w-3.5 h-3.5" />}
-                    <span>{seedingMaster ? 'Menginisialisasi...' : '🏢 Inisialisasi Master Data'}</span>
+                    <span>{seedingMaster ? 'Mengisi...' : '⚡ Preset (Semua)'}</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={openCustomMasterModal}
+                    disabled={seedingMaster}
+                    className="inline-flex items-center justify-center gap-1.5 py-2 px-3 bg-blue-50 hover:bg-blue-100 text-blue-800 border border-blue-200 rounded-lg text-xs font-bold transition-all disabled:opacity-50 cursor-pointer"
+                  >
+                    <Sliders className="w-3.5 h-3.5" />
+                    <span>Custom Master...</span>
                   </button>
                 </div>
               </div>
@@ -1179,6 +1231,344 @@ export default function WebsiteSettings({ refreshTrigger }) {
               </div>
 
             </div>
+
+            {/* MODAL: Custom Inisialisasi Master Data Template */}
+            {isCustomMasterModalOpen && (
+              <div 
+                onClick={() => setIsCustomMasterModalOpen(false)}
+                className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4"
+              >
+                <div 
+                  onClick={(e) => e.stopPropagation()}
+                  className="bg-white rounded-3xl border border-slate-200 shadow-2xl max-w-5xl w-full overflow-hidden animate-in fade-in zoom-in duration-150 flex flex-col max-h-[90vh]"
+                >
+                  
+                  {/* Header Modal */}
+                  <div className="px-7 py-4 bg-slate-50 border-b border-slate-100 flex items-center justify-between shrink-0">
+                    <div className="flex items-center gap-3">
+                      <span className="p-2.5 bg-blue-100 text-blue-800 rounded-xl shadow-xs">
+                        <Building2 className="w-5 h-5" />
+                      </span>
+                      <div>
+                        <h3 className="text-base font-bold text-slate-900">Custom Inisialisasi Master Data</h3>
+                        <p className="text-xs text-slate-500">Pilih sektor industri, customer, dan komponen part yang ingin didaftarkan ke sistem</p>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setIsCustomMasterModalOpen(false)}
+                      className="p-2 text-slate-400 hover:text-slate-600 rounded-xl hover:bg-slate-200/60 transition-colors cursor-pointer"
+                      title="Tutup (ESC)"
+                    >
+                      <X className="w-5 h-5" />
+                    </button>
+                  </div>
+
+                  {/* Body Modal (2 Columns Wide Layout) */}
+                  <div className="p-6 overflow-y-auto grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    
+                    {/* Kolom Kiri: Seleksi Master Customer */}
+                    <div className="bg-slate-50/80 p-4 sm:p-5 rounded-2xl border border-slate-200 shadow-xs space-y-3.5 flex flex-col">
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="flex items-center gap-2">
+                          <span className="w-2.5 h-2.5 rounded-full bg-blue-600"></span>
+                          <span className="text-xs font-bold text-slate-800 uppercase tracking-wide">
+                            Master Customer Industri
+                          </span>
+                        </div>
+                        <span className="text-blue-700 font-extrabold text-xs px-2.5 py-0.5 bg-blue-100/70 rounded-lg">
+                          {selectedCompanies.length} / {masterTemplates.companies.length} Dipilih
+                        </span>
+                      </div>
+
+                      {/* Filter Sektor & Action Chips */}
+                      <div className="flex items-center justify-between gap-2 flex-wrap pt-1">
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          {[
+                            { id: 'all', label: 'Semua' },
+                            { id: 'automotive_oem', label: 'Otomotif (OEM)' },
+                            { id: 'components_tier1', label: 'Tier-1' },
+                            { id: 'electronics_precision', label: 'Elektronik' }
+                          ].map(s => (
+                            <button
+                              key={s.id}
+                              type="button"
+                              onClick={() => setCompanySectorFilter(s.id)}
+                              className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition-all cursor-pointer ${
+                                companySectorFilter === s.id
+                                  ? 'bg-blue-700 text-white shadow-xs'
+                                  : 'bg-white text-slate-600 hover:bg-slate-200/70 border border-slate-200'
+                              }`}
+                            >
+                              {s.label}
+                            </button>
+                          ))}
+                        </div>
+
+                        <div className="flex items-center gap-1.5 text-[11px] font-semibold text-blue-700">
+                          <button
+                            type="button"
+                            onClick={() => setSelectedCompanies(masterTemplates.companies.map(c => c.customer_id))}
+                            className="hover:underline cursor-pointer"
+                          >
+                            Pilih Semua
+                          </button>
+                          <span className="text-slate-300">|</span>
+                          <button
+                            type="button"
+                            onClick={() => setSelectedCompanies([])}
+                            className="text-slate-500 hover:text-slate-700 hover:underline cursor-pointer"
+                          >
+                            Batalkan
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Customer Cards List */}
+                      <div className="h-72 overflow-y-auto space-y-2 pr-1">
+                        {loadingTemplates ? (
+                          <div className="h-full flex items-center justify-center text-xs text-slate-400">
+                            <RefreshCw className="w-4 h-4 animate-spin mr-2 text-blue-600" />
+                            Memuat template customer...
+                          </div>
+                        ) : masterTemplates.companies
+                          .filter(c => companySectorFilter === 'all' || c.sector === companySectorFilter)
+                          .map(c => {
+                            const isSelected = selectedCompanies.includes(c.customer_id);
+                            return (
+                              <div
+                                key={c.customer_id}
+                                onClick={() => {
+                                  setSelectedCompanies(prev => 
+                                    prev.includes(c.customer_id) 
+                                      ? prev.filter(id => id !== c.customer_id)
+                                      : [...prev, c.customer_id]
+                                  );
+                                }}
+                                className={`p-3 rounded-xl border transition-all cursor-pointer text-xs flex items-start gap-3 ${
+                                  isSelected
+                                    ? 'bg-blue-50/60 border-blue-400 shadow-2xs'
+                                    : 'bg-white border-slate-200 hover:border-slate-300'
+                                }`}
+                              >
+                                <input
+                                  type="checkbox"
+                                  checked={isSelected}
+                                  onChange={() => {}} // Handled by container
+                                  className="mt-0.5 rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer w-4 h-4 shrink-0"
+                                />
+                                <div className="min-w-0 flex-1">
+                                  <div className="flex items-center justify-between gap-1">
+                                    <span className="font-bold text-slate-900 truncate">{c.customer_name}</span>
+                                    <span className="text-[10px] font-mono px-1.5 py-0.2 bg-slate-100 text-slate-600 rounded shrink-0">
+                                      {c.customer_id}
+                                    </span>
+                                  </div>
+                                  <div className="text-[11px] text-slate-500 flex items-center gap-1.5 mt-0.5">
+                                    <span className="font-medium text-blue-800 bg-blue-100/60 px-1.5 py-0.2 rounded text-[10px]">
+                                      {c.zone}
+                                    </span>
+                                    <span className="truncate">• {c.contact_person}</span>
+                                  </div>
+                                </div>
+                              </div>
+                            );
+                          })}
+                      </div>
+                    </div>
+
+                    {/* Kolom Kanan: Seleksi Katalog Part & Opsi Tambahan */}
+                    <div className="space-y-4">
+                      
+                      {/* Part Selector Box */}
+                      <div className="bg-slate-50/80 p-4 sm:p-5 rounded-2xl border border-slate-200 shadow-xs space-y-3 flex flex-col">
+                        <div className="flex items-center justify-between gap-2">
+                          <div className="flex items-center gap-2">
+                            <span className="w-2.5 h-2.5 rounded-full bg-blue-600"></span>
+                            <span className="text-xs font-bold text-slate-800 uppercase tracking-wide">
+                              Katalog Part & Produk Presisi
+                            </span>
+                          </div>
+                          <span className="text-blue-700 font-extrabold text-xs px-2.5 py-0.5 bg-blue-100/70 rounded-lg">
+                            {selectedParts.length} / {masterTemplates.parts.length} Dipilih
+                          </span>
+                        </div>
+
+                        {/* Filter Kategori Part & Action Chips */}
+                        <div className="flex items-center justify-between gap-2 flex-wrap pt-1">
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            {[
+                              { id: 'all', label: 'Semua' },
+                              { id: 'stamping_mechanical', label: 'Stamping' },
+                              { id: 'electrical_sensor', label: 'Elektrikal' },
+                              { id: 'gasket_seals_cases', label: 'Gasket & Case' }
+                            ].map(cat => (
+                              <button
+                                key={cat.id}
+                                type="button"
+                                onClick={() => setPartCategoryFilter(cat.id)}
+                                className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition-all cursor-pointer ${
+                                  partCategoryFilter === cat.id
+                                    ? 'bg-blue-700 text-white shadow-xs'
+                                    : 'bg-white text-slate-600 hover:bg-slate-200/70 border border-slate-200'
+                                }`}
+                              >
+                                {cat.label}
+                              </button>
+                            ))}
+                          </div>
+
+                          <div className="flex items-center gap-1.5 text-[11px] font-semibold text-blue-700">
+                            <button
+                              type="button"
+                              onClick={() => setSelectedParts(masterTemplates.parts.map(p => p.part_no))}
+                              className="hover:underline cursor-pointer"
+                            >
+                              Pilih Semua
+                            </button>
+                            <span className="text-slate-300">|</span>
+                            <button
+                              type="button"
+                              onClick={() => setSelectedParts([])}
+                              className="text-slate-500 hover:text-slate-700 hover:underline cursor-pointer"
+                            >
+                              Batalkan
+                            </button>
+                          </div>
+                        </div>
+
+                        {/* Part Cards List */}
+                        <div className="h-44 overflow-y-auto space-y-2 pr-1">
+                          {loadingTemplates ? (
+                            <div className="h-full flex items-center justify-center text-xs text-slate-400">
+                              <RefreshCw className="w-4 h-4 animate-spin mr-2 text-blue-600" />
+                              Memuat template part...
+                            </div>
+                          ) : masterTemplates.parts
+                            .filter(p => partCategoryFilter === 'all' || p.category === partCategoryFilter)
+                            .map(p => {
+                              const isSelected = selectedParts.includes(p.part_no);
+                              return (
+                                <div
+                                  key={p.part_no}
+                                  onClick={() => {
+                                    setSelectedParts(prev =>
+                                      prev.includes(p.part_no)
+                                        ? prev.filter(no => no !== p.part_no)
+                                        : [...prev, p.part_no]
+                                    );
+                                  }}
+                                  className={`p-2.5 rounded-xl border transition-all cursor-pointer text-xs flex items-center gap-3 ${
+                                    isSelected
+                                      ? 'bg-blue-50/60 border-blue-400 shadow-2xs'
+                                      : 'bg-white border-slate-200 hover:border-slate-300'
+                                  }`}
+                                >
+                                  <input
+                                    type="checkbox"
+                                    checked={isSelected}
+                                    onChange={() => {}} // Handled by container
+                                    className="rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer w-4 h-4 shrink-0"
+                                  />
+                                  <div className="min-w-0 flex-1">
+                                    <div className="flex items-center justify-between gap-1">
+                                      <span className="font-bold text-slate-900 truncate">{p.part_name}</span>
+                                      <span className="font-bold text-blue-800 font-mono text-[11px] shrink-0">
+                                        ${p.price_usd?.toFixed(4)}
+                                      </span>
+                                    </div>
+                                    <div className="text-[10px] text-slate-500 flex items-center gap-2 mt-0.5">
+                                      <span className="font-mono bg-slate-100 px-1 py-0.2 rounded text-slate-700">{p.part_no}</span>
+                                      <span>• {p.qty_per_box} pcs/box</span>
+                                      <span>• {p.length}x{p.width}x{p.height} {p.unit}</span>
+                                    </div>
+                                  </div>
+                                </div>
+                              );
+                            })}
+                        </div>
+                      </div>
+
+                      {/* Opsi Tambahan Master Data */}
+                      <div className="bg-slate-50/80 p-4 rounded-2xl border border-slate-200 shadow-xs space-y-2.5">
+                        <span className="text-xs font-bold text-slate-800 uppercase tracking-wide flex items-center gap-1.5">
+                          <span className="w-2 h-2 rounded-full bg-blue-600"></span>
+                          Ketentuan & Riwayat Harga
+                        </span>
+
+                        <div className="space-y-2">
+                          <label className="flex items-start gap-2.5 p-2.5 rounded-xl border border-slate-200 bg-white hover:border-blue-300 hover:bg-blue-50/20 transition-colors cursor-pointer">
+                            <input
+                              type="checkbox"
+                              checked={includePriceHistory}
+                              onChange={e => setIncludePriceHistory(e.target.checked)}
+                              className="mt-0.5 rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer w-4 h-4"
+                            />
+                            <div className="text-xs">
+                              <span className="font-bold text-slate-800">Sertakan Riwayat Perubahan Harga</span>
+                              <p className="text-[11px] text-slate-500 mt-0.5 leading-snug">
+                                Membuat 2 entri riwayat fluktuasi harga (awal tahun & penyesuaian bahan) per part.
+                              </p>
+                            </div>
+                          </label>
+
+                          <label className="flex items-start gap-2.5 p-2.5 rounded-xl border border-slate-200 bg-white hover:border-blue-300 hover:bg-blue-50/20 transition-colors cursor-pointer">
+                            <input
+                              type="checkbox"
+                              checked={includeTerms}
+                              onChange={e => setIncludeTerms(e.target.checked)}
+                              className="mt-0.5 rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer w-4 h-4"
+                            />
+                            <div className="text-xs">
+                              <span className="font-bold text-slate-800">Sertakan Termin Transaksi Standar</span>
+                              <p className="text-[11px] text-slate-500 mt-0.5 leading-snug">
+                                Mendaftarkan opsi Payment Terms (Net 30/45/60, COD) dan Delivery Terms (FOB, CIF, Franco).
+                              </p>
+                            </div>
+                          </label>
+                        </div>
+                      </div>
+
+                    </div>
+
+                  </div>
+
+                  {/* Footer Modal */}
+                  <div className="px-7 py-4 bg-slate-50 border-t border-slate-100 flex items-center justify-between gap-3 shrink-0">
+                    <div className="text-xs text-slate-500 flex items-center gap-1.5">
+                      <Info className="w-4 h-4 text-blue-600 shrink-0" />
+                      <span>Mode <strong>Append</strong>: Data yang sudah terdaftar tidak akan diduplikasi.</span>
+                    </div>
+                    <div className="flex items-center gap-2.5 ml-auto">
+                      <button
+                        type="button"
+                        onClick={() => setIsCustomMasterModalOpen(false)}
+                        className="px-4 py-2 text-xs font-semibold text-slate-600 hover:text-slate-800 hover:bg-slate-200/60 rounded-xl transition-colors cursor-pointer"
+                      >
+                        Batal
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleSeedMaster({
+                          customerIds: selectedCompanies,
+                          partNos: selectedParts,
+                          includePriceHistory,
+                          includeTerms
+                        })}
+                        disabled={seedingMaster || (selectedCompanies.length === 0 && selectedParts.length === 0)}
+                        className="inline-flex items-center gap-2 px-6 py-2.5 bg-blue-700 hover:bg-blue-800 text-white rounded-xl text-xs font-bold shadow-md shadow-blue-700/20 transition-all disabled:opacity-50 cursor-pointer"
+                      >
+                        {seedingMaster ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Building2 className="w-3.5 h-3.5" />}
+                        <span>
+                          {seedingMaster ? 'Menginisialisasi...' : `Inisialisasi (${selectedCompanies.length} Cust, ${selectedParts.length} Part)`}
+                        </span>
+                      </button>
+                    </div>
+                  </div>
+
+                </div>
+              </div>
+            )}
 
             {/* MODAL: Kustomisasi Database Seeder */}
             {isCustomModalOpen && (

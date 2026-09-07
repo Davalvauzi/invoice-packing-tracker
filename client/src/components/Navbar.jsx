@@ -54,7 +54,8 @@ export default function Navbar({
   const navItems = [
     { id: 'dashboard', label: 'Main Menu', icon: Home },
     { id: 'data-logger', label: 'Data Logger', icon: Database },
-    { id: 'master-data', label: 'Master Data', icon: Settings },
+    { id: 'master-data', label: 'Master Data', icon: Package },
+    { id: 'website-settings', label: 'Website Settings', icon: Settings },
   ];
 
   return (

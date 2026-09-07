@@ -463,7 +463,7 @@ export default function Dashboard({
                                 {isExpanded ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
                               </button>
                             ) : (
-                              <span className="text-[11px] text-slate-300 font-mono">#{idx + 1}</span>
+                              <span className="text-[12px] text-slate-300 font-bold select-none" title="Invoice tunggal (belum ada dokumen turunan PL / DO)">—</span>
                             )}
                           </td>
                           <td className="px-4 py-3 font-medium whitespace-nowrap">

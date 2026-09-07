@@ -401,7 +401,7 @@ export default function PrintInvoice({ id, onBack }) {
                           </div>
                         )}
                       </td>
-                      <td className="pt-1.5 pb-1 px-0.5 text-center font-mono">
+                      <td className="pt-1.5 pb-1 px-0.5 text-center font-mono text-[6pt] leading-tight tracking-tight whitespace-nowrap">
                         {item.customer_po_no || invoice.customer_po_no || ''}
                       </td>
                       <td className="pt-1.5 pb-1 px-0.5 text-center font-mono">
@@ -437,7 +437,7 @@ export default function PrintInvoice({ id, onBack }) {
                       </div>
                     )}
                   </td>
-                  <td className="pt-1.5 px-0.5 text-center font-mono">
+                  <td className="pt-1.5 px-0.5 text-center font-mono text-[6pt] leading-tight tracking-tight whitespace-nowrap">
                     {invoice.customer_po_no || ''}
                   </td>
                   <td className="pt-1.5 px-0.5 text-center font-mono">

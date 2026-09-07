@@ -549,20 +549,20 @@ export default function PrintInvoice({ id, onBack }) {
         {/* ========================================================= */}
         {/* 6. SIGNATURES (COC DIVISION & FA DIVISION)                */}
         {/* ========================================================= */}
-        <div className="flex pt-1 text-[7.5pt]">
+        <div className="flex pt-6 text-[7.5pt]">
           
           {/* Prepared By / COC DIVISION (Left 64%) */}
           <div style={{ width: '64%' }} className="flex flex-col items-start pl-8">
             {/* Optional initials or signature image */}
-            <div className="h-6 flex items-end justify-start w-36">
+            <div className="h-16 flex items-end justify-start w-44">
               {settings?.prepared_by_sign_url ? (
-                <img src={settings.prepared_by_sign_url} alt="Sign" className="h-6 object-contain" />
+                <img src={settings.prepared_by_sign_url} alt="Sign" className="h-14 object-contain" />
               ) : (
-                <span className="text-[7.5pt] italic text-slate-700 select-none pb-0.5">Mb</span>
+                <span className="text-[7.5pt] italic text-slate-700 select-none pb-1">Mb</span>
               )}
             </div>
             {/* Signature Underline */}
-            <div className="border-b border-black w-36 mb-0.5"></div>
+            <div className="border-b border-black w-44 mb-1"></div>
             {/* Division Title */}
             <div className="font-bold text-[7.5pt]">
               {settings?.prepared_by_title || 'COC DIVISION'}
@@ -577,13 +577,13 @@ export default function PrintInvoice({ id, onBack }) {
           {/* Authorized Signature / FA DIVISION (Right 36% - Sejajar di bawah Country of Origin) */}
           <div style={{ width: '36%' }} className="flex flex-col items-start pl-2">
             {/* Optional signature image */}
-            <div className="h-6 flex items-end justify-start w-36">
+            <div className="h-16 flex items-end justify-start w-44">
               {settings?.authorized_sign_url && (
-                <img src={settings.authorized_sign_url} alt="Sign" className="h-6 object-contain" />
+                <img src={settings.authorized_sign_url} alt="Sign" className="h-14 object-contain" />
               )}
             </div>
             {/* Signature Underline */}
-            <div className="border-b border-black w-36 mb-0.5"></div>
+            <div className="border-b border-black w-44 mb-1"></div>
             {/* Division Title */}
             <div className="font-bold text-[7.5pt]">
               {settings?.authorized_sign_title || 'FA DIVISION'}

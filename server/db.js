@@ -153,12 +153,14 @@ db.exec(`
     authorized_sign_title TEXT DEFAULT 'Authorized Signature',
     authorized_sign_url TEXT DEFAULT '',
     doc_control_code TEXT DEFAULT 'FRM-ACC-01 Rev.02',
+    show_letterhead INTEGER DEFAULT 1,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
   );
 `);
 
 // Safe migrations for existing data.sqlite
 const migrationColumns = [
+  'ALTER TABLE settings ADD COLUMN show_letterhead INTEGER DEFAULT 1',
   'ALTER TABLE data_logger ADD COLUMN terms_of_delivery TEXT',
   'ALTER TABLE data_logger ADD COLUMN payment_term TEXT',
   'ALTER TABLE data_logger ADD COLUMN dimensions TEXT',

@@ -5,6 +5,7 @@ export default function PrintInvoice({ id, onBack }) {
   const [invoice, setInvoice] = useState(null);
   const [customer, setCustomer] = useState(null);
   const [settings, setSettings] = useState(null);
+  const [showLetterhead, setShowLetterhead] = useState(true);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -24,6 +25,9 @@ export default function PrintInvoice({ id, onBack }) {
 
       setInvoice(invData);
       setSettings(setData);
+      if (setData) {
+        setShowLetterhead(setData.show_letterhead !== undefined ? (setData.show_letterhead === 1 || setData.show_letterhead === true) : true);
+      }
 
       if (invData.customer_name) {
         const cRes = await fetch('/api/customers');
@@ -134,6 +138,24 @@ export default function PrintInvoice({ id, onBack }) {
         </div>
 
         <div className="flex items-center gap-2">
+          {/* Quick Toggle Kop Dokumen / Kertas Kop Bawaan */}
+          <label 
+            className={`inline-flex items-center gap-1.5 px-3 py-2 rounded text-xs font-semibold cursor-pointer select-none transition-colors border ${
+              showLetterhead 
+                ? 'bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border-emerald-300' 
+                : 'bg-amber-50 hover:bg-amber-100 text-amber-800 border-amber-300'
+            }`}
+            title={showLetterhead ? 'Kop surat digital aktif. Klik untuk sembunyikan jika pakai kertas kop resmi.' : 'Kop surat digital nonaktif (kertas kop resmi). Klik untuk tampilkan kop.'}
+          >
+            <input
+              type="checkbox"
+              checked={showLetterhead}
+              onChange={e => setShowLetterhead(e.target.checked)}
+              className="rounded border-slate-400 text-emerald-800 focus:ring-emerald-700 w-3.5 h-3.5 cursor-pointer"
+            />
+            <span>{showLetterhead ? 'Kop Surat Digital: ON' : 'Kertas Kop Resmi: ON'}</span>
+          </label>
+
           <button
             onClick={() => window.print()}
             className="inline-flex items-center gap-2 px-5 py-2 bg-slate-900 hover:bg-black text-white rounded text-xs font-bold shadow transition-colors cursor-pointer"
@@ -154,9 +176,10 @@ export default function PrintInvoice({ id, onBack }) {
       <div className="print-page max-w-[210mm] mx-auto bg-white shadow-xl px-8 pt-5 pb-5 print:p-0 print:shadow-none min-h-[297mm] text-black text-[7.5pt] leading-[1.2] font-['Calibri',sans-serif]">
         
         {/* ========================================================= */}
-        {/* 1. HEADER (KOP SURAT RESMI: LOGO BESAR, NAMA & ALAMAT BESAR) */}
+        {/* 1. HEADER (KOP SURAT RESMI ATAU JARAK KERTAS KOP BAWAAN)  */}
         {/* ========================================================= */}
-        <div className="flex items-start justify-between pb-1">
+        {showLetterhead ? (
+          <div className="flex items-start justify-between pb-1">
           
           {/* Logo PATCO & Info Perusahaan */}
           <div className="flex items-start gap-3">
@@ -258,6 +281,10 @@ export default function PrintInvoice({ id, onBack }) {
           </div>
 
         </div>
+        ) : (
+          /* Blank Spacer for Pre-printed Letterhead Paper (~62px) */
+          <div className="h-[62px] w-full" aria-hidden="true"></div>
+        )}
 
         {/* ========================================================= */}
         {/* 2. TITLE: INVOICE (Centered cleanly above metadata)        */}

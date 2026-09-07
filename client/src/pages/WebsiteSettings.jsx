@@ -58,7 +58,8 @@ export default function WebsiteSettings({ refreshTrigger }) {
     authorized_sign_name: '',
     authorized_sign_title: '',
     authorized_sign_url: '',
-    doc_control_code: 'FRM-ACC-01 Rev.02'
+    doc_control_code: 'FRM-ACC-01 Rev.02',
+    show_letterhead: 1
   });
 
   const [loading, setLoading] = useState(true);
@@ -459,6 +460,34 @@ export default function WebsiteSettings({ refreshTrigger }) {
               <p className="text-xs text-slate-500">
                 Informasi ini akan tercetak pada bagian atas tengah template dokumen.
               </p>
+            </div>
+
+            {/* Toggle Kop Surat / Pre-printed Letterhead Paper */}
+            <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-bold text-slate-900 uppercase">Cetak Kop Dokumen (Letterhead)</span>
+                  <span className={`text-[10px] font-extrabold px-2 py-0.5 rounded ${
+                    Boolean(settings.show_letterhead ?? 1)
+                      ? 'bg-emerald-100 text-emerald-800'
+                      : 'bg-amber-100 text-amber-800'
+                  }`}>
+                    {Boolean(settings.show_letterhead ?? 1) ? 'KOP AKTIF (Kertas Putih/PDF)' : 'KOP NONAKTIF (Kertas Kop Bawaan)'}
+                  </span>
+                </div>
+                <p className="text-[11px] text-slate-500 mt-1 max-w-xl leading-relaxed">
+                  Matikan opsi ini jika Anda mencetak menggunakan <b>kertas kop resmi perusahaan (pre-printed paper)</b> yang sudah tercetak kop suratnya dari percetakan. Saat dinonaktifkan, kop digital akan disembunyikan dan ruang atas dikosongkan agar teks invoice jatuh tepat di bawah kop fisik kertas.
+                </p>
+              </div>
+              <label className="relative inline-flex items-center cursor-pointer shrink-0">
+                <input
+                  type="checkbox"
+                  checked={Boolean(settings.show_letterhead ?? 1)}
+                  onChange={e => setSettings({ ...settings, show_letterhead: e.target.checked ? 1 : 0 })}
+                  className="sr-only peer"
+                />
+                <div className="w-12 h-6.5 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[3px] after:left-[3px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-700 shadow-inner"></div>
+              </label>
             </div>
 
             <div>

@@ -138,7 +138,8 @@ app.put('/api/settings', (req, res) => {
       authorized_sign_name,
       authorized_sign_title,
       authorized_sign_url,
-      doc_control_code
+      doc_control_code,
+      show_letterhead
     } = req.body;
 
     db.prepare(`
@@ -169,6 +170,7 @@ app.put('/api/settings', (req, res) => {
           authorized_sign_title = ?,
           authorized_sign_url = ?,
           doc_control_code = ?,
+          show_letterhead = ?,
           updated_at = CURRENT_TIMESTAMP
       WHERE id = 1
     `).run(
@@ -197,7 +199,8 @@ app.put('/api/settings', (req, res) => {
       authorized_sign_name || '',
       authorized_sign_title || '',
       authorized_sign_url || '',
-      doc_control_code || ''
+      doc_control_code || '',
+      show_letterhead !== undefined ? (show_letterhead ? 1 : 0) : 1
     );
 
     const updated = db.prepare('SELECT * FROM settings WHERE id = 1').get();

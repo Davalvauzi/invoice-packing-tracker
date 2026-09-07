@@ -1168,7 +1168,7 @@ export default function DataLogger({
           onClick={() => setSelectedLog(null)}
         >
           <div 
-            className="bg-white rounded-2xl max-w-xl w-full p-6 shadow-2xl border border-slate-200 animate-in fade-in zoom-in-95 duration-200"
+            className="bg-white rounded-2xl max-w-3xl lg:max-w-4xl w-full p-6 sm:p-7 shadow-2xl border border-slate-200 animate-in fade-in zoom-in-95 duration-200"
             onClick={(e) => e.stopPropagation()}
           >
             
@@ -1308,7 +1308,7 @@ export default function DataLogger({
           onClick={() => !isSavingEdit && setEditingLog(null)}
         >
           <div 
-            className="bg-white rounded-2xl max-w-2xl w-full my-auto shadow-2xl border border-slate-200 overflow-hidden flex flex-col max-h-[92vh] animate-in fade-in zoom-in-95 duration-200"
+            className="bg-white rounded-2xl max-w-4xl lg:max-w-5xl w-full my-auto shadow-2xl border border-slate-200 overflow-hidden flex flex-col max-h-[92vh] animate-in fade-in zoom-in-95 duration-200"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Modal Header */}

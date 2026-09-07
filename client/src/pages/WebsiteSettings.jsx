@@ -1118,178 +1118,200 @@ export default function WebsiteSettings({ refreshTrigger }) {
               >
                 <div 
                   onClick={(e) => e.stopPropagation()}
-                  className="bg-white rounded-2xl border border-slate-200 shadow-2xl max-w-lg w-full overflow-hidden animate-in fade-in zoom-in duration-150"
+                  className="bg-white rounded-3xl border border-slate-200 shadow-2xl max-w-4xl w-full overflow-hidden animate-in fade-in zoom-in duration-150 flex flex-col max-h-[90vh]"
                 >
                   
                   {/* Header Modal */}
-                  <div className="px-6 py-4 bg-slate-50 border-b border-slate-100 flex items-center justify-between">
-                    <div className="flex items-center gap-2.5">
-                      <span className="p-2 bg-emerald-100 text-emerald-800 rounded-xl">
+                  <div className="px-7 py-4.5 bg-slate-50 border-b border-slate-100 flex items-center justify-between shrink-0">
+                    <div className="flex items-center gap-3">
+                      <span className="p-2.5 bg-emerald-100 text-emerald-800 rounded-xl shadow-xs">
                         <Sliders className="w-5 h-5" />
                       </span>
                       <div>
-                        <h3 className="text-sm font-bold text-slate-900">Custom Database Seeder</h3>
-                        <p className="text-[11px] text-slate-500">Atur parameter dan kuantitas data transaksi yang ingin di-generate</p>
+                        <h3 className="text-base font-bold text-slate-900">Custom Database Seeder</h3>
+                        <p className="text-xs text-slate-500">Atur parameter dan kuantitas data transaksi sintetis dengan leluasa</p>
                       </div>
                     </div>
                     <button
                       type="button"
                       onClick={() => setIsCustomModalOpen(false)}
-                      className="p-1.5 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-slate-200/60 transition-colors cursor-pointer"
+                      className="p-2 text-slate-400 hover:text-slate-600 rounded-xl hover:bg-slate-200/60 transition-colors cursor-pointer"
                       title="Tutup (ESC)"
                     >
-                      <X className="w-4 h-4" />
+                      <X className="w-5 h-5" />
                     </button>
                   </div>
 
-                  {/* Body Modal */}
-                  <div className="p-6 space-y-5 max-h-[75vh] overflow-y-auto">
+                  {/* Body Modal (2 Columns Wide Layout) */}
+                  <div className="p-7 overflow-y-auto grid grid-cols-1 md:grid-cols-2 gap-7">
                     
-                    {/* Parameter 1: Jumlah Data Faktur (Custom Count) */}
-                    <div className="space-y-2">
-                      <label className="text-xs font-bold text-slate-800 uppercase tracking-wide flex items-center justify-between">
-                        <span>Jumlah Transaksi Faktur</span>
-                        <span className="text-emerald-700 font-extrabold text-sm">{seederConfig.count} Faktur</span>
-                      </label>
-                      
-                      {/* Quick Chips */}
-                      <div className="grid grid-cols-4 gap-2">
-                        {[5, 10, 25, 50].map(val => (
-                          <button
-                            key={val}
-                            type="button"
-                            onClick={() => setSeederConfig(prev => ({ ...prev, count: val }))}
-                            className={`py-1.5 rounded-lg text-xs font-bold border transition-all cursor-pointer ${
-                              seederConfig.count === val 
-                                ? 'bg-emerald-800 text-white border-emerald-800 shadow-xs' 
-                                : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
-                            }`}
-                          >
-                            {val} Data
-                          </button>
-                        ))}
+                    {/* Kolom Kiri: Kuantitas & Rentang Waktu */}
+                    <div className="space-y-6">
+                      {/* Parameter 1: Jumlah Data Faktur */}
+                      <div className="bg-slate-50/80 p-4.5 rounded-2xl border border-slate-200/80 space-y-3">
+                        <label className="text-xs font-bold text-slate-800 uppercase tracking-wide flex items-center justify-between">
+                          <span className="flex items-center gap-1.5">
+                            <span className="w-2 h-2 rounded-full bg-emerald-600"></span>
+                            Jumlah Transaksi Faktur
+                          </span>
+                          <span className="text-emerald-700 font-extrabold text-sm px-2.5 py-0.5 bg-emerald-100/70 rounded-lg">{seederConfig.count} Faktur</span>
+                        </label>
+                        
+                        {/* Quick Chips */}
+                        <div className="grid grid-cols-4 gap-2">
+                          {[5, 10, 25, 50].map(val => (
+                            <button
+                              key={val}
+                              type="button"
+                              onClick={() => setSeederConfig(prev => ({ ...prev, count: val }))}
+                              className={`py-2 rounded-xl text-xs font-bold border transition-all cursor-pointer ${
+                                seederConfig.count === val 
+                                  ? 'bg-emerald-800 text-white border-emerald-800 shadow-xs ring-2 ring-emerald-800/20' 
+                                  : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-100 hover:border-slate-300'
+                              }`}
+                            >
+                              {val} Data
+                            </button>
+                          ))}
+                        </div>
+
+                        {/* Manual Numeric Input */}
+                        <div className="flex items-center gap-2 pt-1">
+                          <input
+                            type="number"
+                            min="1"
+                            max="100"
+                            value={seederConfig.count}
+                            onChange={e => setSeederConfig(prev => ({ ...prev, count: Math.max(1, Math.min(100, Number(e.target.value) || 1)) }))}
+                            className="w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl text-xs font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-500 shadow-2xs"
+                            placeholder="Ketik angka kustom (1 - 100)"
+                          />
+                          <span className="text-xs font-semibold text-slate-400 shrink-0 px-2">Maks. 100</span>
+                        </div>
                       </div>
 
-                      {/* Manual Numeric Input */}
-                      <div className="flex items-center gap-2 pt-1">
-                        <input
-                          type="number"
-                          min="1"
-                          max="100"
-                          value={seederConfig.count}
-                          onChange={e => setSeederConfig(prev => ({ ...prev, count: Math.max(1, Math.min(100, Number(e.target.value) || 1)) }))}
-                          className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl text-xs font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-500"
-                          placeholder="Ketik angka (1 - 100)"
-                        />
-                        <span className="text-xs text-slate-400 shrink-0">Maks. 100</span>
+                      {/* Parameter 2: Rentang Waktu Tanggal */}
+                      <div className="bg-slate-50/80 p-4.5 rounded-2xl border border-slate-200/80 space-y-3">
+                        <label className="text-xs font-bold text-slate-800 uppercase tracking-wide flex items-center gap-1.5">
+                          <span className="w-2 h-2 rounded-full bg-emerald-600"></span>
+                          Rentang Waktu Tanggal Dokumen
+                        </label>
+                        <div className="grid grid-cols-3 gap-2">
+                          {[
+                            { label: '1 Bulan Lalu', value: 1 },
+                            { label: '3 Bulan Lalu', value: 3 },
+                            { label: '6 Bulan Lalu', value: 6 }
+                          ].map(item => (
+                            <button
+                              key={item.value}
+                              type="button"
+                              onClick={() => setSeederConfig(prev => ({ ...prev, dateRangeMonths: item.value }))}
+                              className={`py-2.5 px-2 rounded-xl text-xs font-semibold border text-center transition-all cursor-pointer ${
+                                seederConfig.dateRangeMonths === item.value
+                                  ? 'bg-emerald-800 text-white border-emerald-800 shadow-xs ring-2 ring-emerald-800/20'
+                                  : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-100 hover:border-slate-300'
+                              }`}
+                            >
+                              {item.label}
+                            </button>
+                          ))}
+                        </div>
+                        <p className="text-[11px] text-slate-500 leading-relaxed pt-0.5">
+                          Tanggal faktur akan diacak tersebar sehingga grafik riwayat dan filter tanggal di Data Logger tampil dinamis & realistis.
+                        </p>
                       </div>
                     </div>
 
-                    {/* Parameter 2: Rentang Waktu Tanggal */}
-                    <div className="space-y-2 pt-2 border-t border-slate-100">
-                      <label className="text-xs font-bold text-slate-800 uppercase tracking-wide">
-                        Rentang Waktu Tanggal Dokumen
-                      </label>
-                      <div className="grid grid-cols-3 gap-2">
-                        {[
-                          { label: '1 Bulan Lalu', value: 1 },
-                          { label: '3 Bulan Lalu', value: 3 },
-                          { label: '6 Bulan Lalu', value: 6 }
-                        ].map(item => (
-                          <button
-                            key={item.value}
-                            type="button"
-                            onClick={() => setSeederConfig(prev => ({ ...prev, dateRangeMonths: item.value }))}
-                            className={`py-2 px-2 rounded-lg text-xs font-semibold border text-center transition-all cursor-pointer ${
-                              seederConfig.dateRangeMonths === item.value
-                                ? 'bg-emerald-800 text-white border-emerald-800 shadow-xs'
-                                : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
-                            }`}
-                          >
-                            {item.label}
-                          </button>
-                        ))}
-                      </div>
-                      <p className="text-[11px] text-slate-400 leading-tight">
-                        Tanggal faktur akan diacak tersebar sehingga grafik riwayat dan filter tanggal di Data Logger tampil dinamis.
-                      </p>
-                    </div>
-
-                    {/* Parameter 3: Variasi Mata Uang */}
-                    <div className="space-y-2 pt-2 border-t border-slate-100">
-                      <label className="text-xs font-bold text-slate-800 uppercase tracking-wide">
-                        Mata Uang yang Diacak
-                      </label>
-                      <div className="flex items-center gap-3">
-                        {[
-                          { code: 'USD', name: 'Dollar (USD)' },
-                          { code: 'IDR', name: 'Rupiah (IDR)' },
-                          { code: 'JPY', name: 'Yen (JPY)' }
-                        ].map(curr => {
-                          const isChecked = seederConfig.currencies.includes(curr.code);
-                          return (
-                            <label key={curr.code} className="inline-flex items-center gap-2 text-xs font-medium text-slate-700 cursor-pointer">
-                              <input
-                                type="checkbox"
-                                checked={isChecked}
-                                onChange={e => {
-                                  if (e.target.checked) {
-                                    setSeederConfig(prev => ({ ...prev, currencies: [...prev.currencies, curr.code] }));
-                                  } else {
-                                    if (seederConfig.currencies.length > 1) {
-                                      setSeederConfig(prev => ({ ...prev, currencies: prev.currencies.filter(c => c !== curr.code) }));
+                    {/* Kolom Kanan: Mata Uang & Relasi Tree View */}
+                    <div className="space-y-6">
+                      {/* Parameter 3: Variasi Mata Uang */}
+                      <div className="bg-slate-50/80 p-4.5 rounded-2xl border border-slate-200/80 space-y-3">
+                        <label className="text-xs font-bold text-slate-800 uppercase tracking-wide flex items-center gap-1.5">
+                          <span className="w-2 h-2 rounded-full bg-emerald-600"></span>
+                          Mata Uang yang Diacak
+                        </label>
+                        <div className="grid grid-cols-3 gap-2.5">
+                          {[
+                            { code: 'USD', name: 'Dollar (USD)', symbol: '$' },
+                            { code: 'IDR', name: 'Rupiah (IDR)', symbol: 'Rp' },
+                            { code: 'JPY', name: 'Yen (JPY)', symbol: '¥' }
+                          ].map(curr => {
+                            const isChecked = seederConfig.currencies.includes(curr.code);
+                            return (
+                              <label 
+                                key={curr.code} 
+                                className={`flex flex-col items-center justify-center p-3 rounded-xl border text-center cursor-pointer transition-all ${
+                                  isChecked 
+                                    ? 'bg-emerald-50/80 border-emerald-500 text-emerald-950 font-bold shadow-2xs ring-1 ring-emerald-500' 
+                                    : 'bg-white border-slate-200 text-slate-600 hover:border-slate-300'
+                                }`}
+                              >
+                                <input
+                                  type="checkbox"
+                                  checked={isChecked}
+                                  onChange={e => {
+                                    if (e.target.checked) {
+                                      setSeederConfig(prev => ({ ...prev, currencies: [...prev.currencies, curr.code] }));
+                                    } else {
+                                      if (seederConfig.currencies.length > 1) {
+                                        setSeederConfig(prev => ({ ...prev, currencies: prev.currencies.filter(c => c !== curr.code) }));
+                                      }
                                     }
-                                  }
-                                }}
-                                className="rounded border-slate-300 text-emerald-800 focus:ring-emerald-500 cursor-pointer"
-                              />
-                              <span>{curr.name}</span>
-                            </label>
-                          );
-                        })}
+                                  }}
+                                  className="sr-only"
+                                />
+                                <span className="text-lg font-black font-mono mb-0.5">{curr.symbol}</span>
+                                <span className="text-xs">{curr.name}</span>
+                              </label>
+                            );
+                          })}
+                        </div>
                       </div>
-                    </div>
 
-                    {/* Parameter 4: Relasi Dokumen Turunan */}
-                    <div className="space-y-2.5 pt-2 border-t border-slate-100">
-                      <label className="text-xs font-bold text-slate-800 uppercase tracking-wide">
-                        Dokumen Turunan Otomatis (Hierarki Tree View)
-                      </label>
+                      {/* Parameter 4: Relasi Dokumen Turunan */}
+                      <div className="bg-slate-50/80 p-4.5 rounded-2xl border border-slate-200/80 space-y-3">
+                        <label className="text-xs font-bold text-slate-800 uppercase tracking-wide flex items-center gap-1.5">
+                          <span className="w-2 h-2 rounded-full bg-emerald-600"></span>
+                          Dokumen Turunan Otomatis (Hierarki Tree View)
+                        </label>
 
-                      <label className="flex items-start gap-2.5 p-2.5 rounded-xl border border-slate-200 hover:border-emerald-300 hover:bg-emerald-50/20 transition-colors cursor-pointer">
-                        <input
-                          type="checkbox"
-                          checked={seederConfig.includePL}
-                          onChange={e => setSeederConfig(prev => ({ ...prev, includePL: e.target.checked }))}
-                          className="mt-0.5 rounded border-slate-300 text-emerald-800 focus:ring-emerald-500 cursor-pointer"
-                        />
-                        <div className="text-xs">
-                          <span className="font-bold text-slate-800">Otomatis buatkan Packing List (PL)</span>
-                          <p className="text-[11px] text-slate-500 mt-0.5">
-                            Menautkan invoice dengan spesifikasi kemasan box, pallet, dan dimensi part.
-                          </p>
+                        <div className="space-y-2">
+                          <label className="flex items-start gap-3 p-3 rounded-xl border border-slate-200 bg-white hover:border-emerald-300 hover:bg-emerald-50/30 transition-colors cursor-pointer shadow-2xs">
+                            <input
+                              type="checkbox"
+                              checked={seederConfig.includePL}
+                              onChange={e => setSeederConfig(prev => ({ ...prev, includePL: e.target.checked }))}
+                              className="mt-0.5 rounded border-slate-300 text-emerald-800 focus:ring-emerald-500 cursor-pointer w-4 h-4"
+                            />
+                            <div className="text-xs">
+                              <span className="font-bold text-slate-800">Otomatis buatkan Packing List (PL)</span>
+                              <p className="text-[11px] text-slate-500 mt-0.5 leading-snug">
+                                Menautkan invoice dengan data kemasan box, pallet, dan dimensi part.
+                              </p>
+                            </div>
+                          </label>
+
+                          <label className="flex items-start gap-3 p-3 rounded-xl border border-slate-200 bg-white hover:border-emerald-300 hover:bg-emerald-50/30 transition-colors cursor-pointer shadow-2xs">
+                            <input
+                              type="checkbox"
+                              checked={seederConfig.includeDO}
+                              onChange={e => setSeederConfig(prev => ({ ...prev, includeDO: e.target.checked }))}
+                              className="mt-0.5 rounded border-slate-300 text-emerald-800 focus:ring-emerald-500 cursor-pointer w-4 h-4"
+                            />
+                            <div className="text-xs">
+                              <span className="font-bold text-slate-800">Otomatis buatkan Delivery Order (DO)</span>
+                              <p className="text-[11px] text-slate-500 mt-0.5 leading-snug">
+                                Menghasilkan surat jalan pengiriman fisik sesuai nomor PO terkait.
+                              </p>
+                            </div>
+                          </label>
                         </div>
-                      </label>
 
-                      <label className="flex items-start gap-2.5 p-2.5 rounded-xl border border-slate-200 hover:border-emerald-300 hover:bg-emerald-50/20 transition-colors cursor-pointer">
-                        <input
-                          type="checkbox"
-                          checked={seederConfig.includeDO}
-                          onChange={e => setSeederConfig(prev => ({ ...prev, includeDO: e.target.checked }))}
-                          className="mt-0.5 rounded border-slate-300 text-emerald-800 focus:ring-emerald-500 cursor-pointer"
-                        />
-                        <div className="text-xs">
-                          <span className="font-bold text-slate-800">Otomatis buatkan Delivery Order (DO)</span>
-                          <p className="text-[11px] text-slate-500 mt-0.5">
-                            Menghasilkan surat jalan pengiriman barang fisik sesuai nomor PO terkait.
-                          </p>
-                        </div>
-                      </label>
-
-                      <div className="p-3 bg-emerald-50/70 border border-emerald-200/80 rounded-xl flex items-start gap-2.5 text-[11px] text-emerald-900 leading-relaxed">
-                        <Info className="w-4 h-4 text-emerald-700 shrink-0 mt-0.5" />
-                        <div>
-                          Seluruh dokumen turunan akan otomatis dihubungkan ke invoice induk sehingga tombol ekspansi <strong>Tree View `[ &gt; ]`</strong> di Data Logger langsung memiliki relasi lengkap.
+                        <div className="p-3 bg-emerald-50/90 border border-emerald-200 rounded-xl flex items-start gap-2.5 text-[11px] text-emerald-900 leading-relaxed">
+                          <Info className="w-4 h-4 text-emerald-700 shrink-0 mt-0.5" />
+                          <div>
+                            Dokumen turunan otomatis ditautkan ke invoice induk sehingga tombol ekspansi <strong>Tree View `[ &gt; ]`</strong> di Data Logger langsung memiliki relasi lengkap.
+                          </div>
                         </div>
                       </div>
                     </div>
@@ -1297,23 +1319,26 @@ export default function WebsiteSettings({ refreshTrigger }) {
                   </div>
 
                   {/* Footer Modal */}
-                  <div className="px-6 py-4 bg-slate-50 border-t border-slate-100 flex items-center justify-end gap-2.5">
-                    <button
-                      type="button"
-                      onClick={() => setIsCustomModalOpen(false)}
-                      className="px-4 py-2 text-xs font-semibold text-slate-600 hover:text-slate-800 hover:bg-slate-200/60 rounded-xl transition-colors cursor-pointer"
-                    >
-                      Batal
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => handleGenerateDummy(true)}
-                      disabled={generatingDummy}
-                      className="inline-flex items-center gap-2 px-5 py-2.5 bg-emerald-800 hover:bg-emerald-900 text-white rounded-xl text-xs font-bold shadow-md shadow-emerald-800/20 transition-all disabled:opacity-50 cursor-pointer"
-                    >
-                      {generatingDummy ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />}
-                      <span>{generatingDummy ? 'Sedang Men-generate...' : `🚀 Generate ${seederConfig.count} Data Sekarang`}</span>
-                    </button>
+                  <div className="px-7 py-4 bg-slate-50 border-t border-slate-100 flex items-center justify-between gap-3 shrink-0">
+                    <span className="text-xs text-slate-400 hidden sm:inline">Tekan <kbd className="px-1.5 py-0.5 bg-slate-200 text-slate-700 rounded text-[10px] font-mono">ESC</kbd> untuk menutup</span>
+                    <div className="flex items-center gap-2.5 ml-auto">
+                      <button
+                        type="button"
+                        onClick={() => setIsCustomModalOpen(false)}
+                        className="px-4 py-2 text-xs font-semibold text-slate-600 hover:text-slate-800 hover:bg-slate-200/60 rounded-xl transition-colors cursor-pointer"
+                      >
+                        Batal
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleGenerateDummy(true)}
+                        disabled={generatingDummy}
+                        className="inline-flex items-center gap-2 px-6 py-2.5 bg-emerald-800 hover:bg-emerald-900 text-white rounded-xl text-xs font-bold shadow-md shadow-emerald-800/20 transition-all disabled:opacity-50 cursor-pointer"
+                      >
+                        {generatingDummy ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />}
+                        <span>{generatingDummy ? 'Sedang Men-generate...' : `🚀 Generate ${seederConfig.count} Data Sekarang`}</span>
+                      </button>
+                    </div>
                   </div>
 
                 </div>

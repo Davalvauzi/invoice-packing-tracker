@@ -1210,7 +1210,55 @@ app.get('/api/packing-lists', (req, res) => {
 
 app.get('/api/packing-lists/:id', (req, res) => {
   try {
-    const row = db.prepare('SELECT * FROM packing_lists WHERE id = ?').get(req.params.id);
+    const rawParam = req.params.id;
+    let row = null;
+
+    // 1. Cari langsung by id tabel packing_lists
+    if (!isNaN(rawParam)) {
+      row = db.prepare('SELECT * FROM packing_lists WHERE id = ?').get(rawParam);
+    }
+
+    // 2. Cari by invoice_number
+    if (!row) {
+      row = db.prepare('SELECT * FROM packing_lists WHERE invoice_number = ? LIMIT 1').get(rawParam);
+    }
+
+    // 3. Jika param adalah ID invoice di tabel invoices (ref_id)
+    if (!row && !isNaN(rawParam)) {
+      const inv = db.prepare('SELECT invoice_number FROM invoices WHERE id = ?').get(rawParam);
+      if (inv && inv.invoice_number) {
+        row = db.prepare('SELECT * FROM packing_lists WHERE invoice_number = ? LIMIT 1').get(inv.invoice_number);
+      }
+    }
+
+    // 4. Cari via data_logger
+    if (!row) {
+      const dl = db.prepare(`
+        SELECT * FROM data_logger 
+        WHERE doc_type = 'PACKING_LIST' AND (id = ? OR ref_id = ? OR doc_number = ?)
+        LIMIT 1
+      `).get(rawParam, rawParam, rawParam);
+
+      if (dl) {
+        row = db.prepare('SELECT * FROM packing_lists WHERE invoice_number = ? LIMIT 1').get(dl.doc_number);
+        if (!row) {
+          row = {
+            id: dl.id,
+            invoice_number: dl.doc_number,
+            invoice_date: dl.doc_date,
+            customer_name: dl.customer_name,
+            customer_po_no: dl.po_no,
+            part_name: dl.part_name,
+            terms_of_delivery: dl.terms_of_delivery?.replace(/^Ref Inv:\s*/i, '') || '',
+            box_qty: dl.box_qty,
+            pallet_qty: dl.pallet_qty,
+            items: dl.items,
+            created_at: dl.created_at
+          };
+        }
+      }
+    }
+
     if (!row) return res.status(404).json({ error: 'Packing list not found' });
     res.json(row);
   } catch (err) {
@@ -1458,7 +1506,70 @@ app.get('/api/delivery-orders', (req, res) => {
 
 app.get('/api/delivery-orders/:id', (req, res) => {
   try {
-    const row = db.prepare('SELECT * FROM delivery_orders WHERE id = ?').get(req.params.id);
+    const rawParam = req.params.id;
+    let row = null;
+
+    // 1. Cari langsung by id tabel delivery_orders jika numeric
+    if (!isNaN(rawParam)) {
+      row = db.prepare('SELECT * FROM delivery_orders WHERE id = ?').get(rawParam);
+    }
+
+    // 2. Cari by do_number langsung
+    if (!row) {
+      row = db.prepare('SELECT * FROM delivery_orders WHERE do_number = ?').get(rawParam);
+    }
+
+    // 3. Cari by invoice_number
+    if (!row) {
+      row = db.prepare('SELECT * FROM delivery_orders WHERE invoice_number = ? LIMIT 1').get(rawParam);
+    }
+
+    // 4. Jika param adalah ID invoice di tabel invoices (ref_id dari data_logger)
+    if (!row && !isNaN(rawParam)) {
+      const inv = db.prepare('SELECT invoice_number FROM invoices WHERE id = ?').get(rawParam);
+      if (inv && inv.invoice_number) {
+        row = db.prepare('SELECT * FROM delivery_orders WHERE invoice_number = ? LIMIT 1').get(inv.invoice_number);
+      }
+    }
+
+    // 5. Cari via data_logger jika dipanggil menggunakan id data_logger atau ref_id
+    if (!row) {
+      const dl = db.prepare(`
+        SELECT * FROM data_logger 
+        WHERE doc_type = 'DELIVERY_ORDER' AND (id = ? OR ref_id = ? OR doc_number = ?)
+        LIMIT 1
+      `).get(rawParam, rawParam, rawParam);
+
+      if (dl) {
+        row = db.prepare('SELECT * FROM delivery_orders WHERE do_number = ?').get(dl.doc_number);
+        if (!row && dl.terms_of_delivery) {
+          const invNum = dl.terms_of_delivery.replace(/^Ref Inv:\s*/i, '').trim();
+          if (invNum) {
+            row = db.prepare('SELECT * FROM delivery_orders WHERE invoice_number = ? LIMIT 1').get(invNum);
+          }
+        }
+
+        // Fallback rekonstruksi dari data_logger jika tidak ada di tabel delivery_orders
+        if (!row) {
+          row = {
+            id: dl.id,
+            do_number: dl.doc_number,
+            do_date: dl.doc_date,
+            invoice_number: dl.terms_of_delivery?.replace(/^Ref Inv:\s*/i, '') || '',
+            customer_name: dl.customer_name,
+            customer_id: dl.customer_id,
+            customer_po_no: dl.po_no,
+            part_name: dl.part_name,
+            pallet_qty: dl.pallet_qty,
+            box_qty: dl.box_qty,
+            notes: dl.notes,
+            items: dl.items,
+            created_at: dl.created_at
+          };
+        }
+      }
+    }
+
     if (!row) return res.status(404).json({ error: 'Delivery order not found' });
     res.json(row);
   } catch (err) {

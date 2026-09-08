@@ -941,7 +941,7 @@ export default function DataLogger({
                                   <Eye className="w-3.5 h-3.5" />
                                 </button>
                                 <button
-                                  onClick={() => openPrintTab(child.doc_type === 'DELIVERY_ORDER' ? 'print-delivery-order' : 'print-packing-list', child.ref_id)}
+                                  onClick={() => openPrintTab(child.doc_type === 'DELIVERY_ORDER' ? 'print-delivery-order' : 'print-packing-list', child.ref_id || child.id || child.doc_number)}
                                   className={`inline-flex items-center gap-1 px-2 py-0.5 ${child.doc_type === 'DELIVERY_ORDER' ? 'bg-cyan-50 text-cyan-800 hover:bg-cyan-100' : 'bg-teal-50 text-teal-800 hover:bg-teal-100'} rounded-lg text-xs font-bold transition-colors`}
                                   title="Buka / Cetak PDF di Tab Baru"
                                 >
@@ -1025,7 +1025,7 @@ export default function DataLogger({
                                   const view = orphan.doc_type === 'DELIVERY_ORDER' 
                                     ? 'print-delivery-order' 
                                     : (orphan.doc_type.toLowerCase() === 'invoice' ? 'print-invoice' : 'print-packing-list');
-                                  openPrintTab(view, orphan.ref_id);
+                                  openPrintTab(view, orphan.ref_id || orphan.id || orphan.doc_number);
                                 }}
                                 className="inline-flex items-center gap-1 px-2.5 py-1 bg-teal-50 text-teal-800 hover:bg-teal-100 rounded-lg text-xs font-bold transition-colors"
                                 title="Buka / Cetak PDF di Tab Baru"
@@ -1107,7 +1107,7 @@ export default function DataLogger({
                             const view = log.doc_type === 'DELIVERY_ORDER' 
                               ? 'print-delivery-order' 
                               : (log.doc_type.toLowerCase() === 'invoice' ? 'print-invoice' : 'print-packing-list');
-                            openPrintTab(view, log.ref_id);
+                            openPrintTab(view, log.ref_id || log.id || log.doc_number);
                           }}
                           className="inline-flex items-center gap-1 px-2.5 py-1 bg-emerald-50 text-emerald-800 hover:bg-emerald-100 rounded-lg text-xs font-bold transition-colors"
                           title="Buka / Cetak PDF di Tab Baru"
@@ -1356,7 +1356,7 @@ export default function DataLogger({
                     const view = selectedLog.doc_type === 'DELIVERY_ORDER' 
                       ? 'print-delivery-order' 
                       : (selectedLog.doc_type.toLowerCase() === 'invoice' ? 'print-invoice' : 'print-packing-list');
-                    openPrintTab(view, selectedLog.ref_id);
+                    openPrintTab(view, selectedLog.ref_id || selectedLog.id || selectedLog.doc_number);
                   }}
                   className="inline-flex items-center gap-1.5 px-4 py-2 bg-emerald-800 text-white rounded-xl text-xs font-bold hover:bg-emerald-900 shadow-xs cursor-pointer"
                 >

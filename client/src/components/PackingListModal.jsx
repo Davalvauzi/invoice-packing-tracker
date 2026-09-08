@@ -23,6 +23,10 @@ const createEmptyPLItem = () => ({
   customer_po_no: '',
   box_qty: '',
   pallet_qty: '',
+  qty_per_box: '',
+  total_qty: '',
+  net_weight: '',
+  gross_weight: '',
   length: '',
   width: '',
   height: '',
@@ -140,7 +144,22 @@ export default function PackingListModal({ isOpen, onClose, openPrintTab, onSucc
   const handleItemChange = (index, field, value) => {
     setItems(prev => {
       const updated = [...prev];
-      updated[index] = { ...updated[index], [field]: value };
+      const row = { ...updated[index], [field]: value };
+      if (field === 'box_qty' || field === 'qty_per_box') {
+        const b = Number(field === 'box_qty' ? value : row.box_qty) || 0;
+        const q = Number(field === 'qty_per_box' ? value : row.qty_per_box) || 0;
+        if (b > 0 && q > 0) {
+          const tot = b * q;
+          row.total_qty = String(tot);
+          if (!row.net_weight || field === 'box_qty' || field === 'qty_per_box') {
+            row.net_weight = String((tot * 0.55).toFixed(2));
+            row.gross_weight = String((tot * 0.55 * 1.34).toFixed(2));
+          }
+        } else if (field === 'box_qty' && !value) {
+          row.total_qty = '';
+        }
+      }
+      updated[index] = row;
       return updated;
     });
   };
@@ -162,6 +181,16 @@ export default function PackingListModal({ isOpen, onClose, openPrintTab, onSucc
         row.width = found.width ? String(found.width) : (row.width || '');
         row.height = found.height ? String(found.height) : (row.height || '');
         row.unit_note = found.unit || row.unit_note || 'mm';
+        if (found.qty_per_box) {
+          row.qty_per_box = String(found.qty_per_box);
+          const b = Number(row.box_qty) || 0;
+          if (b > 0) {
+            const tot = b * Number(found.qty_per_box);
+            row.total_qty = String(tot);
+            row.net_weight = String((tot * 0.55).toFixed(2));
+            row.gross_weight = String((tot * 0.55 * 1.34).toFixed(2));
+          }
+        }
       } else {
         row.part_name = selectedVal;
       }
@@ -331,6 +360,9 @@ export default function PackingListModal({ isOpen, onClose, openPrintTab, onSucc
   // Calculate totals for footer
   const totalBox = items.reduce((s, it) => s + (Number(it.box_qty) || 0), 0);
   const totalPallet = items.reduce((s, it) => s + (Number(it.pallet_qty) || 0), 0);
+  const grandTotalQty = items.reduce((s, it) => s + (Number(it.total_qty) || 0), 0);
+  const totalNetWeight = items.reduce((s, it) => s + (Number(it.net_weight) || 0), 0);
+  const totalGrossWeight = items.reduce((s, it) => s + (Number(it.gross_weight) || 0), 0);
   const totalCbm = items.reduce((acc, it) => {
     const l = Number(it.length) || 0;
     const w = Number(it.width) || 0;
@@ -710,6 +742,65 @@ export default function PackingListModal({ isOpen, onClose, openPrintTab, onSucc
                         </div>
                       </div>
 
+                      {/* Row 3: Qty/Box, Total Qty, Net Weight, Gross Weight */}
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 pt-1">
+                        <div>
+                          <label className="block text-[9px] font-bold text-slate-600 uppercase mb-0.5">
+                            QTY / BOX (PCS)
+                          </label>
+                          <input
+                            type="number"
+                            min="0"
+                            placeholder="Isi / box"
+                            value={item.qty_per_box || ''}
+                            onChange={(e) => handleItemChange(index, 'qty_per_box', e.target.value)}
+                            className="w-full px-2 py-1.5 rounded-lg border border-teal-300 bg-white font-mono text-xs font-bold text-slate-800 text-center"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block text-[9px] font-bold text-teal-800 uppercase mb-0.5">
+                            TOTAL QTY (PCS)
+                          </label>
+                          <input
+                            type="number"
+                            min="0"
+                            placeholder="Auto (Box × Qty)"
+                            value={item.total_qty || ''}
+                            onChange={(e) => handleItemChange(index, 'total_qty', e.target.value)}
+                            className="w-full px-2 py-1.5 rounded-lg border border-teal-400 bg-teal-50/70 font-mono text-xs font-extrabold text-teal-950 text-center"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block text-[9px] font-bold text-slate-600 uppercase mb-0.5">
+                            NET WEIGHT (KG)
+                          </label>
+                          <input
+                            type="number"
+                            step="any"
+                            placeholder="0.00"
+                            value={item.net_weight || ''}
+                            onChange={(e) => handleItemChange(index, 'net_weight', e.target.value)}
+                            className="w-full px-2 py-1.5 rounded-lg border border-slate-300 bg-white font-mono text-xs text-center"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block text-[9px] font-bold text-slate-600 uppercase mb-0.5">
+                            GROSS WEIGHT (KG)
+                          </label>
+                          <input
+                            type="number"
+                            step="any"
+                            placeholder="0.00"
+                            value={item.gross_weight || ''}
+                            onChange={(e) => handleItemChange(index, 'gross_weight', e.target.value)}
+                            className="w-full px-2 py-1.5 rounded-lg border border-slate-300 bg-white font-mono text-xs text-center"
+                          />
+                        </div>
+                      </div>
+
                     </div>
                   );
                 })}
@@ -731,9 +822,14 @@ export default function PackingListModal({ isOpen, onClose, openPrintTab, onSucc
                   <Box className="w-4 h-4 text-teal-300" />
                   TOTAL CARGO CARRIER:
                 </div>
-                <div className="flex items-center gap-4 font-mono font-bold">
+                <div className="flex items-center gap-4 sm:gap-6 font-mono font-bold">
                   <span>Total Box: <strong className="text-white text-sm">{totalBox}</strong></span>
                   <span>Total Pallet: <strong className="text-white text-sm">{totalPallet}</strong></span>
+                  {grandTotalQty > 0 && (
+                    <span className="bg-white/10 px-2 py-0.5 rounded text-teal-200">
+                      Total Qty: <strong className="text-white text-sm">{grandTotalQty.toLocaleString()} Pcs</strong>
+                    </span>
+                  )}
                   {totalCbm > 0 && (
                     <span className="bg-white/10 px-2 py-0.5 rounded text-teal-200">
                       Total CBM: <strong className="text-white text-sm">{totalCbm.toFixed(3)} m³</strong>

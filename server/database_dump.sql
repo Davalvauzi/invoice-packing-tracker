@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict n0AJQr2WkuB040LjSXetygYKlcP4bUF1tIXme6TcxlYSBLbHXx9aoM94yXP7b2g
+\restrict 7w1RsZENYhp8TX0vasuLDzaTXlubPVw5edTSc4EdpWGOy3wkgfuECD3dC5yCbWz
 
 -- Dumped from database version 18.2
 -- Dumped by pg_dump version 18.2
@@ -644,6 +644,7 @@ COPY public.data_logger (id, doc_type, doc_number, doc_date, customer_name, cust
 219	INVOICE	INV/2026/08/703	2026-08-31	PT. Yamaha Indonesia Motor Mfg.	CUST-YIMM-04	PO-PTYAM-3719	Shaft Drive Axle Front Precision Ground	32	2	Franco Cikarang	Ex-Works	600 x 120 x 120 mm	\N	\N	\N	89	11366.4	12.8	USD	1	0	2026-09-08 03:40:49
 220	PACKING_LIST	INV/2026/08/703	2026-09-01	PT. Yamaha Indonesia Motor Mfg.	CUST-YIMM-04	PO-PTYAM-3719	Shaft Drive Axle Front Precision Ground	32	2	Ref Inv: INV/2026/08/703	Ex-Works	600 x 120 x 120 mm	\N	\N	\N	89	11366.4	12.8	USD	1	0	2026-09-08 03:40:49
 221	DELIVERY_ORDER	285992 - 89 - 10	2026-09-08	PT. Yamaha Indonesia Motor Mfg.	CUST-YIMM-04	PO-PTYAM-3719	2 Items: Shaft Drive Axle Front Precision Ground, Shaft Drive Axle Front Precision Ground	72	7	Ref Inv: INV/2026/08/703	\N	\N	\N		[{"id":1788847877463.7725,"part_name":"Shaft Drive Axle Front Precision Ground","part_no":"SHF-AX-554","customer_po_no":"PO-PTYAM-3719","pallet_qty":"2","box_qty":"32","qty_per_box":25,"total_qty":800},{"id":1788847880486.8364,"part_name":"Shaft Drive Axle Front Precision Ground","part_no":"SHF-AX-554","customer_po_no":"PO-PTYAM-3720","pallet_qty":"5","box_qty":"40","qty_per_box":25,"total_qty":1000}]	54	0	0	USD	0	0	2026-09-08 13:11:45.07108
+222	PACKING_LIST	1256123 - 22 - 10	2026-04-07	PT. Denso Indonesia	\N	PO-PTDEN-7029	2 Items: Pinion Gear Transmission Planetary Type, Shaft Drive Axle Front Precision Ground	54	7	CIF Tanjung Priok	\N	350 x 250 x 200 mm			[{"id":1788849158104.2183,"part_name":"Pinion Gear Transmission Planetary Type","part_no":"GR-PIN-902","customer_po_no":"PO-PTDEN-7029","box_qty":"39","pallet_qty":"2","length":"350","width":"250","height":"200","unit_note":"mm","qty_per_box":60,"total_qty":2340,"net_weight":1287,"gross_weight":1724.58},{"id":1788849460504.83,"part_name":"Shaft Drive Axle Front Precision Ground","part_no":"SHF-AX-554","customer_po_no":"PO-PTDEN-7030","box_qty":"15","pallet_qty":"5","length":"600","width":"120","height":"120","unit_note":"mm","qty_per_box":25,"total_qty":375,"net_weight":206.25,"gross_weight":276.38}]	79	0	0	USD	0	0	2026-09-08 13:38:06.70105
 \.
 
 
@@ -708,6 +709,7 @@ COPY public.packing_lists (id, invoice_number, invoice_date, customer_name, cust
 76	INV/2026/08/133	2026-08-21	PT. Indonesia Epson Industry	PO-PTIND-7023	Pinion Gear Transmission Planetary Type (GR-PIN-902)	CIF Tanjung Priok	41	3	350	250	200	mm	\N	\N	\N	1	2026-09-08 03:40:49
 77	INV/2026/08/586	2026-08-24	PT. Toyota Motor Manufacturing Indonesia	PO-PTTOY-3534	Bracket Engine Mount RH High-Tensile (BKT-ENG-001)	FOB Tanjung Priok	54	3	400	250	200	mm	\N	\N	\N	1	2026-09-08 03:40:49
 78	INV/2026/08/703	2026-09-01	PT. Yamaha Indonesia Motor Mfg.	PO-PTYAM-3719	Shaft Drive Axle Front Precision Ground (SHF-AX-554)	Franco Cikarang	32	2	600	120	120	mm	\N	\N	\N	1	2026-09-08 03:40:49
+79	1256123 - 22 - 10	2026-04-07	PT. Denso Indonesia	PO-PTDEN-7029	2 Items: Pinion Gear Transmission Planetary Type, Shaft Drive Axle Front Precision Ground	CIF Tanjung Priok	54	7	350	250	200	mm			[{"id":1788849158104.2183,"part_name":"Pinion Gear Transmission Planetary Type","part_no":"GR-PIN-902","customer_po_no":"PO-PTDEN-7029","box_qty":"39","pallet_qty":"2","length":"350","width":"250","height":"200","unit_note":"mm","qty_per_box":60,"total_qty":2340,"net_weight":1287,"gross_weight":1724.58},{"id":1788849460504.83,"part_name":"Shaft Drive Axle Front Precision Ground","part_no":"SHF-AX-554","customer_po_no":"PO-PTDEN-7030","box_qty":"15","pallet_qty":"5","length":"600","width":"120","height":"120","unit_note":"mm","qty_per_box":25,"total_qty":375,"net_weight":206.25,"gross_weight":276.38}]	0	2026-09-08 13:38:06.694683
 \.
 
 
@@ -775,7 +777,7 @@ SELECT pg_catalog.setval('public.customers_id_seq', 124, true);
 -- Name: data_logger_id_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
 --
 
-SELECT pg_catalog.setval('public.data_logger_id_seq', 221, true);
+SELECT pg_catalog.setval('public.data_logger_id_seq', 222, true);
 
 
 --
@@ -803,7 +805,7 @@ SELECT pg_catalog.setval('public.invoices_id_seq', 89, true);
 -- Name: packing_lists_id_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
 --
 
-SELECT pg_catalog.setval('public.packing_lists_id_seq', 78, true);
+SELECT pg_catalog.setval('public.packing_lists_id_seq', 79, true);
 
 
 --
@@ -999,5 +1001,5 @@ ALTER TABLE ONLY public.part_price_history
 -- PostgreSQL database dump complete
 --
 
-\unrestrict n0AJQr2WkuB040LjSXetygYKlcP4bUF1tIXme6TcxlYSBLbHXx9aoM94yXP7b2g
+\unrestrict 7w1RsZENYhp8TX0vasuLDzaTXlubPVw5edTSc4EdpWGOy3wkgfuECD3dC5yCbWz
 

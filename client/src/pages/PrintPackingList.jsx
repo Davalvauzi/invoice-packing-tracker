@@ -131,6 +131,7 @@ export default function PrintPackingList({ id, onBack }) {
     cbm: fallbackCbmVal
   };
 
+  let cumulativePallet = 1;
   const items = hasMultipleItems ? rawItems.map((it, idx) => {
     const parsed = extractPartDetails(it.part_name, it.part_no);
     const box = Number(it.no_of_box) || Number(it.box_qty) || 0;
@@ -152,8 +153,23 @@ export default function PrintPackingList({ id, onBack }) {
     const u = it.unit_note || fallbackU;
     const cbm = Number(it.cbm) || (calcCbm(l, w, h, u) * (box || 1));
 
+    // Hitung range pallet berurutan jika tidak ada explicit pallet_no
+    let pltDisplay = it.pallet_no || it.plt_no || '';
+    if (!pltDisplay) {
+      const pQty = Number(it.pallet_qty) || Number(it.no_of_pallet) || 0;
+      if (pQty > 1) {
+        pltDisplay = `${cumulativePallet}~${cumulativePallet + pQty - 1}`;
+        cumulativePallet += pQty;
+      } else if (pQty === 1) {
+        pltDisplay = `${cumulativePallet}`;
+        cumulativePallet += 1;
+      } else {
+        pltDisplay = `${idx + 1}`;
+      }
+    }
+
     return {
-      pallet_no: it.pallet_no || it.plt_no || (it.pallet_qty ? `1~${it.pallet_qty}` : `${idx + 1}`),
+      pallet_no: pltDisplay,
       part_name: parsed.name,
       part_no: parsed.no,
       customer_po_no: it.customer_po_no || it.cust_po_no || packingList.customer_po_no || '',

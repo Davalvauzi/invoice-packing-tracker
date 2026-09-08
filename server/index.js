@@ -1340,6 +1340,59 @@ app.get('/api/packing-lists/:id', async (req, res) => {
       if (!row.gross_weight && row.net_weight) {
         row.gross_weight = (Number(row.net_weight) * 1.34).toFixed(2);
       }
+
+      // Auto-enrich multi-items array if present
+      if (row.items) {
+        let parsedMulti = null;
+        try {
+          parsedMulti = typeof row.items === 'string' ? JSON.parse(row.items) : row.items;
+        } catch (e) {
+          parsedMulti = null;
+        }
+        if (Array.isArray(parsedMulti) && parsedMulti.length > 0) {
+          for (const it of parsedMulti) {
+            let itPartName = it.part_name || '';
+            let itPartNo = it.part_no || '';
+            const m = itPartName.match(/^(.*?)\s*\(([^)]+)\)\s*$/);
+            if (m) {
+              itPartName = m[1].trim();
+              if (!itPartNo) itPartNo = m[2].trim();
+            }
+            if (!it.qty_per_box || !it.total_qty || !it.length || !it.width || !it.height) {
+              let pMatch = null;
+              if (itPartNo) {
+                pMatch = await db.prepare('SELECT * FROM parts WHERE part_no = ? LIMIT 1').get(itPartNo);
+              }
+              if (!pMatch && itPartName) {
+                pMatch = await db.prepare('SELECT * FROM parts WHERE part_name LIKE ? LIMIT 1').get(`%${itPartName}%`);
+              }
+              if (pMatch) {
+                if (!it.part_no) it.part_no = pMatch.part_no;
+                if (!it.qty_per_box) it.qty_per_box = pMatch.qty_per_box;
+                if (!it.length) it.length = pMatch.length;
+                if (!it.width) it.width = pMatch.width;
+                if (!it.height) it.height = pMatch.height;
+                if (!it.unit_note) it.unit_note = pMatch.unit || 'mm';
+              }
+            }
+            const b = Number(it.box_qty) || Number(it.no_of_box) || 0;
+            let q = Number(it.qty_per_box) || 0;
+            let t = Number(it.total_qty) || 0;
+            if (!t && b > 0 && q > 0) t = b * q;
+            if (!q && b > 0 && t > 0) q = Math.round(t / b);
+            it.qty_per_box = q;
+            it.total_qty = t;
+
+            if (!it.net_weight && t > 0) {
+              it.net_weight = Number((t * 0.55).toFixed(2));
+            }
+            if (!it.gross_weight && it.net_weight) {
+              it.gross_weight = Number((Number(it.net_weight) * 1.34).toFixed(2));
+            }
+          }
+          row.items = JSON.stringify(parsedMulti);
+        }
+      }
     } catch (e) {
       console.error('PL enrichment error:', e);
     }
@@ -1397,6 +1450,48 @@ app.post('/api/packing-lists', async (req, res) => {
       if (!customer_po_no) {
         const distinctPo = [...new Set(parsedItems.map(i => i.customer_po_no || i.po_no).filter(Boolean))];
         if (distinctPo.length > 0) finalPoNo = distinctPo.join(', ');
+      }
+
+      // Enrich items with catalog specs, total_qty & weights if missing
+      for (const it of parsedItems) {
+        let itPartName = it.part_name || '';
+        let itPartNo = it.part_no || '';
+        const m = itPartName.match(/^(.*?)\s*\(([^)]+)\)\s*$/);
+        if (m) {
+          itPartName = m[1].trim();
+          if (!itPartNo) itPartNo = m[2].trim();
+        }
+        if (!it.qty_per_box || !it.total_qty || !it.length || !it.width || !it.height) {
+          let pMatch = null;
+          if (itPartNo) {
+            pMatch = await db.prepare('SELECT * FROM parts WHERE part_no = ? LIMIT 1').get(itPartNo);
+          }
+          if (!pMatch && itPartName) {
+            pMatch = await db.prepare('SELECT * FROM parts WHERE part_name LIKE ? LIMIT 1').get(`%${itPartName}%`);
+          }
+          if (pMatch) {
+            if (!it.part_no) it.part_no = pMatch.part_no;
+            if (!it.qty_per_box) it.qty_per_box = pMatch.qty_per_box;
+            if (!it.length) it.length = pMatch.length;
+            if (!it.width) it.width = pMatch.width;
+            if (!it.height) it.height = pMatch.height;
+            if (!it.unit_note) it.unit_note = pMatch.unit || 'mm';
+          }
+        }
+        const b = Number(it.box_qty) || Number(it.no_of_box) || 0;
+        let q = Number(it.qty_per_box) || 0;
+        let t = Number(it.total_qty) || 0;
+        if (!t && b > 0 && q > 0) t = b * q;
+        if (!q && b > 0 && t > 0) q = Math.round(t / b);
+        it.qty_per_box = q;
+        it.total_qty = t;
+
+        if (!it.net_weight && t > 0) {
+          it.net_weight = Number((t * 0.55).toFixed(2));
+        }
+        if (!it.gross_weight && it.net_weight) {
+          it.gross_weight = Number((Number(it.net_weight) * 1.34).toFixed(2));
+        }
       }
     }
 

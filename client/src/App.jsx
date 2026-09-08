@@ -6,6 +6,7 @@ import MasterData from './pages/MasterData';
 import WebsiteSettings from './pages/WebsiteSettings';
 import PrintInvoice from './pages/PrintInvoice';
 import PrintPackingList from './pages/PrintPackingList';
+import PrintDeliveryOrder from './pages/PrintDeliveryOrder';
 import InvoiceModal from './components/InvoiceModal';
 import PackingListModal from './components/PackingListModal';
 import DeliveryOrderModal from './components/DeliveryOrderModal';
@@ -34,7 +35,7 @@ function AppContent() {
     const idParam = params.get('id');
 
     if (viewParam && idParam) {
-      if (viewParam === 'print-invoice' || viewParam === 'print-packing-list') {
+      if (viewParam === 'print-invoice' || viewParam === 'print-packing-list' || viewParam === 'print-delivery-order') {
         setPrintDoc({ view: viewParam, id: idParam });
       }
     }
@@ -67,6 +68,17 @@ function AppContent() {
     if (printDoc.view === 'print-packing-list') {
       return (
         <PrintPackingList 
+          id={printDoc.id} 
+          onBack={() => {
+            window.history.replaceState({}, '', window.location.pathname);
+            setPrintDoc(null);
+          }} 
+        />
+      );
+    }
+    if (printDoc.view === 'print-delivery-order') {
+      return (
+        <PrintDeliveryOrder 
           id={printDoc.id} 
           onBack={() => {
             window.history.replaceState({}, '', window.location.pathname);

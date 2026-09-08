@@ -59,7 +59,26 @@ export default function WebsiteSettings({ refreshTrigger }) {
     authorized_sign_title: '',
     authorized_sign_url: '',
     doc_control_code: 'FRM-ACC-01 Rev.02',
-    show_letterhead: 1
+    show_letterhead: 1,
+    pl_prepared_by_name: 'Staff Warehouse',
+    pl_prepared_by_title: 'Prepared By',
+    pl_authorized_name: 'Warehouse Supervisor',
+    pl_authorized_title: 'Authorized Signature',
+    pl_doc_control_code: 'FRM-WHS-02 Rev.01',
+    do_drawn_in_favour: 'PT. PATCO ELEKTRONIK TEKNOLOGI',
+    do_sign_col1_title: 'Prepared By',
+    do_sign_col1_name: '',
+    do_sign_col2_title: 'Checked By',
+    do_sign_col2_name: '',
+    do_sign_col3_title: 'Approved By',
+    do_sign_col3_name: '',
+    do_sign_col4_title: 'Security',
+    do_sign_col4_name: '',
+    do_sign_col5_title: 'Driver',
+    do_sign_col5_name: '',
+    do_sign_col6_title: 'Received By',
+    do_sign_col6_name: '',
+    do_doc_control_code: 'FRM-WHS-01 Rev.00'
   });
 
   const [loading, setLoading] = useState(true);
@@ -870,21 +889,53 @@ export default function WebsiteSettings({ refreshTrigger }) {
               </div>
             </div>
 
-            <div className="pt-3 border-t border-slate-100">
-              <label className="block text-xs font-bold text-slate-800 uppercase mb-1">
-                Kode Kontrol Formulir ISO (Merah Kanan Paling Bawah)
-              </label>
-              <div className="max-w-xs">
-                <input
-                  type="text"
-                  value={settings.doc_control_code}
-                  onChange={e => setSettings({ ...settings, doc_control_code: e.target.value })}
-                  className="w-full px-3 py-2 text-xs rounded-xl border border-slate-300 focus:border-emerald-700 font-mono font-bold"
-                  placeholder="FRM-ACC-01 Rev.02"
-                />
-                <p className="text-[10px] text-slate-400 mt-1">
-                  Tercetak kecil di pojok paling kanan bawah kertas A4.
-                </p>
+            <div className="pt-3 border-t border-slate-100 space-y-3">
+              <h3 className="text-xs font-bold text-slate-800 uppercase">
+                Kode Kontrol Formulir ISO (Coretan Kuning Kanan Paling Bawah)
+              </h3>
+              <p className="text-[11px] text-slate-500">
+                Tercetak kecil di pojok paling kanan bawah kertas A4 masing-masing template dokumen cetak.
+              </p>
+
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-700 uppercase mb-1">
+                    Kode Dokumen Invoice
+                  </label>
+                  <input
+                    type="text"
+                    value={settings.doc_control_code}
+                    onChange={e => setSettings({ ...settings, doc_control_code: e.target.value })}
+                    className="w-full px-3 py-2 text-xs rounded-xl border border-slate-300 focus:border-emerald-700 font-mono font-bold bg-white"
+                    placeholder="FRM-ACC-01 Rev.02"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-700 uppercase mb-1">
+                    Kode Dokumen Packing List
+                  </label>
+                  <input
+                    type="text"
+                    value={settings.pl_doc_control_code}
+                    onChange={e => setSettings({ ...settings, pl_doc_control_code: e.target.value })}
+                    className="w-full px-3 py-2 text-xs rounded-xl border border-slate-300 focus:border-teal-700 font-mono font-bold bg-white"
+                    placeholder="FRM-WHS-02 Rev.01"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-700 uppercase mb-1">
+                    Kode Dokumen Delivery Order
+                  </label>
+                  <input
+                    type="text"
+                    value={settings.do_doc_control_code}
+                    onChange={e => setSettings({ ...settings, do_doc_control_code: e.target.value })}
+                    className="w-full px-3 py-2 text-xs rounded-xl border border-slate-300 focus:border-cyan-700 font-mono font-bold bg-white"
+                    placeholder="FRM-WHS-01 Rev.00"
+                  />
+                </div>
               </div>
             </div>
           </div>
@@ -895,25 +946,40 @@ export default function WebsiteSettings({ refreshTrigger }) {
           <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-xs space-y-4">
             <div className="border-b border-slate-100 pb-3 mb-4">
               <span className="text-[10px] font-bold uppercase tracking-wider text-red-700 bg-red-50 px-2 py-0.5 rounded">
-                Warna Merah Kiri Bawah
+                Warna Merah Kiri Bawah & Hijau Tengah DO
               </span>
               <h2 className="text-base font-bold text-slate-900 mt-1">Data Rekening Bank & Instruksi Pembayaran</h2>
               <p className="text-xs text-slate-500">
-                Instruksi pembayaran resmi yang akan muncul di bawah tabel Invoice untuk customer transfer dana.
+                Instruksi pembayaran resmi yang akan muncul di bawah tabel Invoice & Delivery Order untuk customer.
               </p>
             </div>
 
-            <div>
-              <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
-                All Payment to be drawn in favour of:
-              </label>
-              <input
-                type="text"
-                value={settings.bank_drawn_in_favour}
-                onChange={e => setSettings({ ...settings, bank_drawn_in_favour: e.target.value })}
-                className="w-full px-3 py-2 text-xs rounded-xl border border-slate-300 focus:border-emerald-700 font-bold"
-                placeholder="PT. PATCO ELEKTRONIK TEKNOLOGI"
-              />
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
+                  Invoice - Drawn in Favour of:
+                </label>
+                <input
+                  type="text"
+                  value={settings.bank_drawn_in_favour}
+                  onChange={e => setSettings({ ...settings, bank_drawn_in_favour: e.target.value })}
+                  className="w-full px-3 py-2 text-xs rounded-xl border border-slate-300 focus:border-emerald-700 font-bold"
+                  placeholder="PT. PATCO ELEKTRONIK TEKNOLOGI"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
+                  Delivery Order - Drawn in Favour of (Coretan Hijau Tengah):
+                </label>
+                <input
+                  type="text"
+                  value={settings.do_drawn_in_favour}
+                  onChange={e => setSettings({ ...settings, do_drawn_in_favour: e.target.value })}
+                  className="w-full px-3 py-2 text-xs rounded-xl border border-slate-300 focus:border-cyan-700 font-bold"
+                  placeholder="PT. PATCO ELEKTRONIK TEKNOLOGI"
+                />
+              </div>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -1066,7 +1132,7 @@ export default function WebsiteSettings({ refreshTrigger }) {
               <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200 space-y-3">
                 <div className="flex items-center gap-2 text-slate-800 font-bold text-xs pb-2 border-b border-slate-200">
                   <ShieldCheck className="w-3.5 h-3.5 text-emerald-800" />
-                  <span>Kolom Tanda Tangan 2 (Kanan - Otorisasi)</span>
+                  <span>Kolom Tanda Tangan 2 (Kanan - Otorisasi Invoice)</span>
                 </div>
 
                 <div>
@@ -1121,6 +1187,117 @@ export default function WebsiteSettings({ refreshTrigger }) {
                 </div>
               </div>
 
+            </div>
+
+            {/* SEKSI 2: Tanda Tangan PACKING LIST */}
+            <div className="pt-4 border-t border-slate-200">
+              <div className="mb-3">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-teal-700 bg-teal-50 px-2 py-0.5 rounded">
+                  Coretan Hijau Bawah Packing List
+                </span>
+                <h3 className="text-sm font-bold text-slate-900 mt-1">Tanda Tangan Packing List (2 Kolom Bawah)</h3>
+                <p className="text-[11px] text-slate-500">
+                  Dapat diset manual untuk penanda tangan gudang/operasional dan supervisor pada cetak PDF Packing List.
+                </p>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="p-3.5 bg-teal-50/40 rounded-xl border border-teal-200/70 space-y-2.5">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-teal-800">Kolom 1: Pembuat / Gudang (Kiri)</span>
+                  <div>
+                    <label className="block text-[10px] font-bold text-slate-600 uppercase mb-0.5">Judul Kolom</label>
+                    <input
+                      type="text"
+                      value={settings.pl_prepared_by_title}
+                      onChange={e => setSettings({ ...settings, pl_prepared_by_title: e.target.value })}
+                      className="w-full px-2.5 py-1.5 text-xs rounded-lg border border-slate-300 bg-white"
+                      placeholder="Prepared By"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-bold text-slate-600 uppercase mb-0.5">Nama Pejabat / Staf</label>
+                    <input
+                      type="text"
+                      value={settings.pl_prepared_by_name}
+                      onChange={e => setSettings({ ...settings, pl_prepared_by_name: e.target.value })}
+                      className="w-full px-2.5 py-1.5 text-xs rounded-lg border border-slate-300 bg-white font-semibold"
+                      placeholder="Staff Warehouse"
+                    />
+                  </div>
+                </div>
+
+                <div className="p-3.5 bg-teal-50/40 rounded-xl border border-teal-200/70 space-y-2.5">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-teal-800">Kolom 2: Otorisasi / Pimpinan (Kanan)</span>
+                  <div>
+                    <label className="block text-[10px] font-bold text-slate-600 uppercase mb-0.5">Judul Kolom</label>
+                    <input
+                      type="text"
+                      value={settings.pl_authorized_title}
+                      onChange={e => setSettings({ ...settings, pl_authorized_title: e.target.value })}
+                      className="w-full px-2.5 py-1.5 text-xs rounded-lg border border-slate-300 bg-white"
+                      placeholder="Authorized Signature"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-bold text-slate-600 uppercase mb-0.5">Nama Pejabat / Departemen</label>
+                    <input
+                      type="text"
+                      value={settings.pl_authorized_name}
+                      onChange={e => setSettings({ ...settings, pl_authorized_name: e.target.value })}
+                      className="w-full px-2.5 py-1.5 text-xs rounded-lg border border-slate-300 bg-white font-semibold"
+                      placeholder="Warehouse Supervisor"
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* SEKSI 3: Tanda Tangan DELIVERY ORDER (6 Kolom) */}
+            <div className="pt-4 border-t border-slate-200">
+              <div className="mb-3">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-cyan-700 bg-cyan-50 px-2 py-0.5 rounded">
+                  Coretan Hijau Bawah Delivery Order (6 Kolom Garis TTD)
+                </span>
+                <h3 className="text-sm font-bold text-slate-900 mt-1">Tanda Tangan Delivery Order / Surat Jalan</h3>
+                <p className="text-[11px] text-slate-500">
+                  Enam kolom tanda tangan horizontal yang tercetak di bawah teks & total Delivery Order.
+                </p>
+              </div>
+
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+                {[
+                  { num: 1, titleKey: 'do_sign_col1_title', nameKey: 'do_sign_col1_name', defTitle: 'Prepared By' },
+                  { num: 2, titleKey: 'do_sign_col2_title', nameKey: 'do_sign_col2_name', defTitle: 'Checked By' },
+                  { num: 3, titleKey: 'do_sign_col3_title', nameKey: 'do_sign_col3_name', defTitle: 'Approved By' },
+                  { num: 4, titleKey: 'do_sign_col4_title', nameKey: 'do_sign_col4_name', defTitle: 'Security' },
+                  { num: 5, titleKey: 'do_sign_col5_title', nameKey: 'do_sign_col5_name', defTitle: 'Driver' },
+                  { num: 6, titleKey: 'do_sign_col6_title', nameKey: 'do_sign_col6_name', defTitle: 'Received By' }
+                ].map(col => (
+                  <div key={col.num} className="p-3 bg-cyan-50/40 rounded-xl border border-cyan-200/70 space-y-2">
+                    <span className="text-[10px] font-bold uppercase text-cyan-800 block">Kolom {col.num}</span>
+                    <div>
+                      <label className="block text-[9px] font-bold text-slate-500 uppercase mb-0.5">Title / Jabatan</label>
+                      <input
+                        type="text"
+                        value={settings[col.titleKey]}
+                        onChange={e => setSettings({ ...settings, [col.titleKey]: e.target.value })}
+                        className="w-full px-2 py-1 text-xs rounded border border-slate-300 bg-white"
+                        placeholder={col.defTitle}
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[9px] font-bold text-slate-500 uppercase mb-0.5">Nama (Opsional)</label>
+                      <input
+                        type="text"
+                        value={settings[col.nameKey]}
+                        onChange={e => setSettings({ ...settings, [col.nameKey]: e.target.value })}
+                        className="w-full px-2 py-1 text-xs rounded border border-slate-300 bg-white font-semibold"
+                        placeholder="Nama"
+                      />
+                    </div>
+                  </div>
+                ))}
+              </div>
             </div>
           </div>
         )}

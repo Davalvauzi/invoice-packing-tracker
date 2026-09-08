@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { Printer, ArrowLeft } from 'lucide-react';
 
-export default function PrintPackingList({ id, onBack }) {
-  const [packingList, setPackingList] = useState(null);
+export default function PrintDeliveryOrder({ id, onBack }) {
+  const [deliveryOrder, setDeliveryOrder] = useState(null);
   const [customer, setCustomer] = useState(null);
   const [settings, setSettings] = useState(null);
   const [showLetterhead, setShowLetterhead] = useState(true);
@@ -14,23 +14,23 @@ export default function PrintPackingList({ id, onBack }) {
 
   const fetchData = async () => {
     try {
-      const [plRes, setRes] = await Promise.all([
-        fetch(`/api/packing-lists/${id}`),
+      const [doRes, setRes] = await Promise.all([
+        fetch(`/api/delivery-orders/${id}`),
         fetch('/api/settings')
       ]);
 
-      if (!plRes.ok) throw new Error('Packing list not found');
-      const plData = await plRes.json();
+      if (!doRes.ok) throw new Error('Delivery order not found');
+      const doData = await doRes.json();
       const setData = await setRes.json();
 
-      setPackingList(plData);
+      setDeliveryOrder(doData);
       setSettings(setData);
       if (setData) {
         setShowLetterhead(setData.show_letterhead !== undefined ? (setData.show_letterhead === 1 || setData.show_letterhead === true) : true);
       }
 
-      if (plData.customer_name) {
-        const cRes = await fetch(`/api/customers?name=${encodeURIComponent(plData.customer_name)}`);
+      if (doData.customer_name) {
+        const cRes = await fetch(`/api/customers?name=${encodeURIComponent(doData.customer_name)}`);
         if (cRes.ok) {
           const found = await cRes.json();
           if (found) setCustomer(found);
@@ -48,16 +48,16 @@ export default function PrintPackingList({ id, onBack }) {
       <div className="min-h-screen flex items-center justify-center bg-slate-100 font-['Calibri',sans-serif]">
         <div className="text-center space-y-2">
           <div className="w-8 h-8 border-4 border-slate-700 border-t-transparent rounded-full animate-spin mx-auto"></div>
-          <p className="text-slate-600 text-xs font-medium">Menyiapkan dokumen A4 Packing List...</p>
+          <p className="text-slate-600 text-xs font-medium">Menyiapkan dokumen A4 Delivery Order...</p>
         </div>
       </div>
     );
   }
 
-  if (!packingList) {
+  if (!deliveryOrder) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-slate-100 gap-4 font-['Calibri',sans-serif]">
-        <p className="text-red-500 font-semibold text-xs">Data packing list tidak ditemukan.</p>
+        <p className="text-red-500 font-semibold text-xs">Data delivery order tidak ditemukan.</p>
         {onBack && (
           <button onClick={onBack} className="px-4 py-2 bg-slate-800 text-white rounded-lg text-xs cursor-pointer">
             Kembali
@@ -68,89 +68,80 @@ export default function PrintPackingList({ id, onBack }) {
   }
 
   // Multi-item parsing
-  const rawItems = Array.isArray(packingList.items)
-    ? packingList.items
-    : (typeof packingList.items === 'string' && packingList.items.trim().startsWith('[')
-        ? (() => { try { return JSON.parse(packingList.items); } catch (e) { return null; } })()
+  const rawItems = Array.isArray(deliveryOrder.items)
+    ? deliveryOrder.items
+    : (typeof deliveryOrder.items === 'string' && deliveryOrder.items.trim().startsWith('[')
+        ? (() => { try { return JSON.parse(deliveryOrder.items); } catch (e) { return null; } })()
         : null);
 
   const hasMultipleItems = rawItems && rawItems.length > 0;
 
   // Single fallback item
   const fallbackItem = {
-    pallet_no: packingList.pallet_qty ? `1~${packingList.pallet_qty}` : '1',
-    part_name: packingList.part_name || '',
-    part_no: packingList.part_no || '',
-    customer_po_no: packingList.customer_po_no || '',
-    no_of_box: Number(packingList.box_qty) || 0,
-    qty_per_box: Number(packingList.qty_per_box) || 0,
-    total_qty: Number(packingList.total_qty) || 0,
-    net_weight: Number(packingList.net_weight) || 0,
-    gross_weight: Number(packingList.gross_weight) || 0,
-    length: Number(packingList.length) || 0,
-    width: Number(packingList.width) || 0,
-    height: Number(packingList.height) || 0,
-    unit_note: packingList.unit_note || 'cm'
-  };
-
-  const calcCbm = (l, w, h, unit) => {
-    if (!l || !w || !h) return 0;
-    if (unit === 'cm') return (l * w * h) / 1_000_000;
-    if (unit === 'inch') return (l * w * h * 0.000016387);
-    return (l * w * h) / 1_000_000_000; // default mm
+    part_name: deliveryOrder.part_name || '',
+    part_no: deliveryOrder.part_no || '',
+    our_po_no: deliveryOrder.invoice_number || '',
+    cust_po_no: deliveryOrder.customer_po_no || '',
+    plt_no: deliveryOrder.pallet_qty ? `1~${deliveryOrder.pallet_qty}` : '1',
+    no_of_ctn: Number(deliveryOrder.box_qty) || 0,
+    qty_per_ctn: Number(deliveryOrder.qty_per_box) || 0,
+    total_qty: Number(deliveryOrder.total_qty) || 0,
+    remark: deliveryOrder.notes || ''
   };
 
   const items = hasMultipleItems ? rawItems.map((it, idx) => {
-    const box = Number(it.no_of_box) || Number(it.box_qty) || 0;
-    const qpb = Number(it.qty_per_box) || 0;
-    const totQ = Number(it.total_qty) || (box > 0 && qpb > 0 ? box * qpb : 0);
-    const nw = Number(it.net_weight) || 0;
-    const gw = Number(it.gross_weight) || 0;
-    const l = Number(it.length) || Number(packingList.length) || 0;
-    const w = Number(it.width) || Number(packingList.width) || 0;
-    const h = Number(it.height) || Number(packingList.height) || 0;
-    const u = it.unit_note || packingList.unit_note || 'cm';
-    const cbm = Number(it.cbm) || (calcCbm(l, w, h, u) * (box || 1));
+    const ctn = Number(it.box_qty) || Number(it.no_of_ctn) || Number(it.no_of_box) || 0;
+    const qpc = Number(it.qty_per_box) || Number(it.qty_per_ctn) || 0;
+    const totQ = Number(it.total_qty) || (ctn > 0 && qpc > 0 ? ctn * qpc : 0);
 
     return {
-      pallet_no: it.pallet_no || it.plt_no || (it.pallet_qty ? `1~${it.pallet_qty}` : `${idx + 1}`),
       part_name: it.part_name || '',
       part_no: it.part_no || '',
-      customer_po_no: it.customer_po_no || packingList.customer_po_no || '',
-      no_of_box: box,
-      qty_per_box: qpb || (box > 0 && totQ > 0 ? Math.round(totQ / box) : 0),
+      our_po_no: it.our_po_no || deliveryOrder.invoice_number || '',
+      cust_po_no: it.customer_po_no || it.cust_po_no || deliveryOrder.customer_po_no || '',
+      plt_no: it.plt_no || it.pallet_no || (it.pallet_qty ? `1~${it.pallet_qty}` : `${idx + 1}`),
+      no_of_ctn: ctn,
+      qty_per_ctn: qpc || (ctn > 0 && totQ > 0 ? Math.round(totQ / ctn) : 0),
       total_qty: totQ,
-      net_weight: nw,
-      gross_weight: gw,
-      length: l,
-      width: w,
-      height: h,
-      cbm: cbm
+      remark: it.remark || it.notes || ''
     };
   }) : [fallbackItem];
 
   // Totals
-  const totalBoxes = items.reduce((sum, it) => sum + (Number(it.no_of_box) || 0), 0);
+  const totalCtn = items.reduce((sum, it) => sum + (Number(it.no_of_ctn) || 0), 0);
   const grandTotalQty = items.reduce((sum, it) => sum + (Number(it.total_qty) || 0), 0);
-  const totalNetWeight = items.reduce((sum, it) => sum + (Number(it.net_weight) || 0), 0);
-  const totalGrossWeight = items.reduce((sum, it) => sum + (Number(it.gross_weight) || 0), 0);
-  const totalCbm = items.reduce((sum, it) => sum + (Number(it.cbm) || 0), 0);
 
-  // Parse Ship To
-  const rawShipTo = packingList.ship_to || customer?.ship_to || customer?.address || '';
-  let shipToLines = rawShipTo.split('\n').map(l => l.trim()).filter(Boolean);
-  if (shipToLines.length === 0 && packingList.customer_name) {
-    shipToLines = [packingList.customer_name];
+  // Parse Bill To & Ship To
+  const rawBillTo = customer?.bill_to || customer?.address || '';
+  let billToLines = rawBillTo.split('\n').map(l => l.trim()).filter(Boolean);
+  if (billToLines.length === 0 && deliveryOrder.customer_name) {
+    billToLines = [deliveryOrder.customer_name];
   }
 
-  const formatNum = (val, decimals = 0) => {
+  const rawShipTo = customer?.ship_to || customer?.address || '';
+  let shipToLines = rawShipTo.split('\n').map(l => l.trim()).filter(Boolean);
+  if (shipToLines.length === 0 && deliveryOrder.customer_name) {
+    shipToLines = [deliveryOrder.customer_name];
+  }
+
+  const formatNum = (val) => {
     if (val === null || val === undefined || isNaN(val) || val === '') return '-';
-    if (decimals === 0 && Number(val) === 0) return '-';
-    return Number(val).toLocaleString('en-US', {
-      minimumFractionDigits: decimals,
-      maximumFractionDigits: decimals
-    });
+    if (Number(val) === 0) return '-';
+    return Number(val).toLocaleString('en-US');
   };
+
+  const htsCode = settings?.hts_code_do || '8504.40.00';
+  const drawnInFavour = settings?.do_drawn_in_favour || settings?.bank_drawn_in_favour || 'PT. PATCO ELEKTRONIK TEKNOLOGI';
+
+  // 6 Signature Columns
+  const signatureCols = [
+    { title: settings?.do_sign_col1_title || 'Prepared By', name: settings?.do_sign_col1_name || '' },
+    { title: settings?.do_sign_col2_title || 'Checked By', name: settings?.do_sign_col2_name || '' },
+    { title: settings?.do_sign_col3_title || 'Approved By', name: settings?.do_sign_col3_name || '' },
+    { title: settings?.do_sign_col4_title || 'Security', name: settings?.do_sign_col4_name || '' },
+    { title: settings?.do_sign_col5_title || 'Driver', name: settings?.do_sign_col5_name || '' },
+    { title: settings?.do_sign_col6_title || 'Received By', name: settings?.do_sign_col6_name || '' }
+  ];
 
   return (
     <div className="min-h-screen bg-slate-300 py-6 px-4 print:p-0 print:bg-white text-black font-['Calibri',sans-serif] selection:bg-slate-300">
@@ -167,7 +158,7 @@ export default function PrintPackingList({ id, onBack }) {
             </button>
           )}
           <span className="text-xs text-slate-600 font-medium">
-            Dokumen Packing List: <strong className="text-slate-900 font-mono">{packingList.invoice_number || '-'}</strong>
+            Dokumen Delivery Order: <strong className="text-slate-900 font-mono">{deliveryOrder.do_number || '-'}</strong>
           </span>
         </div>
 
@@ -309,60 +300,77 @@ export default function PrintPackingList({ id, onBack }) {
             </div>
           )}
 
-          {/* ================= 2. TITLE: PACKING LIST ================= */}
+          {/* ================= 2. TITLE: DELIVERY ORDER ================= */}
           <div className={`text-center ${showLetterhead ? 'pt-3 pb-3' : 'pt-2 pb-3'}`}>
             <h1 className="text-[12pt] font-bold tracking-wider text-black uppercase leading-tight">
-              PACKING LIST
+              DELIVERY ORDER
             </h1>
           </div>
 
-          {/* ================= 3. METADATA: SHIP TO & DOC INFO ================= */}
-          <div className="grid grid-cols-12 gap-2 text-[7.5pt] leading-[1.2] items-start mb-3">
+          {/* ================= 3. METADATA: BILL TO, SHIP TO & DOC INFO ================= */}
+          <div className="grid grid-cols-12 gap-2 text-[7.5pt] leading-[1.2] items-start mb-2">
             
-            {/* Kiri (Coretan Pink): Ship to */}
-            <div className="col-span-7 pr-2">
-              <div className="font-bold">Ship to :</div>
-              <div className="pl-0 mt-0.5">
-                <div className="font-bold">{packingList.customer_name}</div>
-                {shipToLines.length > 0 ? (
-                  shipToLines.map((line, idx) => (
-                    <div key={idx} className="leading-tight">
-                      {line !== packingList.customer_name ? line : ''}
+            {/* Kiri (Coretan Pink): BILL TO & Ship to */}
+            <div className="col-span-7 pr-2 space-y-2">
+              <div>
+                <div className="font-bold">BILL TO :</div>
+                <div className="pl-0 mt-0.5">
+                  <div className="font-bold">{deliveryOrder.customer_name}</div>
+                  {billToLines.length > 0 ? (
+                    billToLines.map((line, idx) => (
+                      <div key={idx} className="leading-tight">
+                        {line !== deliveryOrder.customer_name ? line : ''}
+                      </div>
+                    ))
+                  ) : (
+                    <div>{customer?.address || '-'}</div>
+                  )}
+                </div>
+              </div>
+
+              <div>
+                <div className="font-bold">Ship to :</div>
+                <div className="pl-0 mt-0.5">
+                  {shipToLines.length > 0 ? (
+                    shipToLines.map((line, idx) => (
+                      <div key={idx} className="leading-tight">
+                        {line}
+                      </div>
+                    ))
+                  ) : (
+                    <div>{customer?.address || '-'}</div>
+                  )}
+                  {customer?.phone && (
+                    <div className="mt-0.5">
+                      <span>Phone: {customer.phone}</span>
+                      {customer?.fax && <span className="ml-3">Fax: {customer.fax}</span>}
                     </div>
-                  ))
-                ) : (
-                  <div>{customer?.address || '-'}</div>
-                )}
-                {customer?.phone && (
-                  <div className="mt-0.5">
-                    <span>Phone: {customer.phone}</span>
-                    {customer?.fax && <span className="ml-3">Fax: {customer.fax}</span>}
-                  </div>
-                )}
-                {customer?.contact_person && (
-                  <div>Attn: {customer.contact_person}</div>
-                )}
+                  )}
+                  {customer?.contact_person && (
+                    <div>Attn: {customer.contact_person}</div>
+                  )}
+                </div>
               </div>
             </div>
 
-            {/* Kanan (Coretan Ungu): Info Dokumen */}
-            <div className="col-span-5 pl-2">
+            {/* Kanan (Coretan Ungu): Number, Date & HTS CODE */}
+            <div className="col-span-5 pl-2 flex flex-col justify-between h-full">
               <div className="space-y-1">
                 <div className="grid grid-cols-12">
-                  <span className="col-span-5">Invoice Number</span>
+                  <span className="col-span-4">Number</span>
                   <span className="col-span-1">:</span>
-                  <span className="col-span-6 font-bold">{packingList.invoice_number || '-'}</span>
+                  <span className="col-span-7 font-bold">{deliveryOrder.do_number || '-'}</span>
                 </div>
                 <div className="grid grid-cols-12">
-                  <span className="col-span-5">Invoice Date</span>
+                  <span className="col-span-4">Date</span>
                   <span className="col-span-1">:</span>
-                  <span className="col-span-6">{packingList.invoice_date || '-'}</span>
+                  <span className="col-span-7">{deliveryOrder.do_date || '-'}</span>
                 </div>
-                <div className="grid grid-cols-12">
-                  <span className="col-span-5">Terms of Delivery</span>
-                  <span className="col-span-1">:</span>
-                  <span className="col-span-6">{packingList.terms_of_delivery || 'FOB'}</span>
-                </div>
+              </div>
+
+              {/* Coretan Merah: HTS CODE di kanan tepat di atas tabel */}
+              <div className="text-right pt-6">
+                <span className="font-bold">HTS CODE : {htsCode}</span>
               </div>
             </div>
 
@@ -373,97 +381,75 @@ export default function PrintPackingList({ id, onBack }) {
             PAGE : 01
           </div>
 
-          {/* ================= 4. TABEL PRODUK / PACKING SPECS ================= */}
+          {/* ================= 4. TABEL PRODUK DELIVERY ORDER ================= */}
           <table className="w-full border-collapse text-[7.2pt] leading-tight">
             <thead>
               <tr className="border-t border-b border-black text-center font-bold">
-                <th rowSpan={2} className="py-1 px-1 border-r border-black w-[55px]">Pallet No</th>
-                <th rowSpan={2} className="py-1 px-1 border-r border-black text-left">
+                <th className="py-1.5 px-1 border-r border-black w-[35px]">NO</th>
+                <th className="py-1.5 px-1 border-r border-black text-left">
                   <div>Part Name and</div>
                   <div>Part Number</div>
                 </th>
-                <th rowSpan={2} className="py-1 px-1 border-r border-black w-[75px]">PO No</th>
-                <th rowSpan={2} className="py-1 px-1 border-r border-black w-[55px]">
-                  <div>Total Box</div>
-                  <div>No</div>
-                  <div className="font-normal text-[6.5pt]">( Pcs )</div>
+                <th className="py-1.5 px-1 border-r border-black w-[90px]">
+                  <div>Our PO No.</div>
+                  <div>Cust PO No.</div>
                 </th>
-                <th rowSpan={2} className="py-1 px-1 border-r border-black w-[50px]">
-                  <div>Qty/Box</div>
-                  <div className="font-normal text-[6.5pt]">( Pcs )</div>
+                <th className="py-1.5 px-1 border-r border-black w-[50px]">
+                  <div>Plt</div>
+                  <div>No.</div>
                 </th>
-                <th rowSpan={2} className="py-1 px-1 border-r border-black w-[60px]">
-                  <div>Total Qty</div>
-                  <div className="font-normal text-[6.5pt]">( Pcs )</div>
+                <th className="py-1.5 px-1 border-r border-black w-[55px]">
+                  <div>No of</div>
+                  <div>Ctn/Tray</div>
                 </th>
-                <th rowSpan={2} className="py-1 px-1 border-r border-black w-[60px]">
-                  <div>Net Weight</div>
-                  <div className="font-normal text-[6.5pt]">( Kgs )</div>
+                <th className="py-1.5 px-1 border-r border-black w-[55px]">
+                  <div>Qty per</div>
+                  <div>Ctn/Tray</div>
                 </th>
-                <th rowSpan={2} className="py-1 px-1 border-r border-black w-[60px]">
-                  <div>Gross Weight</div>
-                  <div className="font-normal text-[6.5pt]">( Kgs )</div>
+                <th className="py-1.5 px-1 border-r border-black w-[60px]">
+                  <div>Total</div>
+                  <div>Qty</div>
                 </th>
-                <th colSpan={4} className="py-1 px-1 border-b border-black text-center">
-                  Measurement
+                <th className="py-1.5 px-1 w-[65px]">
+                  REMARK
                 </th>
-              </tr>
-              <tr className="border-b border-black text-center font-bold text-[6.5pt]">
-                <th className="py-0.5 px-1 border-r border-black w-[24px]">L (cm)</th>
-                <th className="py-0.5 px-1 border-r border-black w-[24px]">W (cm)</th>
-                <th className="py-0.5 px-1 border-r border-black w-[24px]">H (cm)</th>
-                <th className="py-0.5 px-1 w-[38px]">CBM (M3)</th>
               </tr>
             </thead>
             <tbody>
               {items.map((it, idx) => (
                 <tr key={idx} className="align-top border-b border-slate-200">
-                  <td className="py-1 px-1 text-center font-bold border-r border-black">
-                    {it.pallet_no}
+                  <td className="py-1.5 px-1 text-center font-mono border-r border-black">
+                    {idx + 1}
                   </td>
-                  <td className="py-1 px-1 text-left border-r border-black">
+                  <td className="py-1.5 px-1 text-left border-r border-black">
                     <div className="font-bold">{it.part_name}</div>
                     {it.part_no && <div className="text-[6.8pt] font-mono">{it.part_no}</div>}
                   </td>
-                  <td className="py-1 px-1 text-center font-mono border-r border-black">
-                    {it.customer_po_no || '-'}
+                  <td className="py-1.5 px-1 text-center font-mono border-r border-black">
+                    {it.our_po_no && <div>{it.our_po_no}</div>}
+                    {it.cust_po_no && <div className="font-semibold">{it.cust_po_no}</div>}
+                    {!it.our_po_no && !it.cust_po_no && '-'}
                   </td>
-                  <td className="py-1 px-1 text-right font-mono border-r border-black">
-                    {it.no_of_box > 0 ? formatNum(it.no_of_box) : '-'}
+                  <td className="py-1.5 px-1 text-center font-bold border-r border-black">
+                    {it.plt_no}
                   </td>
-                  <td className="py-1 px-1 text-right font-mono border-r border-black">
-                    {it.qty_per_box > 0 ? formatNum(it.qty_per_box) : '-'}
+                  <td className="py-1.5 px-1 text-right font-mono border-r border-black">
+                    {it.no_of_ctn > 0 ? formatNum(it.no_of_ctn) : '-'}
                   </td>
-                  <td className="py-1 px-1 text-right font-mono font-bold border-r border-black">
+                  <td className="py-1.5 px-1 text-right font-mono border-r border-black">
+                    {it.qty_per_ctn > 0 ? formatNum(it.qty_per_ctn) : '-'}
+                  </td>
+                  <td className="py-1.5 px-1 text-right font-mono font-bold border-r border-black">
                     {it.total_qty > 0 ? formatNum(it.total_qty) : '-'}
                   </td>
-                  <td className="py-1 px-1 text-right font-mono border-r border-black">
-                    {it.net_weight > 0 ? formatNum(it.net_weight, 2) : '-'}
-                  </td>
-                  <td className="py-1 px-1 text-right font-mono border-r border-black">
-                    {it.gross_weight > 0 ? formatNum(it.gross_weight, 2) : '-'}
-                  </td>
-                  <td className="py-1 px-0.5 text-center font-mono border-r border-black text-[6.8pt]">
-                    {it.length > 0 ? it.length : '-'}
-                  </td>
-                  <td className="py-1 px-0.5 text-center font-mono border-r border-black text-[6.8pt]">
-                    {it.width > 0 ? it.width : '-'}
-                  </td>
-                  <td className="py-1 px-0.5 text-center font-mono border-r border-black text-[6.8pt]">
-                    {it.height > 0 ? it.height : '-'}
-                  </td>
-                  <td className="py-1 px-1 text-right font-mono text-[6.8pt]">
-                    {it.cbm > 0 ? Number(it.cbm).toFixed(3) : '-'}
+                  <td className="py-1.5 px-1 text-center text-[6.8pt]">
+                    {it.remark || '-'}
                   </td>
                 </tr>
               ))}
 
               {/* Space kosong (setara 2-3 baris kosong) sesuai dokumen fisik */}
               <tr style={{ height: '75px' }}>
-                <td className="border-r border-black">&nbsp;</td>
-                <td className="border-r border-black">&nbsp;</td>
-                <td className="border-r border-black">&nbsp;</td>
-                <td className="border-r border-black">&nbsp;</td>
                 <td className="border-r border-black">&nbsp;</td>
                 <td className="border-r border-black">&nbsp;</td>
                 <td className="border-r border-black">&nbsp;</td>
@@ -478,77 +464,57 @@ export default function PrintPackingList({ id, onBack }) {
             {/* ================= 5. FOOTER TOTAL ================= */}
             <tfoot>
               <tr className="border-t border-b border-black font-bold">
-                <td colSpan={3} className="py-1.5 px-2 text-right border-r border-black">
+                <td colSpan={4} className="py-1.5 px-2 text-right border-r border-black">
                   Total
                 </td>
                 <td className="py-1.5 px-1 text-right font-mono border-r border-black">
-                  {totalBoxes > 0 ? formatNum(totalBoxes) : '-'}
+                  {totalCtn > 0 ? formatNum(totalCtn) : '-'}
                 </td>
-                <td className="py-1.5 px-1 text-center font-mono border-r border-black">
+                <td className="py-1.5 px-1 text-center border-r border-black">
                   -
                 </td>
                 <td className="py-1.5 px-1 text-right font-mono border-r border-black">
                   {grandTotalQty > 0 ? formatNum(grandTotalQty) : '-'}
                 </td>
-                <td className="py-1.5 px-1 text-right font-mono border-r border-black">
-                  {totalNetWeight > 0 ? formatNum(totalNetWeight, 2) : '-'}
-                </td>
-                <td className="py-1.5 px-1 text-right font-mono border-r border-black">
-                  {totalGrossWeight > 0 ? formatNum(totalGrossWeight, 2) : '-'}
-                </td>
-                <td colSpan={3} className="py-1.5 px-1 text-center border-r border-black">
+                <td className="py-1.5 px-1 text-center">
                   -
-                </td>
-                <td className="py-1.5 px-1 text-right font-mono">
-                  {totalCbm > 0 ? Number(totalCbm).toFixed(3) : '-'}
                 </td>
               </tr>
             </tfoot>
           </table>
+
+          {/* ================= 6. TEKS REMITTANCE (Coretan Hijau Panjang) ================= */}
+          <div className="pt-2 text-[7.2pt] font-semibold">
+            <span>All payment to be drawn in favour of </span>
+            <span className="font-bold">{drawnInFavour}</span>
+          </div>
+
         </div>
 
-        {/* ================= 6. TANDA TANGAN (Coretan Hijau) & KODE DOKUMEN (Coretan Kuning) ================= */}
-        <div className="pt-16 pb-4">
-          <div className="grid grid-cols-12 gap-4 items-end">
-            
-            {/* Tanda Tangan Kiri: Prepared By */}
-            <div className="col-span-4 text-center">
-              <div className="h-16 flex items-center justify-center">
-                {/* Optional digital signature if uploaded */}
-              </div>
-              <div className="border-t border-black w-3/4 mx-auto pt-1 font-bold">
-                {settings?.pl_prepared_by_title || 'Prepared By'}
-              </div>
-              {settings?.pl_prepared_by_name && (
-                <div className="text-[7pt] text-slate-700">
-                  ( {settings.pl_prepared_by_name} )
+        {/* ================= 7. TANDA TANGAN (6 Kolom Coretan Hijau Bawah) & KODE DOKUMEN (Kuning) ================= */}
+        <div className="pt-10 pb-4">
+          
+          {/* 6 Kolom Tanda Tangan Sejajar */}
+          <div className="grid grid-cols-6 gap-2 text-center text-[7pt]">
+            {signatureCols.map((col, idx) => (
+              <div key={idx} className="flex flex-col items-center justify-end">
+                <div className="font-bold mb-14">
+                  {col.title}
                 </div>
-              )}
-            </div>
-
-            {/* Ruang Tengah */}
-            <div className="col-span-4"></div>
-
-            {/* Tanda Tangan Kanan: Authorized Signature */}
-            <div className="col-span-4 text-center">
-              <div className="h-16 flex items-center justify-center">
-                {/* Optional authorized sign */}
-              </div>
-              <div className="border-t border-black w-3/4 mx-auto pt-1 font-bold">
-                {settings?.pl_authorized_title || 'Authorized Signature'}
-              </div>
-              {settings?.pl_authorized_name && (
-                <div className="text-[7pt] text-slate-700">
-                  ( {settings.pl_authorized_name} )
+                <div className="border-t border-black w-full pt-1">
+                  {col.name ? (
+                    <span className="text-[6.8pt] font-semibold text-slate-800">({col.name})</span>
+                  ) : (
+                    <span>&nbsp;</span>
+                  )}
                 </div>
-              )}
-            </div>
-
+              </div>
+            ))}
           </div>
 
           {/* Kode Dokumen ISO di pojok kanan bawah (Coretan Kuning) */}
           <div className="text-right text-[6.5pt] font-mono text-slate-700 mt-6">
-            {settings?.pl_doc_control_code || 'FRM-WHS-02 Rev.01'}
+            {settings?.do_doc_control_code || 'FRM-WHS-01 Rev.00'}
           </div>
 
         </div>

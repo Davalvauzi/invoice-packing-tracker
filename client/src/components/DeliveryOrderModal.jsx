@@ -9,7 +9,8 @@ import {
   Plus,
   Trash2,
   Package,
-  Box
+  Box,
+  Printer
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { useNotification } from '../context/NotificationContext';
@@ -337,13 +338,26 @@ export default function DeliveryOrderModal({ isOpen, onClose, onSuccess }) {
                   <p className="text-emerald-700">No. DO: <span className="font-mono font-semibold">{submittedDoc.do_number}</span></p>
                 </div>
               </div>
-              <button
-                type="button"
-                onClick={resetForm}
-                className="px-3 py-1.5 bg-emerald-800 hover:bg-emerald-900 text-white rounded-lg text-xs font-semibold cursor-pointer"
-              >
-                Buat DO Baru
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    const url = `${window.location.origin}${window.location.pathname}?view=print-delivery-order&id=${submittedDoc.id}`;
+                    window.open(url, '_blank');
+                  }}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-cyan-800 hover:bg-cyan-900 text-white rounded-lg text-xs font-bold cursor-pointer transition-colors shadow-xs"
+                >
+                  <Printer className="w-3.5 h-3.5" />
+                  <span>Cetak PDF DO</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={resetForm}
+                  className="px-3 py-1.5 bg-emerald-800 hover:bg-emerald-900 text-white rounded-lg text-xs font-semibold cursor-pointer"
+                >
+                  Buat DO Baru
+                </button>
+              </div>
             </div>
           )}
 

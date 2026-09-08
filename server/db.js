@@ -199,7 +199,28 @@ const migrationColumns = [
   'ALTER TABLE delivery_orders ADD COLUMN is_dummy INTEGER DEFAULT 0',
   'ALTER TABLE data_logger ADD COLUMN is_dummy INTEGER DEFAULT 0',
   // Soft delete flag
-  'ALTER TABLE data_logger ADD COLUMN is_deleted INTEGER DEFAULT 0'
+  'ALTER TABLE data_logger ADD COLUMN is_deleted INTEGER DEFAULT 0',
+  // Packing List Settings
+  "ALTER TABLE settings ADD COLUMN pl_prepared_by_name TEXT DEFAULT 'Staff Warehouse'",
+  "ALTER TABLE settings ADD COLUMN pl_prepared_by_title TEXT DEFAULT 'Prepared By'",
+  "ALTER TABLE settings ADD COLUMN pl_authorized_name TEXT DEFAULT 'Warehouse Supervisor'",
+  "ALTER TABLE settings ADD COLUMN pl_authorized_title TEXT DEFAULT 'Authorized Signature'",
+  "ALTER TABLE settings ADD COLUMN pl_doc_control_code TEXT DEFAULT 'FRM-WHS-02 Rev.01'",
+  // Delivery Order Settings
+  "ALTER TABLE settings ADD COLUMN do_drawn_in_favour TEXT DEFAULT 'PT. PATCO ELEKTRONIK TEKNOLOGI'",
+  "ALTER TABLE settings ADD COLUMN do_sign_col1_title TEXT DEFAULT 'Prepared By'",
+  "ALTER TABLE settings ADD COLUMN do_sign_col1_name TEXT DEFAULT ''",
+  "ALTER TABLE settings ADD COLUMN do_sign_col2_title TEXT DEFAULT 'Checked By'",
+  "ALTER TABLE settings ADD COLUMN do_sign_col2_name TEXT DEFAULT ''",
+  "ALTER TABLE settings ADD COLUMN do_sign_col3_title TEXT DEFAULT 'Approved By'",
+  "ALTER TABLE settings ADD COLUMN do_sign_col3_name TEXT DEFAULT ''",
+  "ALTER TABLE settings ADD COLUMN do_sign_col4_title TEXT DEFAULT 'Security'",
+  "ALTER TABLE settings ADD COLUMN do_sign_col4_name TEXT DEFAULT ''",
+  "ALTER TABLE settings ADD COLUMN do_sign_col5_title TEXT DEFAULT 'Driver'",
+  "ALTER TABLE settings ADD COLUMN do_sign_col5_name TEXT DEFAULT ''",
+  "ALTER TABLE settings ADD COLUMN do_sign_col6_title TEXT DEFAULT 'Received By'",
+  "ALTER TABLE settings ADD COLUMN do_sign_col6_name TEXT DEFAULT ''",
+  "ALTER TABLE settings ADD COLUMN do_doc_control_code TEXT DEFAULT 'FRM-WHS-01 Rev.00'"
 ];
 for (const sql of migrationColumns) {
   try {
@@ -226,6 +247,16 @@ for (const sql of indexQueries) {
   } catch (err) {
     // Ignore if failed
   }
+}
+
+// Ensure default settings values
+try {
+  db.exec(`
+    UPDATE settings SET hts_code_do = '8504.40.00' WHERE hts_code_do IS NULL OR hts_code_do = '';
+    UPDATE settings SET hts_code_invoice = '8504.40.90' WHERE hts_code_invoice IS NULL OR hts_code_invoice = '';
+  `);
+} catch (err) {
+  // Ignore
 }
 
 // Ensure 100% removal of PPC Moulding Services and sample part 105110195

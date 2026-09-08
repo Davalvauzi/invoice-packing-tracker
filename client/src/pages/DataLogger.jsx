@@ -940,16 +940,14 @@ export default function DataLogger({
                                 >
                                   <Eye className="w-3.5 h-3.5" />
                                 </button>
-                                {child.doc_type === 'PACKING_LIST' && (
-                                  <button
-                                    onClick={() => openPrintTab('print-packing-list', child.ref_id)}
-                                    className="inline-flex items-center gap-1 px-2 py-0.5 bg-teal-50 text-teal-800 hover:bg-teal-100 rounded-lg text-xs font-bold transition-colors"
-                                    title="Buka / Cetak PDF di Tab Baru"
-                                  >
-                                    <Printer className="w-3 h-3" />
-                                    <span>PDF</span>
-                                  </button>
-                                )}
+                                <button
+                                  onClick={() => openPrintTab(child.doc_type === 'DELIVERY_ORDER' ? 'print-delivery-order' : 'print-packing-list', child.ref_id)}
+                                  className={`inline-flex items-center gap-1 px-2 py-0.5 ${child.doc_type === 'DELIVERY_ORDER' ? 'bg-cyan-50 text-cyan-800 hover:bg-cyan-100' : 'bg-teal-50 text-teal-800 hover:bg-teal-100'} rounded-lg text-xs font-bold transition-colors`}
+                                  title="Buka / Cetak PDF di Tab Baru"
+                                >
+                                  <Printer className="w-3 h-3" />
+                                  <span>PDF</span>
+                                </button>
                                 <button
                                   onClick={() => handleDelete(child.id)}
                                   className="p-1 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
@@ -1022,16 +1020,19 @@ export default function DataLogger({
                               >
                                 <Eye className="w-3.5 h-3.5" />
                               </button>
-                              {orphan.doc_type === 'PACKING_LIST' && (
-                                <button
-                                  onClick={() => openPrintTab('print-packing-list', orphan.ref_id)}
-                                  className="inline-flex items-center gap-1 px-2.5 py-1 bg-teal-50 text-teal-800 hover:bg-teal-100 rounded-lg text-xs font-bold transition-colors"
-                                  title="Buka / Cetak PDF di Tab Baru"
-                                >
-                                  <Printer className="w-3.5 h-3.5" />
-                                  <span>PDF</span>
-                                </button>
-                              )}
+                              <button
+                                onClick={() => {
+                                  const view = orphan.doc_type === 'DELIVERY_ORDER' 
+                                    ? 'print-delivery-order' 
+                                    : (orphan.doc_type.toLowerCase() === 'invoice' ? 'print-invoice' : 'print-packing-list');
+                                  openPrintTab(view, orphan.ref_id);
+                                }}
+                                className="inline-flex items-center gap-1 px-2.5 py-1 bg-teal-50 text-teal-800 hover:bg-teal-100 rounded-lg text-xs font-bold transition-colors"
+                                title="Buka / Cetak PDF di Tab Baru"
+                              >
+                                <Printer className="w-3.5 h-3.5" />
+                                <span>PDF</span>
+                              </button>
                               <button
                                 onClick={() => handleDelete(orphan.id)}
                                 className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
@@ -1101,16 +1102,19 @@ export default function DataLogger({
                         >
                           <Eye className="w-3.5 h-3.5" />
                         </button>
-                        {log.doc_type !== 'DELIVERY_ORDER' && (
-                          <button
-                            onClick={() => openPrintTab(log.doc_type.toLowerCase() === 'invoice' ? 'print-invoice' : 'print-packing-list', log.ref_id)}
-                            className="inline-flex items-center gap-1 px-2.5 py-1 bg-emerald-50 text-emerald-800 hover:bg-emerald-100 rounded-lg text-xs font-bold transition-colors"
-                            title="Buka / Cetak PDF di Tab Baru"
-                          >
-                            <Printer className="w-3.5 h-3.5" />
-                            <span>PDF</span>
-                          </button>
-                        )}
+                        <button
+                          onClick={() => {
+                            const view = log.doc_type === 'DELIVERY_ORDER' 
+                              ? 'print-delivery-order' 
+                              : (log.doc_type.toLowerCase() === 'invoice' ? 'print-invoice' : 'print-packing-list');
+                            openPrintTab(view, log.ref_id);
+                          }}
+                          className="inline-flex items-center gap-1 px-2.5 py-1 bg-emerald-50 text-emerald-800 hover:bg-emerald-100 rounded-lg text-xs font-bold transition-colors"
+                          title="Buka / Cetak PDF di Tab Baru"
+                        >
+                          <Printer className="w-3.5 h-3.5" />
+                          <span>PDF</span>
+                        </button>
                         <button
                           onClick={() => handleDelete(log.id)}
                           className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
@@ -1347,17 +1351,18 @@ export default function DataLogger({
                 >
                   Tutup
                 </button>
-                {selectedLog.doc_type !== 'DELIVERY_ORDER' && (
-                  <button
-                    onClick={() => {
-                      openPrintTab(selectedLog.doc_type.toLowerCase() === 'invoice' ? 'print-invoice' : 'print-packing-list', selectedLog.ref_id);
-                    }}
-                    className="inline-flex items-center gap-1.5 px-4 py-2 bg-emerald-800 text-white rounded-xl text-xs font-bold hover:bg-emerald-900 shadow-xs"
-                  >
-                    <Printer className="w-3.5 h-3.5" />
-                    <span>Buka PDF</span>
-                  </button>
-                )}
+                <button
+                  onClick={() => {
+                    const view = selectedLog.doc_type === 'DELIVERY_ORDER' 
+                      ? 'print-delivery-order' 
+                      : (selectedLog.doc_type.toLowerCase() === 'invoice' ? 'print-invoice' : 'print-packing-list');
+                    openPrintTab(view, selectedLog.ref_id);
+                  }}
+                  className="inline-flex items-center gap-1.5 px-4 py-2 bg-emerald-800 text-white rounded-xl text-xs font-bold hover:bg-emerald-900 shadow-xs cursor-pointer"
+                >
+                  <Printer className="w-3.5 h-3.5" />
+                  <span>Buka PDF</span>
+                </button>
               </div>
             </div>
 

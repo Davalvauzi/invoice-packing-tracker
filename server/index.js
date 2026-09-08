@@ -185,7 +185,28 @@ app.put('/api/settings', (req, res) => {
       authorized_sign_title,
       authorized_sign_url,
       doc_control_code,
-      show_letterhead
+      show_letterhead,
+      // Packing List fields
+      pl_prepared_by_name,
+      pl_prepared_by_title,
+      pl_authorized_name,
+      pl_authorized_title,
+      pl_doc_control_code,
+      // Delivery Order fields
+      do_drawn_in_favour,
+      do_sign_col1_title,
+      do_sign_col1_name,
+      do_sign_col2_title,
+      do_sign_col2_name,
+      do_sign_col3_title,
+      do_sign_col3_name,
+      do_sign_col4_title,
+      do_sign_col4_name,
+      do_sign_col5_title,
+      do_sign_col5_name,
+      do_sign_col6_title,
+      do_sign_col6_name,
+      do_doc_control_code
     } = req.body;
 
     db.prepare(`
@@ -217,6 +238,25 @@ app.put('/api/settings', (req, res) => {
           authorized_sign_url = ?,
           doc_control_code = ?,
           show_letterhead = ?,
+          pl_prepared_by_name = ?,
+          pl_prepared_by_title = ?,
+          pl_authorized_name = ?,
+          pl_authorized_title = ?,
+          pl_doc_control_code = ?,
+          do_drawn_in_favour = ?,
+          do_sign_col1_title = ?,
+          do_sign_col1_name = ?,
+          do_sign_col2_title = ?,
+          do_sign_col2_name = ?,
+          do_sign_col3_title = ?,
+          do_sign_col3_name = ?,
+          do_sign_col4_title = ?,
+          do_sign_col4_name = ?,
+          do_sign_col5_title = ?,
+          do_sign_col5_name = ?,
+          do_sign_col6_title = ?,
+          do_sign_col6_name = ?,
+          do_doc_control_code = ?,
           updated_at = CURRENT_TIMESTAMP
       WHERE id = 1
     `).run(
@@ -246,7 +286,26 @@ app.put('/api/settings', (req, res) => {
       authorized_sign_title || '',
       authorized_sign_url || '',
       doc_control_code || '',
-      show_letterhead !== undefined ? (show_letterhead ? 1 : 0) : 1
+      show_letterhead !== undefined ? (show_letterhead ? 1 : 0) : 1,
+      pl_prepared_by_name !== undefined ? pl_prepared_by_name : 'Staff Warehouse',
+      pl_prepared_by_title !== undefined ? pl_prepared_by_title : 'Prepared By',
+      pl_authorized_name !== undefined ? pl_authorized_name : 'Warehouse Supervisor',
+      pl_authorized_title !== undefined ? pl_authorized_title : 'Authorized Signature',
+      pl_doc_control_code !== undefined ? pl_doc_control_code : 'FRM-WHS-02 Rev.01',
+      do_drawn_in_favour !== undefined ? do_drawn_in_favour : 'PT. PATCO ELEKTRONIK TEKNOLOGI',
+      do_sign_col1_title !== undefined ? do_sign_col1_title : 'Prepared By',
+      do_sign_col1_name !== undefined ? do_sign_col1_name : '',
+      do_sign_col2_title !== undefined ? do_sign_col2_title : 'Checked By',
+      do_sign_col2_name !== undefined ? do_sign_col2_name : '',
+      do_sign_col3_title !== undefined ? do_sign_col3_title : 'Approved By',
+      do_sign_col3_name !== undefined ? do_sign_col3_name : '',
+      do_sign_col4_title !== undefined ? do_sign_col4_title : 'Security',
+      do_sign_col4_name !== undefined ? do_sign_col4_name : '',
+      do_sign_col5_title !== undefined ? do_sign_col5_title : 'Driver',
+      do_sign_col5_name !== undefined ? do_sign_col5_name : '',
+      do_sign_col6_title !== undefined ? do_sign_col6_title : 'Received By',
+      do_sign_col6_name !== undefined ? do_sign_col6_name : '',
+      do_doc_control_code !== undefined ? do_doc_control_code : 'FRM-WHS-01 Rev.00'
     );
 
     const updated = db.prepare('SELECT * FROM settings WHERE id = 1').get();

@@ -56,13 +56,26 @@ export default function PrintPackingList({ id, onBack }) {
 
   if (!packingList) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center bg-slate-100 gap-4 font-['Calibri',sans-serif]">
-        <p className="text-red-500 font-semibold text-xs">Data packing list tidak ditemukan.</p>
-        {onBack && (
-          <button onClick={onBack} className="px-4 py-2 bg-slate-800 text-white rounded-lg text-xs cursor-pointer">
-            Kembali
-          </button>
-        )}
+      <div className="min-h-screen flex flex-col items-center justify-center bg-slate-100 p-4 font-['Calibri',sans-serif]">
+        <div className="bg-white p-6 rounded-xl shadow-md border border-slate-200 text-center max-w-sm w-full">
+          <div className="w-12 h-12 rounded-full bg-red-100 text-red-500 flex items-center justify-center mx-auto mb-3 text-lg font-bold">!</div>
+          <h3 className="text-slate-800 font-bold text-sm mb-1">Dokumen Tidak Ditemukan</h3>
+          <p className="text-slate-500 text-xs mb-4">Data packing list tidak ditemukan atau ID tidak valid.</p>
+          <div className="flex gap-2 justify-center">
+            {onBack ? (
+              <button onClick={onBack} className="px-4 py-2 bg-slate-800 text-white rounded-lg text-xs hover:bg-slate-700 transition cursor-pointer">
+                Kembali
+              </button>
+            ) : (
+              <button onClick={() => { window.location.href = '/'; }} className="px-4 py-2 bg-slate-800 text-white rounded-lg text-xs hover:bg-slate-700 transition cursor-pointer">
+                Ke Dashboard
+              </button>
+            )}
+            <button onClick={() => window.close()} className="px-4 py-2 bg-slate-200 text-slate-700 rounded-lg text-xs hover:bg-slate-300 transition cursor-pointer">
+              Tutup Tab
+            </button>
+          </div>
+        </div>
       </div>
     );
   }
@@ -514,8 +527,8 @@ export default function PrintPackingList({ id, onBack }) {
                 </tr>
               ))}
 
-              {/* Ruang kosong tabel wajar (setara 5-6 baris) sesuai dokumen fisik asli */}
-              <tr style={{ height: '80px' }}>
+              {/* Ruang kosong tabel adaptif agar tidak meluap ke halaman kedua pada multi-item */}
+              <tr style={{ height: `${hasMultipleItems ? Math.max(15, 80 - Math.max(0, items.length - 2) * 15) : 80}px` }}>
                 <td colSpan={12}>&nbsp;</td>
               </tr>
             </tbody>

@@ -56,13 +56,26 @@ export default function PrintInvoice({ id, onBack }) {
 
   if (!invoice) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center bg-slate-100 gap-4 font-['Calibri',sans-serif]">
-        <p className="text-red-500 font-semibold text-xs">Data invoice tidak ditemukan.</p>
-        {onBack && (
-          <button onClick={onBack} className="px-4 py-2 bg-slate-800 text-white rounded-lg text-xs cursor-pointer">
-            Kembali
-          </button>
-        )}
+      <div className="min-h-screen flex flex-col items-center justify-center bg-slate-100 p-4 font-['Calibri',sans-serif]">
+        <div className="bg-white p-6 rounded-xl shadow-md border border-slate-200 text-center max-w-sm w-full">
+          <div className="w-12 h-12 rounded-full bg-red-100 text-red-500 flex items-center justify-center mx-auto mb-3 text-lg font-bold">!</div>
+          <h3 className="text-slate-800 font-bold text-sm mb-1">Dokumen Tidak Ditemukan</h3>
+          <p className="text-slate-500 text-xs mb-4">Data invoice tidak ditemukan atau ID tidak valid.</p>
+          <div className="flex gap-2 justify-center">
+            {onBack ? (
+              <button onClick={onBack} className="px-4 py-2 bg-slate-800 text-white rounded-lg text-xs hover:bg-slate-700 transition cursor-pointer">
+                Kembali
+              </button>
+            ) : (
+              <button onClick={() => { window.location.href = '/'; }} className="px-4 py-2 bg-slate-800 text-white rounded-lg text-xs hover:bg-slate-700 transition cursor-pointer">
+                Ke Dashboard
+              </button>
+            )}
+            <button onClick={() => window.close()} className="px-4 py-2 bg-slate-200 text-slate-700 rounded-lg text-xs hover:bg-slate-300 transition cursor-pointer">
+              Tutup Tab
+            </button>
+          </div>
+        </div>
       </div>
     );
   }
@@ -486,8 +499,8 @@ export default function PrintInvoice({ id, onBack }) {
                 </tr>
               )}
 
-              {/* Space kosong konsisten setara 3 baris produk (~96px) baik 1 produk maupun 2+ produk */}
-              <tr style={{ height: `${(hasMultipleItems && items.length > 5) ? Math.max(40, 96 - (items.length - 5) * 15) : 96}px` }}>
+              {/* Space kosong adaptif agar pas 1 lembar A4 baik 1 produk maupun multi-produk */}
+              <tr style={{ height: `${hasMultipleItems ? Math.max(20, 96 - Math.max(0, items.length - 2) * 16) : 96}px` }}>
                 <td colSpan={9}></td>
               </tr>
             </tbody>

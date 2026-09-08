@@ -885,7 +885,37 @@ app.get('/api/invoices', async (req, res) => {
 
 app.get('/api/invoices/:id', async (req, res) => {
   try {
-    const row = await db.prepare('SELECT * FROM invoices WHERE id = ?').get(req.params.id);
+    const rawParam = req.params.id;
+    let row = null;
+
+    // 1. Cari by ID numerik
+    if (!isNaN(rawParam)) {
+      row = await db.prepare('SELECT * FROM invoices WHERE id = ?').get(rawParam);
+    }
+
+    // 2. Cari by invoice_number
+    if (!row) {
+      row = await db.prepare('SELECT * FROM invoices WHERE invoice_number = ? LIMIT 1').get(rawParam);
+    }
+
+    // 3. Fallback via data_logger
+    if (!row) {
+      const dl = await db.prepare(`
+        SELECT * FROM data_logger 
+        WHERE doc_type = 'INVOICE' AND (id = ? OR ref_id = ? OR doc_number = ?)
+        LIMIT 1
+      `).get(rawParam, rawParam, rawParam);
+
+      if (dl) {
+        if (dl.doc_number) {
+          row = await db.prepare('SELECT * FROM invoices WHERE invoice_number = ? LIMIT 1').get(dl.doc_number);
+        }
+        if (!row && dl.ref_id && !isNaN(dl.ref_id)) {
+          row = await db.prepare('SELECT * FROM invoices WHERE id = ?').get(dl.ref_id);
+        }
+      }
+    }
+
     if (!row) return res.status(404).json({ error: 'Invoice not found' });
     res.json(row);
   } catch (err) {
@@ -2329,7 +2359,14 @@ app.delete('/api/data-logger/:id', async (req, res) => {
 // Serve built client frontend if available
 const clientDistPath = path.join(__dirname, '..', 'client', 'dist');
 if (fs.existsSync(clientDistPath)) {
-  app.use(express.static(clientDistPath));
+  app.use(express.static(clientDistPath, {
+    maxAge: '1d',
+    setHeaders: (res, filePath) => {
+      if (filePath.includes(path.sep + 'assets' + path.sep) || filePath.includes('/assets/')) {
+        res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+      }
+    }
+  }));
   app.get('*', async (req, res, next) => {
     if (req.path.startsWith('/api') || req.path.startsWith('/uploads')) {
       return next();

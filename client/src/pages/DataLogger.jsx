@@ -21,6 +21,7 @@ import {
   Check,
   ChevronRight,
   ChevronDown,
+  ChevronLeft,
   ListTree,
   List,
   CornerDownRight
@@ -51,6 +52,12 @@ export default function DataLogger({
   // Sorting
   const [sortBy, setSortBy] = useState('id');
   const [sortOrder, setSortOrder] = useState('DESC');
+
+  // Pagination State
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(50);
+  const [totalCount, setTotalCount] = useState(0);
+  const [totalPages, setTotalPages] = useState(1);
 
   // Tree View State ('tree' as default per leader request, or 'flat')
   const [viewMode, setViewMode] = useState('tree');
@@ -93,7 +100,7 @@ export default function DataLogger({
 
   useEffect(() => {
     fetchLogs();
-  }, [typeFilter, customerFilter, startDate, endDate, sortBy, sortOrder, refreshTrigger]);
+  }, [typeFilter, customerFilter, startDate, endDate, sortBy, sortOrder, currentPage, pageSize, refreshTrigger]);
 
   const fetchFilterOptions = async () => {
     try {
@@ -121,10 +128,20 @@ export default function DataLogger({
       if (searchTerm) params.append('search', searchTerm);
       params.append('sort_by', sortBy);
       params.append('sort_order', sortOrder);
+      params.append('page', currentPage);
+      params.append('limit', pageSize);
 
       const res = await fetch(`/api/data-logger?${params.toString()}`);
-      const data = await res.json();
-      setLogs(data);
+      const result = await res.json();
+      if (result && result.pagination) {
+        setLogs(result.data || []);
+        setTotalCount(result.pagination.total || 0);
+        setTotalPages(result.pagination.totalPages || 1);
+      } else if (Array.isArray(result)) {
+        setLogs(result);
+        setTotalCount(result.length);
+        setTotalPages(1);
+      }
     } catch (err) {
       console.error('Failed to fetch data logs:', err);
     } finally {
@@ -134,6 +151,7 @@ export default function DataLogger({
 
   const handleSearch = (e) => {
     e.preventDefault();
+    setCurrentPage(1);
     fetchLogs();
   };
 
@@ -145,6 +163,7 @@ export default function DataLogger({
     setSearchTerm('');
     setSortBy('id');
     setSortOrder('DESC');
+    setCurrentPage(1);
   };
 
   // Edit Handlers
@@ -1106,6 +1125,58 @@ export default function DataLogger({
               )}
             </tbody>
           </table>
+
+          {/* Pagination Toolbar */}
+          <div className="bg-white px-4 py-3 border-t border-slate-200 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs">
+            <div className="text-slate-500 font-medium">
+              Menampilkan <span className="font-bold text-slate-800">{totalCount > 0 ? (pageSize === 'all' ? 1 : (currentPage - 1) * Number(pageSize) + 1) : 0}</span> - <span className="font-bold text-slate-800">{pageSize === 'all' ? totalCount : Math.min(currentPage * Number(pageSize), totalCount)}</span> dari <span className="font-bold text-slate-800 font-mono">{totalCount}</span> total dokumen
+            </div>
+
+            <div className="flex items-center gap-3">
+              {/* Page Size Selector */}
+              <div className="flex items-center gap-1.5">
+                <span className="text-slate-400 text-[11px]">Tampilkan:</span>
+                <select
+                  value={pageSize}
+                  onChange={(e) => {
+                    setPageSize(e.target.value === 'all' ? 'all' : Number(e.target.value));
+                    setCurrentPage(1);
+                  }}
+                  className="px-2 py-1 bg-slate-50 border border-slate-200 rounded-lg text-xs font-semibold text-slate-700 cursor-pointer focus:border-emerald-600"
+                >
+                  <option value={25}>25 / hal</option>
+                  <option value={50}>50 / hal</option>
+                  <option value={100}>100 / hal</option>
+                  <option value="all">Semua</option>
+                </select>
+              </div>
+
+              {/* Prev / Next Page Buttons */}
+              {pageSize !== 'all' && totalPages > 1 && (
+                <div className="flex items-center gap-1">
+                  <button
+                    onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                    disabled={currentPage <= 1}
+                    className="p-1.5 rounded-lg border border-slate-200 hover:bg-slate-50 disabled:opacity-30 disabled:hover:bg-transparent text-slate-600 transition-colors cursor-pointer"
+                    title="Halaman Sebelumnya"
+                  >
+                    <ChevronLeft className="w-4 h-4" />
+                  </button>
+                  <span className="px-2 font-semibold text-slate-700">
+                    {currentPage} / {totalPages}
+                  </span>
+                  <button
+                    onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                    disabled={currentPage >= totalPages}
+                    className="p-1.5 rounded-lg border border-slate-200 hover:bg-slate-50 disabled:opacity-30 disabled:hover:bg-transparent text-slate-600 transition-colors cursor-pointer"
+                    title="Halaman Selanjutnya"
+                  >
+                    <ChevronRight className="w-4 h-4" />
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
         </div>
       </div>
 

@@ -30,10 +30,11 @@ export default function PrintInvoice({ id, onBack }) {
       }
 
       if (invData.customer_name) {
-        const cRes = await fetch('/api/customers');
-        const cList = await cRes.json();
-        const found = cList.find(c => c.customer_name === invData.customer_name);
-        if (found) setCustomer(found);
+        const cRes = await fetch(`/api/customers?name=${encodeURIComponent(invData.customer_name)}`);
+        if (cRes.ok) {
+          const found = await cRes.json();
+          if (found) setCustomer(found);
+        }
       }
     } catch (err) {
       console.error(err);

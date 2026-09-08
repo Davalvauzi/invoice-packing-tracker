@@ -43,25 +43,18 @@ export default function Dashboard({
 
   const fetchDashboardData = async () => {
     try {
-      const [logsRes, custsRes] = await Promise.all([
-        fetch('/api/data-logger'),
-        fetch('/api/customers')
-      ]);
-      const logs = await logsRes.json();
-      const custs = await custsRes.json();
+      const res = await fetch('/api/dashboard/stats');
+      const data = await res.json();
 
-      setAllLogs(logs);
-
-      const invCount = logs.filter(l => l.doc_type === 'INVOICE').length;
-      const plCount = logs.filter(l => l.doc_type === 'PACKING_LIST').length;
-      const doCount = logs.filter(l => l.doc_type === 'DELIVERY_ORDER').length;
+      const recent = data.recentLogs || [];
+      setAllLogs(recent);
 
       setStats({
-        totalInvoices: invCount,
-        totalPackingLists: plCount,
-        totalDeliveryOrders: doCount,
-        totalCustomers: custs.length,
-        recentLogs: logs.slice(0, 5)
+        totalInvoices: data.totalInvoices || 0,
+        totalPackingLists: data.totalPackingLists || 0,
+        totalDeliveryOrders: data.totalDeliveryOrders || 0,
+        totalCustomers: data.totalCustomers || 0,
+        recentLogs: recent.slice(0, 5)
       });
     } catch (err) {
       console.error('Error fetching dashboard stats:', err);

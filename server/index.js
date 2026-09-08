@@ -21,8 +21,11 @@ if (!fs.existsSync(uploadsDir)) {
   fs.mkdirSync(uploadsDir, { recursive: true });
 }
 
-// Serve uploaded files statically
-app.use('/uploads', express.static(uploadsDir));
+// Serve uploaded files statically with security headers
+app.use('/uploads', (req, res, next) => {
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  next();
+}, express.static(uploadsDir));
 
 // Multer storage
 const storage = multer.diskStorage({
@@ -30,15 +33,26 @@ const storage = multer.diskStorage({
     cb(null, uploadsDir);
   },
   filename: (req, file, cb) => {
-    const ext = path.extname(file.originalname);
+    const ext = path.extname(file.originalname).toLowerCase();
     const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
     cb(null, 'drawing-' + uniqueSuffix + ext);
   }
 });
 
+const ALLOWED_EXTENSIONS = ['.jpg', '.jpeg', '.png', '.webp', '.pdf'];
+const ALLOWED_MIME_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'application/pdf'];
+
 const upload = multer({
   storage,
-  limits: { fileSize: 15 * 1024 * 1024 } // 15MB limit
+  limits: { fileSize: 10 * 1024 * 1024 }, // 10MB limit
+  fileFilter: (req, file, cb) => {
+    const ext = path.extname(file.originalname || '').toLowerCase();
+    if (ALLOWED_EXTENSIONS.includes(ext) && ALLOWED_MIME_TYPES.includes(file.mimetype)) {
+      cb(null, true);
+    } else {
+      cb(new Error('Format file tidak didukung! Hanya file JPG, PNG, WebP, atau PDF yang diizinkan.'));
+    }
+  }
 });
 
 // Helper to get local network IP (prioritizes active Wi-Fi / LAN, ignores APIPA 169.254.x.x)
@@ -82,6 +96,38 @@ app.get('/api/network-info', (req, res) => {
     apiPort: PORT,
     clientPort: 3000
   });
+});
+
+// Optimized Dashboard aggregation endpoint (eliminates full data-logger download)
+app.get('/api/dashboard/stats', (req, res) => {
+  try {
+    const counts = db.prepare(`
+      SELECT 
+        SUM(CASE WHEN doc_type = 'INVOICE' AND (is_deleted IS NULL OR is_deleted = 0) THEN 1 ELSE 0 END) AS totalInvoices,
+        SUM(CASE WHEN doc_type = 'PACKING_LIST' AND (is_deleted IS NULL OR is_deleted = 0) THEN 1 ELSE 0 END) AS totalPackingLists,
+        SUM(CASE WHEN doc_type = 'DELIVERY_ORDER' AND (is_deleted IS NULL OR is_deleted = 0) THEN 1 ELSE 0 END) AS totalDeliveryOrders
+      FROM data_logger
+    `).get();
+
+    const customerCount = db.prepare('SELECT COUNT(*) as count FROM customers').get().count;
+
+    // Retrieve recent logs for tree display (top 20)
+    const recentLogs = db.prepare(`
+      SELECT * FROM data_logger 
+      WHERE (is_deleted IS NULL OR is_deleted = 0)
+      ORDER BY id DESC LIMIT 20
+    `).all();
+
+    res.json({
+      totalInvoices: counts?.totalInvoices || 0,
+      totalPackingLists: counts?.totalPackingLists || 0,
+      totalDeliveryOrders: counts?.totalDeliveryOrders || 0,
+      totalCustomers: customerCount || 0,
+      recentLogs: recentLogs || []
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 // File upload endpoint
@@ -378,6 +424,11 @@ app.post('/api/dummy-data/clear', (req, res) => {
 // Customers
 app.get('/api/customers', (req, res) => {
   try {
+    const { name } = req.query;
+    if (name) {
+      const row = db.prepare('SELECT * FROM customers WHERE customer_name = ? LIMIT 1').get(name);
+      return res.json(row || null);
+    }
     const rows = db.prepare('SELECT * FROM customers ORDER BY customer_name ASC').all();
     res.json(rows);
   } catch (err) {
@@ -1572,52 +1623,81 @@ app.get('/api/data-logger', (req, res) => {
       end_date, 
       search,
       sort_by,
-      sort_order
+      sort_order,
+      page,
+      limit
     } = req.query;
 
-    let query = 'SELECT * FROM data_logger WHERE 1=1';
+    let baseQuery = ' FROM data_logger WHERE (is_deleted IS NULL OR is_deleted = 0)';
     const params = [];
 
     if (doc_type && doc_type !== 'ALL') {
-      query += ' AND doc_type = ?';
+      baseQuery += ' AND doc_type = ?';
       params.push(doc_type);
     }
 
     if (customer_name && customer_name !== 'ALL') {
-      query += ' AND customer_name = ?';
+      baseQuery += ' AND customer_name = ?';
       params.push(customer_name);
     }
 
     if (terms_of_delivery && terms_of_delivery !== 'ALL') {
-      query += ' AND terms_of_delivery = ?';
+      baseQuery += ' AND terms_of_delivery = ?';
       params.push(terms_of_delivery);
     }
 
     if (start_date) {
-      query += ' AND doc_date >= ?';
+      baseQuery += ' AND doc_date >= ?';
       params.push(start_date);
     }
 
     if (end_date) {
-      query += ' AND doc_date <= ?';
+      baseQuery += ' AND doc_date <= ?';
       params.push(end_date);
     }
 
     if (search) {
-      query += ' AND (doc_number LIKE ? OR customer_name LIKE ? OR customer_id LIKE ? OR po_no LIKE ? OR part_name LIKE ? OR notes LIKE ?)';
+      baseQuery += ' AND (doc_number LIKE ? OR customer_name LIKE ? OR customer_id LIKE ? OR po_no LIKE ? OR part_name LIKE ? OR notes LIKE ?)';
       const term = `%${search}%`;
       params.push(term, term, term, term, term, term);
     }
+
+    // Get total matching rows
+    const countRow = db.prepare(`SELECT COUNT(*) AS total ${baseQuery}`).get(...params);
+    const total = countRow ? countRow.total : 0;
 
     // Sorting
     const allowedSortCols = ['id', 'doc_date', 'doc_number', 'customer_name', 'box_qty', 'pallet_qty', 'created_at'];
     const col = allowedSortCols.includes(sort_by) ? sort_by : 'id';
     const order = (sort_order && sort_order.toUpperCase() === 'ASC') ? 'ASC' : 'DESC';
 
-    query += ` ORDER BY ${col} ${order}`;
+    let dataQuery = `SELECT * ${baseQuery} ORDER BY ${col} ${order}`;
+    const queryParams = [...params];
 
-    const rows = db.prepare(query).all(...params);
-    res.json(rows);
+    const isPaginationRequested = page !== undefined || limit !== undefined;
+    const pageNum = Math.max(1, parseInt(page) || 1);
+    const pageSize = limit === 'all' ? total : Math.max(1, parseInt(limit) || 50);
+
+    if (limit !== 'all') {
+      dataQuery += ' LIMIT ? OFFSET ?';
+      queryParams.push(pageSize, (pageNum - 1) * pageSize);
+    }
+
+    const rows = db.prepare(dataQuery).all(...queryParams);
+
+    if (isPaginationRequested) {
+      res.json({
+        data: rows,
+        pagination: {
+          page: pageNum,
+          limit: limit === 'all' ? 'all' : pageSize,
+          total,
+          totalPages: limit === 'all' ? 1 : Math.max(1, Math.ceil(total / pageSize))
+        }
+      });
+    } else {
+      res.json(rows);
+    }
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -1741,8 +1821,9 @@ app.put('/api/data-logger/:id', (req, res) => {
 
 app.delete('/api/data-logger/:id', (req, res) => {
   try {
-    db.prepare('DELETE FROM data_logger WHERE id = ?').run(req.params.id);
-    res.json({ success: true });
+    // Soft delete to protect audit trail and prevent permanent data loss
+    db.prepare('UPDATE data_logger SET is_deleted = 1 WHERE id = ?').run(req.params.id);
+    res.json({ success: true, message: 'Data log berhasil diarsipkan / dihapus' });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

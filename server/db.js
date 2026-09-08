@@ -197,13 +197,34 @@ const migrationColumns = [
   'ALTER TABLE invoices ADD COLUMN is_dummy INTEGER DEFAULT 0',
   'ALTER TABLE packing_lists ADD COLUMN is_dummy INTEGER DEFAULT 0',
   'ALTER TABLE delivery_orders ADD COLUMN is_dummy INTEGER DEFAULT 0',
-  'ALTER TABLE data_logger ADD COLUMN is_dummy INTEGER DEFAULT 0'
+  'ALTER TABLE data_logger ADD COLUMN is_dummy INTEGER DEFAULT 0',
+  // Soft delete flag
+  'ALTER TABLE data_logger ADD COLUMN is_deleted INTEGER DEFAULT 0'
 ];
 for (const sql of migrationColumns) {
   try {
     db.exec(sql);
   } catch (err) {
     // Column already exists, ignore
+  }
+}
+
+// Performance Database Indexes
+const indexQueries = [
+  'CREATE INDEX IF NOT EXISTS idx_dl_doc_type ON data_logger(doc_type)',
+  'CREATE INDEX IF NOT EXISTS idx_dl_doc_date ON data_logger(doc_date)',
+  'CREATE INDEX IF NOT EXISTS idx_dl_doc_number ON data_logger(doc_number)',
+  'CREATE INDEX IF NOT EXISTS idx_dl_customer_name ON data_logger(customer_name)',
+  'CREATE INDEX IF NOT EXISTS idx_dl_is_deleted ON data_logger(is_deleted)',
+  'CREATE INDEX IF NOT EXISTS idx_inv_number ON invoices(invoice_number)',
+  'CREATE INDEX IF NOT EXISTS idx_pl_inv_number ON packing_lists(invoice_number)',
+  'CREATE INDEX IF NOT EXISTS idx_do_number ON delivery_orders(do_number)'
+];
+for (const sql of indexQueries) {
+  try {
+    db.exec(sql);
+  } catch (err) {
+    // Ignore if failed
   }
 }
 

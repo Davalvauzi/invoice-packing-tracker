@@ -90,7 +90,7 @@ function getLocalIP() {
 }
 
 // Network info endpoint
-app.get('/api/network-info', (req, res) => {
+app.get('/api/network-info', async (req, res) => {
   res.json({
     localIp: getLocalIP(),
     apiPort: PORT,
@@ -99,9 +99,9 @@ app.get('/api/network-info', (req, res) => {
 });
 
 // Optimized Dashboard aggregation endpoint (eliminates full data-logger download)
-app.get('/api/dashboard/stats', (req, res) => {
+app.get('/api/dashboard/stats', async (req, res) => {
   try {
-    const counts = db.prepare(`
+    const counts = await db.prepare(`
       SELECT 
         SUM(CASE WHEN doc_type = 'INVOICE' AND (is_deleted IS NULL OR is_deleted = 0) THEN 1 ELSE 0 END) AS totalInvoices,
         SUM(CASE WHEN doc_type = 'PACKING_LIST' AND (is_deleted IS NULL OR is_deleted = 0) THEN 1 ELSE 0 END) AS totalPackingLists,
@@ -109,10 +109,10 @@ app.get('/api/dashboard/stats', (req, res) => {
       FROM data_logger
     `).get();
 
-    const customerCount = db.prepare('SELECT COUNT(*) as count FROM customers').get().count;
+    const customerCount = (await db.prepare('SELECT COUNT(*) as count FROM customers').get())?.count || 0;
 
     // Retrieve recent logs for tree display (top 20)
-    const recentLogs = db.prepare(`
+    const recentLogs = await db.prepare(`
       SELECT * FROM data_logger 
       WHERE (is_deleted IS NULL OR is_deleted = 0)
       ORDER BY id DESC LIMIT 20
@@ -131,7 +131,7 @@ app.get('/api/dashboard/stats', (req, res) => {
 });
 
 // File upload endpoint
-app.post('/api/upload', upload.single('drawing'), (req, res) => {
+app.post('/api/upload', upload.single('drawing'), async (req, res) => {
   if (!req.file) {
     return res.status(400).json({ error: 'No file uploaded' });
   }
@@ -141,14 +141,14 @@ app.post('/api/upload', upload.single('drawing'), (req, res) => {
 
 // ================= WEBSITE / TEMPLATE SETTINGS ================= //
 
-app.get('/api/settings', (req, res) => {
+app.get('/api/settings', async (req, res) => {
   try {
-    let row = db.prepare('SELECT * FROM settings WHERE id = 1').get();
+    let row = await db.prepare('SELECT * FROM settings WHERE id = 1').get();
     if (!row) {
-      db.prepare(`
+      await db.prepare(`
         INSERT INTO settings (id, company_name) VALUES (1, 'PT. PATCO ELEKTRONIK TEKNOLOGI')
       `).run();
-      row = db.prepare('SELECT * FROM settings WHERE id = 1').get();
+      row = await db.prepare('SELECT * FROM settings WHERE id = 1').get();
     }
     res.json(row);
   } catch (err) {
@@ -156,7 +156,7 @@ app.get('/api/settings', (req, res) => {
   }
 });
 
-app.put('/api/settings', (req, res) => {
+app.put('/api/settings', async (req, res) => {
   try {
     const {
       company_name,
@@ -209,7 +209,7 @@ app.put('/api/settings', (req, res) => {
       do_doc_control_code
     } = req.body;
 
-    db.prepare(`
+    await db.prepare(`
       UPDATE settings
       SET company_name = ?,
           company_address_line1 = ?,
@@ -308,7 +308,7 @@ app.put('/api/settings', (req, res) => {
       do_doc_control_code !== undefined ? do_doc_control_code : 'FRM-WHS-01 Rev.00'
     );
 
-    const updated = db.prepare('SELECT * FROM settings WHERE id = 1').get();
+    const updated = await db.prepare('SELECT * FROM settings WHERE id = 1').get();
     res.json(updated);
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -316,7 +316,7 @@ app.put('/api/settings', (req, res) => {
 });
 
 // Logo upload endpoint for settings
-app.post('/api/settings/upload-logo', upload.single('logo'), (req, res) => {
+app.post('/api/settings/upload-logo', upload.single('logo'), async (req, res) => {
   if (!req.file) {
     return res.status(400).json({ error: 'No logo file uploaded' });
   }
@@ -326,14 +326,14 @@ app.post('/api/settings/upload-logo', upload.single('logo'), (req, res) => {
 
 // ================= DUMMY / SAMPLE DATA MANAGEMENT ================= //
 
-app.get('/api/dummy-data/stats', (req, res) => {
+app.get('/api/dummy-data/stats', async (req, res) => {
   try {
-    const totalCust = db.prepare('SELECT COUNT(*) as c FROM customers').get().c;
-    const totalParts = db.prepare('SELECT COUNT(*) as c FROM parts').get().c;
-    const totalInv = db.prepare('SELECT COUNT(*) as c FROM invoices').get().c;
-    const totalPL = db.prepare('SELECT COUNT(*) as c FROM packing_lists').get().c;
-    const totalDO = db.prepare('SELECT COUNT(*) as c FROM delivery_orders').get().c;
-    const totalLog = db.prepare('SELECT COUNT(*) as c FROM data_logger').get().c;
+    const totalCust = (await db.prepare('SELECT COUNT(*) as c FROM customers').get())?.c || 0;
+    const totalParts = (await db.prepare('SELECT COUNT(*) as c FROM parts').get())?.c || 0;
+    const totalInv = (await db.prepare('SELECT COUNT(*) as c FROM invoices').get())?.c || 0;
+    const totalPL = (await db.prepare('SELECT COUNT(*) as c FROM packing_lists').get())?.c || 0;
+    const totalDO = (await db.prepare('SELECT COUNT(*) as c FROM delivery_orders').get())?.c || 0;
+    const totalLog = (await db.prepare('SELECT COUNT(*) as c FROM data_logger').get())?.c || 0;
 
     res.json({
       master: {
@@ -356,7 +356,7 @@ app.get('/api/dummy-data/stats', (req, res) => {
 });
 
 // Endpoint: Mendapatkan Daftar Template Master Data beserta Kategori & Sektor
-app.get('/api/dummy-data/master-templates', (req, res) => {
+app.get('/api/dummy-data/master-templates', async (req, res) => {
   try {
     res.json({
       companies: SAMPLE_COMPANIES,
@@ -380,9 +380,9 @@ app.get('/api/dummy-data/master-templates', (req, res) => {
 });
 
 // Endpoint Khusus: Inisialisasi Template Master Data (Customer & Produk)
-app.post('/api/dummy-data/seed-master', (req, res) => {
+app.post('/api/dummy-data/seed-master', async (req, res) => {
   try {
-    const result = seedMasterTemplate(db, req.body || {});
+    const result = await seedMasterTemplate(db, req.body || {});
     res.json({
       success: true,
       message: `Berhasil menginisialisasi template Master Data! (+${result.insertedCustomers} Customer baru, +${result.insertedParts} Part baru). Total aktif: ${result.totalCustomers} Customer, ${result.totalParts} Part.`,
@@ -394,7 +394,7 @@ app.post('/api/dummy-data/seed-master', (req, res) => {
 });
 
 // Endpoint Khusus: Generate Transaksi Saja (Invoices, PL, DO)
-app.post('/api/dummy-data/generate', (req, res) => {
+app.post('/api/dummy-data/generate', async (req, res) => {
   try {
     const {
       count = 10,
@@ -404,7 +404,7 @@ app.post('/api/dummy-data/generate', (req, res) => {
       currencies = ['USD', 'IDR', 'JPY']
     } = req.body || {};
 
-    const stats = generateTransactionsOnly(db, {
+    const stats = await generateTransactionsOnly(db, {
       count: Math.max(1, Math.min(100, Number(count) || 10)),
       dateRangeMonths: Math.max(1, Math.min(24, Number(dateRangeMonths) || 6)),
       includePL: includePL !== false,
@@ -422,16 +422,16 @@ app.post('/api/dummy-data/generate', (req, res) => {
   }
 });
 
-app.post('/api/dummy-data/clear', (req, res) => {
+app.post('/api/dummy-data/clear', async (req, res) => {
   try {
     const { mode = 'transactions' } = req.body;
 
     if (mode === 'transactions' || mode === 'dummy_only') {
       // 1. Hapus Hanya Transaksi (Invoices, PL, DO, Logs) - Master Data 100% AMAN
-      db.prepare('DELETE FROM invoices').run();
-      db.prepare('DELETE FROM packing_lists').run();
-      db.prepare('DELETE FROM delivery_orders').run();
-      db.prepare('DELETE FROM data_logger').run();
+      await db.prepare('DELETE FROM invoices').run();
+      await db.prepare('DELETE FROM packing_lists').run();
+      await db.prepare('DELETE FROM delivery_orders').run();
+      await db.prepare('DELETE FROM data_logger').run();
 
       return res.json({
         success: true,
@@ -441,11 +441,11 @@ app.post('/api/dummy-data/clear', (req, res) => {
 
     if (mode === 'master_only') {
       // 2. Hapus Hanya Master Data (Customers, Parts, Price History, Terms)
-      db.prepare('DELETE FROM part_price_history').run();
-      db.prepare('DELETE FROM customers').run();
-      db.prepare('DELETE FROM parts').run();
-      db.prepare('DELETE FROM payment_terms').run();
-      db.prepare('DELETE FROM delivery_terms').run();
+      await db.prepare('DELETE FROM part_price_history').run();
+      await db.prepare('DELETE FROM customers').run();
+      await db.prepare('DELETE FROM parts').run();
+      await db.prepare('DELETE FROM payment_terms').run();
+      await db.prepare('DELETE FROM delivery_terms').run();
 
       return res.json({
         success: true,
@@ -455,15 +455,15 @@ app.post('/api/dummy-data/clear', (req, res) => {
 
     if (mode === 'all') {
       // 3. Reset Total Database (Kosongkan Seluruh Tabel)
-      db.prepare('DELETE FROM invoices').run();
-      db.prepare('DELETE FROM packing_lists').run();
-      db.prepare('DELETE FROM delivery_orders').run();
-      db.prepare('DELETE FROM data_logger').run();
-      db.prepare('DELETE FROM part_price_history').run();
-      db.prepare('DELETE FROM customers').run();
-      db.prepare('DELETE FROM parts').run();
-      db.prepare('DELETE FROM payment_terms').run();
-      db.prepare('DELETE FROM delivery_terms').run();
+      await db.prepare('DELETE FROM invoices').run();
+      await db.prepare('DELETE FROM packing_lists').run();
+      await db.prepare('DELETE FROM delivery_orders').run();
+      await db.prepare('DELETE FROM data_logger').run();
+      await db.prepare('DELETE FROM part_price_history').run();
+      await db.prepare('DELETE FROM customers').run();
+      await db.prepare('DELETE FROM parts').run();
+      await db.prepare('DELETE FROM payment_terms').run();
+      await db.prepare('DELETE FROM delivery_terms').run();
 
       return res.json({
         success: true,
@@ -481,31 +481,31 @@ app.post('/api/dummy-data/clear', (req, res) => {
 // ================= MASTER DATA ROUTES ================= //
 
 // Customers
-app.get('/api/customers', (req, res) => {
+app.get('/api/customers', async (req, res) => {
   try {
     const { name } = req.query;
     if (name) {
-      const row = db.prepare('SELECT * FROM customers WHERE customer_name = ? LIMIT 1').get(name);
+      const row = await db.prepare('SELECT * FROM customers WHERE customer_name = ? LIMIT 1').get(name);
       return res.json(row || null);
     }
-    const rows = db.prepare('SELECT * FROM customers ORDER BY customer_name ASC').all();
+    const rows = await db.prepare('SELECT * FROM customers ORDER BY customer_name ASC').all();
     res.json(rows);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
 
-app.post('/api/customers', (req, res) => {
+app.post('/api/customers', async (req, res) => {
   try {
     const { customer_id, customer_name, address, bill_to, ship_to, contact_person, phone } = req.body;
     if (!customer_name) {
       return res.status(400).json({ error: 'Customer name is required' });
     }
-    const stmt = db.prepare(`
+    const stmt = await db.prepare(`
       INSERT INTO customers (customer_id, customer_name, address, bill_to, ship_to, contact_person, phone)
       VALUES (?, ?, ?, ?, ?, ?, ?)
     `);
-    const info = stmt.run(
+    const info = await stmt.run(
       customer_id || null, 
       customer_name, 
       address || '', 
@@ -514,17 +514,17 @@ app.post('/api/customers', (req, res) => {
       contact_person || '', 
       phone || ''
     );
-    const newCustomer = db.prepare('SELECT * FROM customers WHERE id = ?').get(info.lastInsertRowid);
+    const newCustomer = await db.prepare('SELECT * FROM customers WHERE id = ?').get(info.lastInsertRowid);
     res.status(201).json(newCustomer);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
 
-app.put('/api/customers/:id', (req, res) => {
+app.put('/api/customers/:id', async (req, res) => {
   try {
     const { customer_id, customer_name, address, bill_to, ship_to, contact_person, phone } = req.body;
-    db.prepare(`
+    await db.prepare(`
       UPDATE customers
       SET customer_id = ?, customer_name = ?, address = ?, bill_to = ?, ship_to = ?, contact_person = ?, phone = ?
       WHERE id = ?
@@ -544,9 +544,9 @@ app.put('/api/customers/:id', (req, res) => {
   }
 });
 
-app.delete('/api/customers/:id', (req, res) => {
+app.delete('/api/customers/:id', async (req, res) => {
   try {
-    db.prepare('DELETE FROM customers WHERE id = ?').run(req.params.id);
+    await db.prepare('DELETE FROM customers WHERE id = ?').run(req.params.id);
     res.json({ success: true });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -554,30 +554,30 @@ app.delete('/api/customers/:id', (req, res) => {
 });
 
 // Payment Terms
-app.get('/api/payment-terms', (req, res) => {
+app.get('/api/payment-terms', async (req, res) => {
   try {
-    const rows = db.prepare('SELECT * FROM payment_terms ORDER BY id ASC').all();
+    const rows = await db.prepare('SELECT * FROM payment_terms ORDER BY id ASC').all();
     res.json(rows);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
 
-app.post('/api/payment-terms', (req, res) => {
+app.post('/api/payment-terms', async (req, res) => {
   try {
     const { name, description } = req.body;
     if (!name) return res.status(400).json({ error: 'Name is required' });
     const stmt = db.prepare('INSERT INTO payment_terms (name, description) VALUES (?, ?)');
-    const info = stmt.run(name, description || '');
+    const info = await stmt.run(name, description || '');
     res.status(201).json({ id: info.lastInsertRowid, name, description });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
 
-app.delete('/api/payment-terms/:id', (req, res) => {
+app.delete('/api/payment-terms/:id', async (req, res) => {
   try {
-    db.prepare('DELETE FROM payment_terms WHERE id = ?').run(req.params.id);
+    await db.prepare('DELETE FROM payment_terms WHERE id = ?').run(req.params.id);
     res.json({ success: true });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -585,30 +585,30 @@ app.delete('/api/payment-terms/:id', (req, res) => {
 });
 
 // Delivery Terms
-app.get('/api/delivery-terms', (req, res) => {
+app.get('/api/delivery-terms', async (req, res) => {
   try {
-    const rows = db.prepare('SELECT * FROM delivery_terms ORDER BY id ASC').all();
+    const rows = await db.prepare('SELECT * FROM delivery_terms ORDER BY id ASC').all();
     res.json(rows);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
 
-app.post('/api/delivery-terms', (req, res) => {
+app.post('/api/delivery-terms', async (req, res) => {
   try {
     const { name, description } = req.body;
     if (!name) return res.status(400).json({ error: 'Name is required' });
     const stmt = db.prepare('INSERT INTO delivery_terms (name, description) VALUES (?, ?)');
-    const info = stmt.run(name, description || '');
+    const info = await stmt.run(name, description || '');
     res.status(201).json({ id: info.lastInsertRowid, name, description });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
 
-app.delete('/api/delivery-terms/:id', (req, res) => {
+app.delete('/api/delivery-terms/:id', async (req, res) => {
   try {
-    db.prepare('DELETE FROM delivery_terms WHERE id = ?').run(req.params.id);
+    await db.prepare('DELETE FROM delivery_terms WHERE id = ?').run(req.params.id);
     res.json({ success: true });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -616,9 +616,9 @@ app.delete('/api/delivery-terms/:id', (req, res) => {
 });
 
 // Parts Catalog
-app.get('/api/parts', (req, res) => {
+app.get('/api/parts', async (req, res) => {
   try {
-    const rows = db.prepare(`
+    const rows = await db.prepare(`
       SELECT p.*,
         (SELECT COUNT(*) FROM part_price_history WHERE part_id = p.id) as price_history_count,
         COALESCE((
@@ -635,15 +635,15 @@ app.get('/api/parts', (req, res) => {
   }
 });
 
-app.post('/api/parts', (req, res) => {
+app.post('/api/parts', async (req, res) => {
   try {
     const { part_name, part_no, length, width, height, unit, qty_per_box, price, currency = 'USD' } = req.body;
     if (!part_name) return res.status(400).json({ error: 'Part name is required' });
-    const stmt = db.prepare(`
+    const stmt = await db.prepare(`
       INSERT INTO parts (part_name, part_no, length, width, height, unit, qty_per_box, price)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?)
     `);
-    const info = stmt.run(
+    const info = await stmt.run(
       part_name,
       part_no || '',
       Number(length) || 0,
@@ -667,10 +667,10 @@ app.post('/api/parts', (req, res) => {
   }
 });
 
-app.put('/api/parts/:id', (req, res) => {
+app.put('/api/parts/:id', async (req, res) => {
   try {
     const { part_name, part_no, length, width, height, unit, qty_per_box, price } = req.body;
-    db.prepare(`
+    await db.prepare(`
       UPDATE parts
       SET part_name = ?, part_no = ?, length = ?, width = ?, height = ?, unit = ?, qty_per_box = ?, price = ?
       WHERE id = ?
@@ -691,9 +691,9 @@ app.put('/api/parts/:id', (req, res) => {
   }
 });
 
-app.delete('/api/parts/:id', (req, res) => {
+app.delete('/api/parts/:id', async (req, res) => {
   try {
-    db.prepare('DELETE FROM parts WHERE id = ?').run(req.params.id);
+    await db.prepare('DELETE FROM parts WHERE id = ?').run(req.params.id);
     res.json({ success: true });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -703,10 +703,10 @@ app.delete('/api/parts/:id', (req, res) => {
 // ================= PART PRICE HISTORY ROUTES ================= //
 
 // Helper to re-sync part's current active price to parts.price
-function syncPartActivePrice(partId) {
+async function syncPartActivePrice(partId) {
   try {
     const today = new Date().toISOString().slice(0, 10);
-    const activeRec = db.prepare(`
+    const activeRec = await db.prepare(`
       SELECT price, currency FROM part_price_history
       WHERE part_id = ? AND effective_date <= ?
       ORDER BY effective_date DESC, id DESC
@@ -714,7 +714,7 @@ function syncPartActivePrice(partId) {
     `).get(partId, today);
 
     if (activeRec) {
-      db.prepare('UPDATE parts SET price = ? WHERE id = ?').run(activeRec.price, partId);
+      await db.prepare('UPDATE parts SET price = ? WHERE id = ?').run(activeRec.price, partId);
     }
   } catch (e) {
     console.error('Error syncing part price:', e);
@@ -722,14 +722,14 @@ function syncPartActivePrice(partId) {
 }
 
 // Get price history for a part
-app.get('/api/parts/:id/prices', (req, res) => {
+app.get('/api/parts/:id/prices', async (req, res) => {
   try {
     const partId = req.params.id;
-    const part = db.prepare('SELECT id, part_name, part_no, price FROM parts WHERE id = ?').get(partId);
+    const part = await db.prepare('SELECT id, part_name, part_no, price FROM parts WHERE id = ?').get(partId);
     if (!part) return res.status(404).json({ error: 'Part tidak ditemukan' });
 
     const today = new Date().toISOString().slice(0, 10);
-    const rows = db.prepare(`
+    const rows = await db.prepare(`
       SELECT * FROM part_price_history 
       WHERE part_id = ? 
       ORDER BY effective_date DESC, id DESC
@@ -774,7 +774,7 @@ app.get('/api/parts/:id/prices', (req, res) => {
 });
 
 // Add new price entry
-app.post('/api/parts/:id/prices', (req, res) => {
+app.post('/api/parts/:id/prices', async (req, res) => {
   try {
     const partId = req.params.id;
     const { price, currency = 'USD', effective_date, notes = '' } = req.body;
@@ -785,14 +785,14 @@ app.post('/api/parts/:id/prices', (req, res) => {
       return res.status(400).json({ error: 'Tanggal mulai berlaku harus diisi' });
     }
 
-    const stmt = db.prepare(`
+    const stmt = await db.prepare(`
       INSERT INTO part_price_history (part_id, price, currency, effective_date, notes)
       VALUES (?, ?, ?, ?, ?)
     `);
-    const info = stmt.run(partId, Number(price), currency, effective_date, notes);
+    const info = await stmt.run(partId, Number(price), currency, effective_date, notes);
     syncPartActivePrice(partId);
 
-    const newRecord = db.prepare('SELECT * FROM part_price_history WHERE id = ?').get(info.lastInsertRowid);
+    const newRecord = await db.prepare('SELECT * FROM part_price_history WHERE id = ?').get(info.lastInsertRowid);
     res.status(201).json(newRecord);
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -800,14 +800,14 @@ app.post('/api/parts/:id/prices', (req, res) => {
 });
 
 // Update price entry
-app.put('/api/parts/prices/:priceId', (req, res) => {
+app.put('/api/parts/prices/:priceId', async (req, res) => {
   try {
     const { priceId } = req.params;
     const { price, currency = 'USD', effective_date, notes = '' } = req.body;
-    const existing = db.prepare('SELECT * FROM part_price_history WHERE id = ?').get(priceId);
+    const existing = await db.prepare('SELECT * FROM part_price_history WHERE id = ?').get(priceId);
     if (!existing) return res.status(404).json({ error: 'Data riwayat tidak ditemukan' });
 
-    db.prepare(`
+    await db.prepare(`
       UPDATE part_price_history
       SET price = ?, currency = ?, effective_date = ?, notes = ?
       WHERE id = ?
@@ -821,13 +821,13 @@ app.put('/api/parts/prices/:priceId', (req, res) => {
 });
 
 // Delete price entry
-app.delete('/api/parts/prices/:priceId', (req, res) => {
+app.delete('/api/parts/prices/:priceId', async (req, res) => {
   try {
     const { priceId } = req.params;
-    const existing = db.prepare('SELECT * FROM part_price_history WHERE id = ?').get(priceId);
+    const existing = await db.prepare('SELECT * FROM part_price_history WHERE id = ?').get(priceId);
     if (!existing) return res.status(404).json({ error: 'Data riwayat tidak ditemukan' });
 
-    db.prepare('DELETE FROM part_price_history WHERE id = ?').run(priceId);
+    await db.prepare('DELETE FROM part_price_history WHERE id = ?').run(priceId);
     syncPartActivePrice(existing.part_id);
     res.json({ success: true });
   } catch (err) {
@@ -836,13 +836,13 @@ app.delete('/api/parts/prices/:priceId', (req, res) => {
 });
 
 // Get effective price at a specific date
-app.get('/api/parts/:id/price-at-date', (req, res) => {
+app.get('/api/parts/:id/price-at-date', async (req, res) => {
   try {
     const partId = req.params.id;
     const targetDate = req.query.date || new Date().toISOString().slice(0, 10);
 
     // Look for effective price <= targetDate
-    let row = db.prepare(`
+    let row = await db.prepare(`
       SELECT price, currency, effective_date, notes
       FROM part_price_history
       WHERE part_id = ? AND effective_date <= ?
@@ -852,7 +852,7 @@ app.get('/api/parts/:id/price-at-date', (req, res) => {
 
     // Fallback if targetDate is earlier than all history records
     if (!row) {
-      row = db.prepare(`
+      row = await db.prepare(`
         SELECT price, currency, effective_date, notes
         FROM part_price_history
         WHERE part_id = ?
@@ -862,7 +862,7 @@ app.get('/api/parts/:id/price-at-date', (req, res) => {
     }
 
     if (!row) {
-      const part = db.prepare('SELECT price FROM parts WHERE id = ?').get(partId);
+      const part = await db.prepare('SELECT price FROM parts WHERE id = ?').get(partId);
       row = { price: part?.price || 0, currency: 'USD', effective_date: targetDate, notes: 'Default master' };
     }
 
@@ -874,18 +874,18 @@ app.get('/api/parts/:id/price-at-date', (req, res) => {
 
 // ================= INVOICE TRANSACTIONS ================= //
 
-app.get('/api/invoices', (req, res) => {
+app.get('/api/invoices', async (req, res) => {
   try {
-    const rows = db.prepare('SELECT * FROM invoices ORDER BY id DESC').all();
+    const rows = await db.prepare('SELECT * FROM invoices ORDER BY id DESC').all();
     res.json(rows);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
 
-app.get('/api/invoices/:id', (req, res) => {
+app.get('/api/invoices/:id', async (req, res) => {
   try {
-    const row = db.prepare('SELECT * FROM invoices WHERE id = ?').get(req.params.id);
+    const row = await db.prepare('SELECT * FROM invoices WHERE id = ?').get(req.params.id);
     if (!row) return res.status(404).json({ error: 'Invoice not found' });
     res.json(row);
   } catch (err) {
@@ -893,7 +893,7 @@ app.get('/api/invoices/:id', (req, res) => {
   }
 });
 
-app.post('/api/invoices', (req, res) => {
+app.post('/api/invoices', async (req, res) => {
   try {
     const {
       invoice_number,
@@ -975,7 +975,7 @@ app.post('/api/invoices', (req, res) => {
     const computedGrandTotal = Number(grand_total) || (computedTotalAmount + computedVatAmount);
     const itemsJson = parsedItems ? JSON.stringify(parsedItems) : null;
 
-    const stmt = db.prepare(`
+    const stmt = await db.prepare(`
       INSERT INTO invoices (
         invoice_number, invoice_date, customer_name, customer_id, bill_to, ship_to,
         payment_term, terms_of_delivery, customer_po_no, part_name, no_of_pallet, no_of_box,
@@ -984,7 +984,7 @@ app.post('/api/invoices', (req, res) => {
       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
 
-    const info = stmt.run(
+    const info = await stmt.run(
       invoice_number || '',
       invoice_date || new Date().toISOString().slice(0, 10),
       customer_name || '',
@@ -1021,7 +1021,7 @@ app.post('/api/invoices', (req, res) => {
         grand_total, unit_price, currency
       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
-    loggerStmt.run(
+    await loggerStmt.run(
       'INVOICE',
       invoice_number || `INV-${refId}`,
       invoice_date || new Date().toISOString().slice(0, 10),
@@ -1043,7 +1043,7 @@ app.post('/api/invoices', (req, res) => {
       currency || 'USD'
     );
 
-    const created = db.prepare('SELECT * FROM invoices WHERE id = ?').get(refId);
+    const created = await db.prepare('SELECT * FROM invoices WHERE id = ?').get(refId);
     res.status(201).json(created);
   } catch (err) {
     console.error('Invoice create error:', err);
@@ -1051,7 +1051,7 @@ app.post('/api/invoices', (req, res) => {
   }
 });
 
-app.put('/api/invoices/:id', (req, res) => {
+app.put('/api/invoices/:id', async (req, res) => {
   try {
     const {
       invoice_number,
@@ -1127,7 +1127,7 @@ app.put('/api/invoices/:id', (req, res) => {
     const computedGrandTotal = Number(grand_total) || (computedTotalAmount + computedVatAmount);
     const itemsJson = parsedItems ? JSON.stringify(parsedItems) : null;
 
-    db.prepare(`
+    await db.prepare(`
       UPDATE invoices
       SET invoice_number = ?, invoice_date = ?, customer_name = ?, customer_id = ?,
           bill_to = ?, ship_to = ?, payment_term = ?, terms_of_delivery = ?, customer_po_no = ?, part_name = ?,
@@ -1163,7 +1163,7 @@ app.put('/api/invoices/:id', (req, res) => {
     );
 
     // Sync update to data_logger
-    db.prepare(`
+    await db.prepare(`
       UPDATE data_logger
       SET doc_number = ?, doc_date = ?, customer_name = ?, customer_id = ?,
           po_no = ?, part_name = ?, box_qty = ?, pallet_qty = ?,
@@ -1189,7 +1189,7 @@ app.put('/api/invoices/:id', (req, res) => {
       req.params.id
     );
 
-    const updated = db.prepare('SELECT * FROM invoices WHERE id = ?').get(req.params.id);
+    const updated = await db.prepare('SELECT * FROM invoices WHERE id = ?').get(req.params.id);
     res.json(updated);
   } catch (err) {
     console.error('Invoice update error:', err);
@@ -1199,48 +1199,48 @@ app.put('/api/invoices/:id', (req, res) => {
 
 // ================= PACKING LIST TRANSACTIONS ================= //
 
-app.get('/api/packing-lists', (req, res) => {
+app.get('/api/packing-lists', async (req, res) => {
   try {
-    const rows = db.prepare('SELECT * FROM packing_lists ORDER BY id DESC').all();
+    const rows = await db.prepare('SELECT * FROM packing_lists ORDER BY id DESC').all();
     res.json(rows);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
 
-app.get('/api/packing-lists/:id', (req, res) => {
+app.get('/api/packing-lists/:id', async (req, res) => {
   try {
     const rawParam = req.params.id;
     let row = null;
 
     // 1. Cari langsung by id tabel packing_lists
     if (!isNaN(rawParam)) {
-      row = db.prepare('SELECT * FROM packing_lists WHERE id = ?').get(rawParam);
+      row = await db.prepare('SELECT * FROM packing_lists WHERE id = ?').get(rawParam);
     }
 
     // 2. Cari by invoice_number
     if (!row) {
-      row = db.prepare('SELECT * FROM packing_lists WHERE invoice_number = ? LIMIT 1').get(rawParam);
+      row = await db.prepare('SELECT * FROM packing_lists WHERE invoice_number = ? LIMIT 1').get(rawParam);
     }
 
     // 3. Jika param adalah ID invoice di tabel invoices (ref_id)
     if (!row && !isNaN(rawParam)) {
-      const inv = db.prepare('SELECT invoice_number FROM invoices WHERE id = ?').get(rawParam);
+      const inv = await db.prepare('SELECT invoice_number FROM invoices WHERE id = ?').get(rawParam);
       if (inv && inv.invoice_number) {
-        row = db.prepare('SELECT * FROM packing_lists WHERE invoice_number = ? LIMIT 1').get(inv.invoice_number);
+        row = await db.prepare('SELECT * FROM packing_lists WHERE invoice_number = ? LIMIT 1').get(inv.invoice_number);
       }
     }
 
     // 4. Cari via data_logger
     if (!row) {
-      const dl = db.prepare(`
+      const dl = await db.prepare(`
         SELECT * FROM data_logger 
         WHERE doc_type = 'PACKING_LIST' AND (id = ? OR ref_id = ? OR doc_number = ?)
         LIMIT 1
       `).get(rawParam, rawParam, rawParam);
 
       if (dl) {
-        row = db.prepare('SELECT * FROM packing_lists WHERE invoice_number = ? LIMIT 1').get(dl.doc_number);
+        row = await db.prepare('SELECT * FROM packing_lists WHERE invoice_number = ? LIMIT 1').get(dl.doc_number);
         if (!row) {
           row = {
             id: dl.id,
@@ -1265,7 +1265,7 @@ app.get('/api/packing-lists/:id', (req, res) => {
     try {
       let linkedInvoice = null;
       if (row.invoice_number) {
-        linkedInvoice = db.prepare('SELECT * FROM invoices WHERE invoice_number = ? LIMIT 1').get(row.invoice_number);
+        linkedInvoice = await db.prepare('SELECT * FROM invoices WHERE invoice_number = ? LIMIT 1').get(row.invoice_number);
       }
 
       if (linkedInvoice) {
@@ -1300,10 +1300,10 @@ app.get('/api/packing-lists/:id', (req, res) => {
 
       let partInfo = null;
       if (extractedNo) {
-        partInfo = db.prepare('SELECT * FROM parts WHERE part_no = ? LIMIT 1').get(extractedNo);
+        partInfo = await db.prepare('SELECT * FROM parts WHERE part_no = ? LIMIT 1').get(extractedNo);
       }
       if (!partInfo && extractedName) {
-        partInfo = db.prepare('SELECT * FROM parts WHERE part_name LIKE ? LIMIT 1').get(`%${extractedName}%`);
+        partInfo = await db.prepare('SELECT * FROM parts WHERE part_name LIKE ? LIMIT 1').get(`%${extractedName}%`);
       }
 
       if (partInfo) {
@@ -1350,7 +1350,7 @@ app.get('/api/packing-lists/:id', (req, res) => {
   }
 });
 
-app.post('/api/packing-lists', (req, res) => {
+app.post('/api/packing-lists', async (req, res) => {
   try {
     const {
       invoice_number,
@@ -1402,7 +1402,7 @@ app.post('/api/packing-lists', (req, res) => {
 
     const itemsJson = parsedItems ? JSON.stringify(parsedItems) : null;
 
-    const stmt = db.prepare(`
+    const stmt = await db.prepare(`
       INSERT INTO packing_lists (
         invoice_number, invoice_date, customer_name, customer_po_no, part_name,
         terms_of_delivery, box_qty, pallet_qty, length, width, height,
@@ -1410,7 +1410,7 @@ app.post('/api/packing-lists', (req, res) => {
       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
 
-    const info = stmt.run(
+    const info = await stmt.run(
       invoice_number || '',
       invoice_date || new Date().toISOString().slice(0, 10),
       customer_name || '',
@@ -1441,7 +1441,7 @@ app.post('/api/packing-lists', (req, res) => {
         part_name, box_qty, pallet_qty, terms_of_delivery, payment_term, dimensions, image_url, notes, items, ref_id
       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
-    loggerStmt.run(
+    await loggerStmt.run(
       'PACKING_LIST',
       invoice_number || `PL-${refId}`,
       invoice_date || new Date().toISOString().slice(0, 10),
@@ -1460,7 +1460,7 @@ app.post('/api/packing-lists', (req, res) => {
       refId
     );
 
-    const created = db.prepare('SELECT * FROM packing_lists WHERE id = ?').get(refId);
+    const created = await db.prepare('SELECT * FROM packing_lists WHERE id = ?').get(refId);
     res.status(201).json(created);
   } catch (err) {
     console.error('Packing list create error:', err);
@@ -1468,7 +1468,7 @@ app.post('/api/packing-lists', (req, res) => {
   }
 });
 
-app.put('/api/packing-lists/:id', (req, res) => {
+app.put('/api/packing-lists/:id', async (req, res) => {
   try {
     const {
       invoice_number,
@@ -1519,7 +1519,7 @@ app.put('/api/packing-lists/:id', (req, res) => {
 
     const itemsJson = parsedItems ? JSON.stringify(parsedItems) : null;
 
-    db.prepare(`
+    await db.prepare(`
       UPDATE packing_lists
       SET invoice_number = ?, invoice_date = ?, customer_name = ?, customer_po_no = ?,
           part_name = ?, terms_of_delivery = ?, box_qty = ?, pallet_qty = ?,
@@ -1548,7 +1548,7 @@ app.put('/api/packing-lists/:id', (req, res) => {
       : null;
 
     // Sync update to data_logger
-    db.prepare(`
+    await db.prepare(`
       UPDATE data_logger
       SET doc_number = ?, doc_date = ?, customer_name = ?,
           po_no = ?, part_name = ?, box_qty = ?, pallet_qty = ?,
@@ -1569,7 +1569,7 @@ app.put('/api/packing-lists/:id', (req, res) => {
       req.params.id
     );
 
-    const updated = db.prepare('SELECT * FROM packing_lists WHERE id = ?').get(req.params.id);
+    const updated = await db.prepare('SELECT * FROM packing_lists WHERE id = ?').get(req.params.id);
     res.json(updated);
   } catch (err) {
     console.error('Packing list update error:', err);
@@ -1579,57 +1579,57 @@ app.put('/api/packing-lists/:id', (req, res) => {
 
 // ================= DELIVERY ORDER TRANSACTIONS ================= //
 
-app.get('/api/delivery-orders', (req, res) => {
+app.get('/api/delivery-orders', async (req, res) => {
   try {
-    const rows = db.prepare('SELECT * FROM delivery_orders ORDER BY id DESC').all();
+    const rows = await db.prepare('SELECT * FROM delivery_orders ORDER BY id DESC').all();
     res.json(rows);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
 
-app.get('/api/delivery-orders/:id', (req, res) => {
+app.get('/api/delivery-orders/:id', async (req, res) => {
   try {
     const rawParam = req.params.id;
     let row = null;
 
     // 1. Cari langsung by id tabel delivery_orders jika numeric
     if (!isNaN(rawParam)) {
-      row = db.prepare('SELECT * FROM delivery_orders WHERE id = ?').get(rawParam);
+      row = await db.prepare('SELECT * FROM delivery_orders WHERE id = ?').get(rawParam);
     }
 
     // 2. Cari by do_number langsung
     if (!row) {
-      row = db.prepare('SELECT * FROM delivery_orders WHERE do_number = ?').get(rawParam);
+      row = await db.prepare('SELECT * FROM delivery_orders WHERE do_number = ?').get(rawParam);
     }
 
     // 3. Cari by invoice_number
     if (!row) {
-      row = db.prepare('SELECT * FROM delivery_orders WHERE invoice_number = ? LIMIT 1').get(rawParam);
+      row = await db.prepare('SELECT * FROM delivery_orders WHERE invoice_number = ? LIMIT 1').get(rawParam);
     }
 
     // 4. Jika param adalah ID invoice di tabel invoices (ref_id dari data_logger)
     if (!row && !isNaN(rawParam)) {
-      const inv = db.prepare('SELECT invoice_number FROM invoices WHERE id = ?').get(rawParam);
+      const inv = await db.prepare('SELECT invoice_number FROM invoices WHERE id = ?').get(rawParam);
       if (inv && inv.invoice_number) {
-        row = db.prepare('SELECT * FROM delivery_orders WHERE invoice_number = ? LIMIT 1').get(inv.invoice_number);
+        row = await db.prepare('SELECT * FROM delivery_orders WHERE invoice_number = ? LIMIT 1').get(inv.invoice_number);
       }
     }
 
     // 5. Cari via data_logger jika dipanggil menggunakan id data_logger atau ref_id
     if (!row) {
-      const dl = db.prepare(`
+      const dl = await db.prepare(`
         SELECT * FROM data_logger 
         WHERE doc_type = 'DELIVERY_ORDER' AND (id = ? OR ref_id = ? OR doc_number = ?)
         LIMIT 1
       `).get(rawParam, rawParam, rawParam);
 
       if (dl) {
-        row = db.prepare('SELECT * FROM delivery_orders WHERE do_number = ?').get(dl.doc_number);
+        row = await db.prepare('SELECT * FROM delivery_orders WHERE do_number = ?').get(dl.doc_number);
         if (!row && dl.terms_of_delivery) {
           const invNum = dl.terms_of_delivery.replace(/^Ref Inv:\s*/i, '').trim();
           if (invNum) {
-            row = db.prepare('SELECT * FROM delivery_orders WHERE invoice_number = ? LIMIT 1').get(invNum);
+            row = await db.prepare('SELECT * FROM delivery_orders WHERE invoice_number = ? LIMIT 1').get(invNum);
           }
         }
 
@@ -1660,7 +1660,7 @@ app.get('/api/delivery-orders/:id', (req, res) => {
     try {
       let linkedInvoice = null;
       if (row.invoice_number) {
-        linkedInvoice = db.prepare('SELECT * FROM invoices WHERE invoice_number = ? LIMIT 1').get(row.invoice_number);
+        linkedInvoice = await db.prepare('SELECT * FROM invoices WHERE invoice_number = ? LIMIT 1').get(row.invoice_number);
       }
 
       if (linkedInvoice) {
@@ -1697,10 +1697,10 @@ app.get('/api/delivery-orders/:id', (req, res) => {
       // Cari di catalog part
       let partInfo = null;
       if (extractedNo) {
-        partInfo = db.prepare('SELECT * FROM parts WHERE part_no = ? LIMIT 1').get(extractedNo);
+        partInfo = await db.prepare('SELECT * FROM parts WHERE part_no = ? LIMIT 1').get(extractedNo);
       }
       if (!partInfo && extractedName) {
-        partInfo = db.prepare('SELECT * FROM parts WHERE part_name LIKE ? LIMIT 1').get(`%${extractedName}%`);
+        partInfo = await db.prepare('SELECT * FROM parts WHERE part_name LIKE ? LIMIT 1').get(`%${extractedName}%`);
       }
 
       if (partInfo) {
@@ -1737,7 +1737,7 @@ app.get('/api/delivery-orders/:id', (req, res) => {
   }
 });
 
-app.post('/api/delivery-orders', (req, res) => {
+app.post('/api/delivery-orders', async (req, res) => {
   try {
     const {
       do_number,
@@ -1785,14 +1785,14 @@ app.post('/api/delivery-orders', (req, res) => {
 
     const itemsJson = parsedItems ? JSON.stringify(parsedItems) : null;
 
-    const stmt = db.prepare(`
+    const stmt = await db.prepare(`
       INSERT INTO delivery_orders (
         do_number, do_date, invoice_number, customer_name, customer_id,
         customer_po_no, part_name, pallet_qty, box_qty, notes, items
       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
 
-    const info = stmt.run(
+    const info = await stmt.run(
       do_number || '',
       do_date || new Date().toISOString().slice(0, 10),
       invoice_number || '',
@@ -1815,7 +1815,7 @@ app.post('/api/delivery-orders', (req, res) => {
         part_name, box_qty, pallet_qty, terms_of_delivery, payment_term, dimensions, image_url, notes, items, ref_id
       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
-    loggerStmt.run(
+    await loggerStmt.run(
       'DELIVERY_ORDER',
       do_number || `DO-${refId}`,
       do_date || new Date().toISOString().slice(0, 10),
@@ -1834,7 +1834,7 @@ app.post('/api/delivery-orders', (req, res) => {
       refId
     );
 
-    const created = db.prepare('SELECT * FROM delivery_orders WHERE id = ?').get(refId);
+    const created = await db.prepare('SELECT * FROM delivery_orders WHERE id = ?').get(refId);
     res.status(201).json(created);
   } catch (err) {
     console.error('Delivery order create error:', err);
@@ -1842,7 +1842,7 @@ app.post('/api/delivery-orders', (req, res) => {
   }
 });
 
-app.put('/api/delivery-orders/:id', (req, res) => {
+app.put('/api/delivery-orders/:id', async (req, res) => {
   try {
     const {
       do_number,
@@ -1890,7 +1890,7 @@ app.put('/api/delivery-orders/:id', (req, res) => {
 
     const itemsJson = parsedItems ? JSON.stringify(parsedItems) : null;
 
-    db.prepare(`
+    await db.prepare(`
       UPDATE delivery_orders
       SET do_number = ?, do_date = ?, invoice_number = ?, customer_name = ?,
           customer_id = ?, customer_po_no = ?, part_name = ?, pallet_qty = ?,
@@ -1912,7 +1912,7 @@ app.put('/api/delivery-orders/:id', (req, res) => {
     );
 
     // Sync to data_logger
-    db.prepare(`
+    await db.prepare(`
       UPDATE data_logger
       SET doc_number = ?, doc_date = ?, customer_name = ?, customer_id = ?,
           po_no = ?, part_name = ?, box_qty = ?, pallet_qty = ?,
@@ -1933,7 +1933,7 @@ app.put('/api/delivery-orders/:id', (req, res) => {
       req.params.id
     );
 
-    const updated = db.prepare('SELECT * FROM delivery_orders WHERE id = ?').get(req.params.id);
+    const updated = await db.prepare('SELECT * FROM delivery_orders WHERE id = ?').get(req.params.id);
     res.json(updated);
   } catch (err) {
     console.error('Delivery order update error:', err);
@@ -1943,7 +1943,7 @@ app.put('/api/delivery-orders/:id', (req, res) => {
 
 // ================= DATA LOGGER ROUTES ================= //
 
-app.get('/api/data-logger', (req, res) => {
+app.get('/api/data-logger', async (req, res) => {
   try {
     const { 
       doc_type, 
@@ -1993,7 +1993,7 @@ app.get('/api/data-logger', (req, res) => {
     }
 
     // Get total matching rows
-    const countRow = db.prepare(`SELECT COUNT(*) AS total ${baseQuery}`).get(...params);
+    const countRow = await db.prepare(`SELECT COUNT(*) AS total ${baseQuery}`).get(...params);
     const total = countRow ? countRow.total : 0;
 
     // Sorting
@@ -2013,7 +2013,7 @@ app.get('/api/data-logger', (req, res) => {
       queryParams.push(pageSize, (pageNum - 1) * pageSize);
     }
 
-    const rows = db.prepare(dataQuery).all(...queryParams);
+    const rows = await db.prepare(dataQuery).all(...queryParams);
 
     if (isPaginationRequested) {
       res.json({
@@ -2033,7 +2033,7 @@ app.get('/api/data-logger', (req, res) => {
   }
 });
 
-app.put('/api/data-logger/:id', (req, res) => {
+app.put('/api/data-logger/:id', async (req, res) => {
   try {
     const {
       doc_number,
@@ -2050,12 +2050,12 @@ app.put('/api/data-logger/:id', (req, res) => {
       notes
     } = req.body;
 
-    const log = db.prepare('SELECT * FROM data_logger WHERE id = ?').get(req.params.id);
+    const log = await db.prepare('SELECT * FROM data_logger WHERE id = ?').get(req.params.id);
     if (!log) {
       return res.status(404).json({ error: 'Data log not found' });
     }
 
-    db.prepare(`
+    await db.prepare(`
       UPDATE data_logger
       SET doc_number = ?, doc_date = ?, customer_name = ?, customer_id = ?,
           po_no = ?, part_name = ?, box_qty = ?, pallet_qty = ?,
@@ -2080,7 +2080,7 @@ app.put('/api/data-logger/:id', (req, res) => {
     // Also sync to referenced invoice or packing list if ref_id exists
     if (log.ref_id) {
       if (log.doc_type === 'INVOICE') {
-        db.prepare(`
+        await db.prepare(`
           UPDATE invoices
           SET invoice_number = ?, invoice_date = ?, customer_name = ?, customer_id = ?,
               customer_po_no = ?, part_name = ?, no_of_box = ?, no_of_pallet = ?,
@@ -2101,7 +2101,7 @@ app.put('/api/data-logger/:id', (req, res) => {
           log.ref_id
         );
       } else if (log.doc_type === 'PACKING_LIST') {
-        db.prepare(`
+        await db.prepare(`
           UPDATE packing_lists
           SET invoice_number = ?, invoice_date = ?, customer_name = ?,
               customer_po_no = ?, part_name = ?, box_qty = ?, pallet_qty = ?,
@@ -2120,7 +2120,7 @@ app.put('/api/data-logger/:id', (req, res) => {
           log.ref_id
         );
       } else if (log.doc_type === 'DELIVERY_ORDER') {
-        db.prepare(`
+        await db.prepare(`
           UPDATE delivery_orders
           SET do_number = ?, do_date = ?, customer_name = ?, customer_id = ?,
               customer_po_no = ?, part_name = ?, box_qty = ?, pallet_qty = ?,
@@ -2141,7 +2141,7 @@ app.put('/api/data-logger/:id', (req, res) => {
       }
     }
 
-    const updated = db.prepare('SELECT * FROM data_logger WHERE id = ?').get(req.params.id);
+    const updated = await db.prepare('SELECT * FROM data_logger WHERE id = ?').get(req.params.id);
     res.json(updated);
   } catch (err) {
     console.error('Data logger update error:', err);
@@ -2149,10 +2149,10 @@ app.put('/api/data-logger/:id', (req, res) => {
   }
 });
 
-app.delete('/api/data-logger/:id', (req, res) => {
+app.delete('/api/data-logger/:id', async (req, res) => {
   try {
     // Soft delete to protect audit trail and prevent permanent data loss
-    db.prepare('UPDATE data_logger SET is_deleted = 1 WHERE id = ?').run(req.params.id);
+    await db.prepare('UPDATE data_logger SET is_deleted = 1 WHERE id = ?').run(req.params.id);
     res.json({ success: true, message: 'Data log berhasil diarsipkan / dihapus' });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -2163,7 +2163,7 @@ app.delete('/api/data-logger/:id', (req, res) => {
 const clientDistPath = path.join(__dirname, '..', 'client', 'dist');
 if (fs.existsSync(clientDistPath)) {
   app.use(express.static(clientDistPath));
-  app.get('*', (req, res, next) => {
+  app.get('*', async (req, res, next) => {
     if (req.path.startsWith('/api') || req.path.startsWith('/uploads')) {
       return next();
     }

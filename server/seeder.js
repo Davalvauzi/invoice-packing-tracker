@@ -201,7 +201,7 @@ function getRandomPastDate(monthsBack = 6) {
  * @param {object} db - SQLite database instance
  * @param {object} options - Kustomisasi seleksi master data
  */
-function seedMasterTemplate(db, options = {}) {
+async function seedMasterTemplate(db, options = {}) {
   const {
     customerIds = [],
     partNos = [],
@@ -214,14 +214,14 @@ function seedMasterTemplate(db, options = {}) {
 
   // A. Seed Payment & Delivery Terms if requested
   if (includeTerms !== false) {
-    PAYMENT_TERMS.forEach(name => {
-      const ex = db.prepare('SELECT id FROM payment_terms WHERE name = ?').get(name);
-      if (!ex) db.prepare('INSERT INTO payment_terms (name, description) VALUES (?, ?)').run(name, `Ketentuan pembayaran ${name}`);
-    });
-    DELIVERY_TERMS.forEach(name => {
-      const ex = db.prepare('SELECT id FROM delivery_terms WHERE name = ?').get(name);
-      if (!ex) db.prepare('INSERT INTO delivery_terms (name, description) VALUES (?, ?)').run(name, `Ketentuan pengiriman ${name}`);
-    });
+    for (const name of PAYMENT_TERMS) {
+      const ex = await db.prepare('SELECT id FROM payment_terms WHERE name = ?').get(name);
+      if (!ex) await db.prepare('INSERT INTO payment_terms (name, description) VALUES (?, ?)').run(name, `Ketentuan pembayaran ${name}`);
+    }
+    for (const name of DELIVERY_TERMS) {
+      const ex = await db.prepare('SELECT id FROM delivery_terms WHERE name = ?').get(name);
+      if (!ex) await db.prepare('INSERT INTO delivery_terms (name, description) VALUES (?, ?)').run(name, `Ketentuan pengiriman ${name}`);
+    }
   }
 
   // Filter target companies based on selection
@@ -235,13 +235,13 @@ function seedMasterTemplate(db, options = {}) {
     VALUES (?, ?, ?, ?, ?, ?, ?, 1)
   `);
 
-  targetCompanies.forEach(c => {
-    const existing = db.prepare('SELECT id FROM customers WHERE customer_name = ? OR customer_id = ?').get(c.customer_name, c.customer_id);
+  for (const c of targetCompanies) {
+    const existing = await db.prepare('SELECT id FROM customers WHERE customer_name = ? OR customer_id = ?').get(c.customer_name, c.customer_id);
     if (!existing) {
-      insertCust.run(c.customer_id, c.customer_name, c.address, c.bill_to, c.ship_to, c.contact_person, c.phone);
+      await insertCust.run(c.customer_id, c.customer_name, c.address, c.bill_to, c.ship_to, c.contact_person, c.phone);
       insertedCustomers++;
     }
-  });
+  }
 
   // Filter target parts based on selection
   const targetParts = (Array.isArray(partNos) && partNos.length > 0)
@@ -258,11 +258,11 @@ function seedMasterTemplate(db, options = {}) {
     VALUES (?, ?, ?, ?, ?)
   `);
 
-  targetParts.forEach(p => {
-    const existing = db.prepare('SELECT id FROM parts WHERE part_name = ? OR part_no = ?').get(p.part_name, p.part_no);
+  for (const p of targetParts) {
+    const existing = await db.prepare('SELECT id FROM parts WHERE part_name = ? OR part_no = ?').get(p.part_name, p.part_no);
     let partId = existing ? existing.id : null;
     if (!existing) {
-      const info = insertPart.run(p.part_name, p.part_no, p.length, p.width, p.height, p.unit, p.qty_per_box, p.price_usd);
+      const info = await insertPart.run(p.part_name, p.part_no, p.length, p.width, p.height, p.unit, p.qty_per_box, p.price_usd);
       partId = info.lastInsertRowid;
       insertedParts++;
 
@@ -277,14 +277,16 @@ function seedMasterTemplate(db, options = {}) {
         const revisedDate = threeMonthsAgo.toISOString().slice(0, 10);
 
         const oldPrice = +(p.price_usd * 0.95).toFixed(4);
-        insertPriceHistory.run(partId, oldPrice, 'USD', initialDate, 'Penetapan harga awal tahun');
-        insertPriceHistory.run(partId, p.price_usd, 'USD', revisedDate, 'Penyesuaian fluktuasi bahan baku');
+        await insertPriceHistory.run(partId, oldPrice, 'USD', initialDate, 'Penetapan harga awal tahun');
+        await insertPriceHistory.run(partId, p.price_usd, 'USD', revisedDate, 'Penyesuaian fluktuasi bahan baku');
       }
     }
-  });
+  }
 
-  const totalCustomers = db.prepare('SELECT COUNT(*) as c FROM customers').get().c;
-  const totalParts = db.prepare('SELECT COUNT(*) as c FROM parts').get().c;
+  const custCountRow = await db.prepare('SELECT COUNT(*) as c FROM customers').get();
+  const partCountRow = await db.prepare('SELECT COUNT(*) as c FROM parts').get();
+  const totalCustomers = custCountRow ? custCountRow.c : 0;
+  const totalParts = partCountRow ? partCountRow.c : 0;
 
   return {
     insertedCustomers,
@@ -301,7 +303,7 @@ function seedMasterTemplate(db, options = {}) {
  * @param {object} db - SQLite database instance
  * @param {object} options - Seeder configuration options
  */
-function generateTransactionsOnly(db, options = {}) {
+async function generateTransactionsOnly(db, options = {}) {
   const {
     count = 10,
     dateRangeMonths = 6,
@@ -311,8 +313,8 @@ function generateTransactionsOnly(db, options = {}) {
   } = options;
 
   // Ambil data customer dan part yang sudah ada di database
-  const allCustomers = db.prepare('SELECT * FROM customers').all();
-  const allParts = db.prepare('SELECT * FROM parts').all();
+  const allCustomers = await db.prepare('SELECT * FROM customers').all();
+  const allParts = await db.prepare('SELECT * FROM parts').all();
 
   if (allCustomers.length === 0) {
     throw new Error('Master Customer masih kosong! Silakan inisialisasi Template Master Data terlebih dahulu.');
@@ -405,11 +407,11 @@ function generateTransactionsOnly(db, options = {}) {
     const htsCode = pickRandom(HTS_CODES);
 
     // Check if invoice_number collision exists
-    const exInv = db.prepare('SELECT id FROM invoices WHERE invoice_number = ?').get(invoiceNumber);
+    const exInv = await db.prepare('SELECT id FROM invoices WHERE invoice_number = ?').get(invoiceNumber);
     if (exInv) continue;
 
     // Insert Invoice
-    const invInfo = insertInv.run(
+    const invInfo = await insertInv.run(
       invoiceNumber, invDate, customer.customer_name, customer.customer_id, customer.bill_to, customer.ship_to,
       paymentTerm, deliveryTerm, poNumber, htsCode,
       part.part_name, noOfPallet, noOfBox, qtyPerBox, totalQty,
@@ -418,7 +420,7 @@ function generateTransactionsOnly(db, options = {}) {
     const invId = invInfo.lastInsertRowid;
 
     // Insert Invoice to Data Logger
-    insertLog.run(
+    await insertLog.run(
       'INVOICE', invoiceNumber, invDate, customer.customer_name, customer.customer_id, poNumber,
       part.part_name, noOfBox, noOfPallet, invId, deliveryTerm, paymentTerm,
       `${part.length || 400} x ${part.width || 300} x ${part.height || 200} mm`,
@@ -433,14 +435,14 @@ function generateTransactionsOnly(db, options = {}) {
       plDateObj.setDate(plDateObj.getDate() + randInt(0, 1));
       const plDate = plDateObj.toISOString().slice(0, 10);
 
-      insertPL.run(
+      await insertPL.run(
         invoiceNumber, plDate, customer.customer_name, poNumber,
         `${part.part_name} (${part.part_no || 'P/N'})`,
         deliveryTerm, noOfBox, noOfPallet,
         part.length || 400, part.width || 300, part.height || 200, part.unit || 'mm'
       );
 
-      insertLog.run(
+      await insertLog.run(
         'PACKING_LIST', invoiceNumber, plDate, customer.customer_name, customer.customer_id, poNumber,
         part.part_name, noOfBox, noOfPallet, invId,
         `Ref Inv: ${invoiceNumber}`, paymentTerm,
@@ -458,13 +460,13 @@ function generateTransactionsOnly(db, options = {}) {
       const doDate = doDateObj.toISOString().slice(0, 10);
       const doNumber = `DO/${year}/${month}/${String(randInt(10, 999)).padStart(3, '0')}`;
 
-      insertDO.run(
+      await insertDO.run(
         doNumber, doDate, invoiceNumber, customer.customer_name, customer.customer_id,
         poNumber, part.part_name, noOfPallet, noOfBox,
         `Surat Jalan resmi pengiriman barang fisik sesuai PO: ${poNumber}`
       );
 
-      insertLog.run(
+      await insertLog.run(
         'DELIVERY_ORDER', doNumber, doDate, customer.customer_name, customer.customer_id, poNumber,
         part.part_name, noOfBox, noOfPallet, invId,
         `Ref Inv: ${invoiceNumber}`, paymentTerm,
@@ -485,13 +487,15 @@ function generateTransactionsOnly(db, options = {}) {
 /**
  * Backward-compatible wrapper
  */
-function runProceduralSeeder(db, options = {}) {
-  const custCount = db.prepare('SELECT COUNT(*) as c FROM customers').get().c;
-  const partCount = db.prepare('SELECT COUNT(*) as c FROM parts').get().c;
+async function runProceduralSeeder(db, options = {}) {
+  const custCountRow = await db.prepare('SELECT COUNT(*) as c FROM customers').get();
+  const partCountRow = await db.prepare('SELECT COUNT(*) as c FROM parts').get();
+  const custCount = custCountRow ? custCountRow.c : 0;
+  const partCount = partCountRow ? partCountRow.c : 0;
   if (custCount === 0 || partCount === 0) {
-    seedMasterTemplate(db);
+    await seedMasterTemplate(db);
   }
-  return generateTransactionsOnly(db, options);
+  return await generateTransactionsOnly(db, options);
 }
 
 module.exports = {

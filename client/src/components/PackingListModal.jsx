@@ -4,12 +4,30 @@ import {
   CheckCircle, 
   X, 
   PlusCircle, 
-  AlertCircle,
-  Printer,
-  Copy
+  AlertCircle, 
+  Printer, 
+  Copy,
+  Plus,
+  Trash2,
+  Box,
+  Layers,
+  Sparkles
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { useNotification } from '../context/NotificationContext';
+
+const createEmptyPLItem = () => ({
+  id: Date.now() + Math.random(),
+  part_name: '',
+  part_no: '',
+  customer_po_no: '',
+  box_qty: '',
+  pallet_qty: '',
+  length: '',
+  width: '',
+  height: '',
+  unit_note: 'mm'
+});
 
 export default function PackingListModal({ isOpen, onClose, openPrintTab, onSuccess }) {
   const { showSuccess, showError, showWarning } = useNotification();
@@ -34,6 +52,9 @@ export default function PackingListModal({ isOpen, onClose, openPrintTab, onSucc
     unit_note: 'mm',
     notes: ''
   });
+
+  // Dynamic Product Items
+  const [items, setItems] = useState([createEmptyPLItem()]);
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submittedDoc, setSubmittedDoc] = useState(null);
@@ -65,6 +86,28 @@ export default function PackingListModal({ isOpen, onClose, openPrintTab, onSucc
     }
   }, [isOpen]);
 
+  // Synchronize aggregate totals from items into formData
+  useEffect(() => {
+    const totalB = items.reduce((acc, it) => acc + (Number(it.box_qty) || 0), 0);
+    const totalP = items.reduce((acc, it) => acc + (Number(it.pallet_qty) || 0), 0);
+    
+    // Auto-update first item's dimensions into main form for backward-compatibility
+    const firstItem = items[0] || {};
+    
+    setFormData(prev => ({
+      ...prev,
+      box_qty: totalB > 0 ? String(totalB) : '',
+      pallet_qty: totalP > 0 ? String(totalP) : '',
+      length: firstItem.length || prev.length || '',
+      width: firstItem.width || prev.width || '',
+      height: firstItem.height || prev.height || '',
+      unit_note: firstItem.unit_note || prev.unit_note || 'mm',
+      part_name: items.length === 1 
+        ? (firstItem.part_name || '') 
+        : `${items.length} Items: ${items.map(i => i.part_name).filter(Boolean).slice(0, 3).join(', ')}${items.length > 3 ? '...' : ''}`
+    }));
+  }, [items]);
+
   const loadInitialData = async () => {
     try {
       const [cRes, dRes, partRes, invRes] = await Promise.all([
@@ -94,37 +137,117 @@ export default function PackingListModal({ isOpen, onClose, openPrintTab, onSucc
     }
   };
 
-  const handlePartSelect = (e) => {
-    const val = e.target.value;
-    setFormData(prev => {
-      const foundPart = parts.find(p => `${p.part_name} (${p.part_no})` === val || p.part_name === val);
-      if (foundPart) {
-        return {
-          ...prev,
-          part_name: val,
-          length: foundPart.length || prev.length,
-          width: foundPart.width || prev.width,
-          height: foundPart.height || prev.height,
-          unit_note: foundPart.unit || prev.unit_note
-        };
-      }
-      return { ...prev, part_name: val };
+  const handleItemChange = (index, field, value) => {
+    setItems(prev => {
+      const updated = [...prev];
+      updated[index] = { ...updated[index], [field]: value };
+      return updated;
     });
   };
 
+  const handlePartSelectForItem = (index, selectedVal) => {
+    const found = parts.find(p => 
+      p.part_name === selectedVal || 
+      p.part_no === selectedVal || 
+      `${p.part_name} (${p.part_no})` === selectedVal
+    );
+
+    setItems(prev => {
+      const updated = [...prev];
+      const row = { ...updated[index] };
+      if (found) {
+        row.part_name = found.part_name;
+        row.part_no = found.part_no || '';
+        row.length = found.length ? String(found.length) : (row.length || '');
+        row.width = found.width ? String(found.width) : (row.width || '');
+        row.height = found.height ? String(found.height) : (row.height || '');
+        row.unit_note = found.unit || row.unit_note || 'mm';
+      } else {
+        row.part_name = selectedVal;
+      }
+      updated[index] = row;
+      return updated;
+    });
+  };
+
+  const addItemRow = () => {
+    const lastPo = items[items.length - 1]?.customer_po_no || formData.customer_po_no || '';
+    const newItem = createEmptyPLItem();
+    if (lastPo) newItem.customer_po_no = lastPo;
+    setItems(prev => [...prev, newItem]);
+  };
+
+  const removeItemRow = (index) => {
+    if (items.length <= 1) {
+      showWarning('Minimal harus ada 1 produk dalam packing list');
+      return;
+    }
+    setItems(prev => prev.filter((_, idx) => idx !== index));
+  };
+
+  // Quick Copy & Auto-Extract from Invoice
   const copyFromInvoice = (inv) => {
+    let parsedItems = null;
+    if (Array.isArray(inv.items) && inv.items.length > 0) {
+      parsedItems = inv.items;
+    } else if (typeof inv.items === 'string' && inv.items.trim().startsWith('[')) {
+      try {
+        parsedItems = JSON.parse(inv.items);
+      } catch (e) {
+        parsedItems = null;
+      }
+    }
+
+    if (parsedItems && parsedItems.length > 0) {
+      const mapped = parsedItems.map(it => {
+        // Find dimensions from parts catalog
+        const matchPart = parts.find(p => 
+          (p.part_no && it.part_no && p.part_no.toLowerCase() === it.part_no.toLowerCase()) ||
+          (p.part_name && it.part_name && p.part_name.toLowerCase() === it.part_name.toLowerCase())
+        );
+
+        return {
+          id: it.id || (Date.now() + Math.random()),
+          part_name: it.part_name || '',
+          part_no: it.part_no || '',
+          customer_po_no: it.customer_po_no || inv.customer_po_no || '',
+          box_qty: String(it.no_of_box || it.box_qty || ''),
+          pallet_qty: String(it.no_of_pallet || it.pallet_qty || ''),
+          length: matchPart?.length ? String(matchPart.length) : '',
+          width: matchPart?.width ? String(matchPart.width) : '',
+          height: matchPart?.height ? String(matchPart.height) : '',
+          unit_note: matchPart?.unit || 'mm'
+        };
+      });
+      setItems(mapped);
+    } else if (inv.part_name) {
+      const matchPart = parts.find(p => 
+        (p.part_name && inv.part_name && p.part_name.toLowerCase() === inv.part_name.toLowerCase())
+      );
+      setItems([{
+        id: Date.now() + Math.random(),
+        part_name: inv.part_name,
+        part_no: matchPart?.part_no || '',
+        customer_po_no: inv.customer_po_no || '',
+        box_qty: String(inv.no_of_box || inv.box_qty || ''),
+        pallet_qty: String(inv.no_of_pallet || inv.pallet_qty || ''),
+        length: matchPart?.length ? String(matchPart.length) : '',
+        width: matchPart?.width ? String(matchPart.width) : '',
+        height: matchPart?.height ? String(matchPart.height) : '',
+        unit_note: matchPart?.unit || 'mm'
+      }]);
+    }
+
     setFormData(prev => ({
       ...prev,
       invoice_number: inv.invoice_number,
       invoice_date: inv.invoice_date,
       customer_name: inv.customer_name,
       customer_po_no: inv.customer_po_no || '',
-      part_name: inv.part_name || '',
-      terms_of_delivery: inv.terms_of_delivery || '',
-      box_qty: inv.no_of_box || '',
-      pallet_qty: inv.no_of_pallet || '',
-      items: inv.items || null
+      terms_of_delivery: inv.terms_of_delivery || prev.terms_of_delivery || ''
     }));
+
+    showSuccess(`Data ${parsedItems?.length ? `${parsedItems.length} produk` : ''} berhasil ditarik dari Invoice ${inv.invoice_number}!`);
   };
 
   const handleSubmit = async (e) => {
@@ -138,12 +261,22 @@ export default function PackingListModal({ isOpen, onClose, openPrintTab, onSucc
       return;
     }
 
+    // Validate at least one item has part_name
+    const hasValidItem = items.some(it => it.part_name && it.part_name.trim());
+    if (!hasValidItem) {
+      showWarning('Mohon isi minimal satu nama part/produk');
+      return;
+    }
+
     setIsSubmitting(true);
     try {
       const postRes = await fetch('/api/packing-lists', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(formData)
+        body: JSON.stringify({
+          ...formData,
+          items: JSON.stringify(items)
+        })
       });
 
       if (!postRes.ok) {
@@ -190,21 +323,25 @@ export default function PackingListModal({ isOpen, onClose, openPrintTab, onSucc
       unit_note: 'mm',
       notes: ''
     });
+    setItems([createEmptyPLItem()]);
   };
 
-  // Handle ESC key to close modal
-  useEffect(() => {
-    if (!isOpen) return;
-    const handleKeyDown = (e) => {
-      if (e.key === 'Escape') {
-        onClose();
-      }
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isOpen, onClose]);
-
   if (!isOpen) return null;
+
+  // Calculate totals for footer
+  const totalBox = items.reduce((s, it) => s + (Number(it.box_qty) || 0), 0);
+  const totalPallet = items.reduce((s, it) => s + (Number(it.pallet_qty) || 0), 0);
+  const totalCbm = items.reduce((acc, it) => {
+    const l = Number(it.length) || 0;
+    const w = Number(it.width) || 0;
+    const h = Number(it.height) || 0;
+    const b = Number(it.box_qty) || 1;
+    let vol = 0;
+    if (it.unit_note === 'cm') vol = (l * w * h) / 1_000_000;
+    else if (it.unit_note === 'inch') vol = (l * w * h * 0.000016387);
+    else vol = (l * w * h) / 1_000_000_000; // default mm
+    return acc + (vol * b);
+  }, 0);
 
   return (
     <div 
@@ -224,12 +361,12 @@ export default function PackingListModal({ isOpen, onClose, openPrintTab, onSucc
             </div>
             <div>
               <h2 className="text-base sm:text-lg font-black tracking-wide uppercase">PACKING LIST FORM</h2>
-              <p className="text-[11px] text-teal-200">Form Spesifikasi Pengemasan & Logistik (Modal Pop-up)</p>
+              <p className="text-[11px] text-teal-200">Form Spesifikasi Pengemasan & Logistik (Multi-Product Supported)</p>
             </div>
           </div>
           <button
             onClick={onClose}
-            className="p-1.5 rounded-lg text-teal-200 hover:text-white hover:bg-white/10 transition-colors"
+            className="p-1.5 rounded-lg text-teal-200 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
             title="Tutup Modal"
           >
             <X className="w-5 h-5" />
@@ -253,14 +390,14 @@ export default function PackingListModal({ isOpen, onClose, openPrintTab, onSucc
                 <button
                   type="button"
                   onClick={() => openPrintTab('print-packing-list', submittedDoc.id)}
-                  className="px-3 py-1.5 bg-teal-800 text-white rounded-lg text-xs font-bold hover:bg-teal-900 flex items-center gap-1"
+                  className="px-3 py-1.5 bg-teal-800 text-white rounded-lg text-xs font-bold hover:bg-teal-900 flex items-center gap-1 cursor-pointer"
                 >
                   <Printer className="w-3.5 h-3.5" /> Buka Tab PDF Lagi
                 </button>
                 <button
                   type="button"
                   onClick={resetForm}
-                  className="px-3 py-1.5 bg-white border border-slate-300 rounded-lg text-xs font-semibold text-slate-700 hover:bg-slate-50"
+                  className="px-3 py-1.5 bg-white border border-slate-300 rounded-lg text-xs font-semibold text-slate-700 hover:bg-slate-50 cursor-pointer"
                 >
                   Input Baru
                 </button>
@@ -273,7 +410,7 @@ export default function PackingListModal({ isOpen, onClose, openPrintTab, onSucc
             <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl flex items-center justify-between gap-3 text-xs">
               <div className="flex items-center gap-1.5 text-slate-600 font-medium truncate">
                 <Copy className="w-3.5 h-3.5 text-teal-700 shrink-0" />
-                <span className="truncate">Salin data dari Invoice yang ada:</span>
+                <span className="truncate">Tarik data otomatis dari Invoice yang terdaftar:</span>
               </div>
               <select 
                 onChange={(e) => {
@@ -281,10 +418,10 @@ export default function PackingListModal({ isOpen, onClose, openPrintTab, onSucc
                   if (inv) copyFromInvoice(inv);
                 }}
                 defaultValue=""
-                className="text-xs font-mono py-1 px-2.5 rounded-lg border border-slate-300 bg-white cursor-pointer"
+                className="text-xs font-mono py-1 px-2.5 rounded-lg border border-slate-300 bg-white cursor-pointer max-w-[240px]"
               >
                 <option value="" disabled>-- Pilih Invoice --</option>
-                {recentInvoices.slice(0, 5).map(inv => (
+                {recentInvoices.slice(0, 10).map(inv => (
                   <option key={inv.id} value={inv.id}>
                     {inv.invoice_number} - {inv.customer_name}
                   </option>
@@ -295,191 +432,320 @@ export default function PackingListModal({ isOpen, onClose, openPrintTab, onSucc
 
           <form id="packing-list-modal-form" onSubmit={handleSubmit} className="space-y-4 text-xs">
             
-            {/* Row 1: Invoice Number & Date */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-[11px] font-bold text-slate-700 uppercase mb-1">
-                  INVOICE NUMBER <span className="text-red-500">*</span>
-                </label>
-                <input
-                  type="text"
-                  required
-                  placeholder="Contoh: INV/2026/09/001"
-                  value={formData.invoice_number}
-                  onChange={(e) => setFormData({ ...formData, invoice_number: e.target.value })}
-                  className="w-full px-3 py-2 rounded-xl border border-slate-300 focus:border-teal-600 font-mono text-xs"
-                />
-              </div>
-
-              <div>
-                <label className="block text-[11px] font-bold text-slate-700 uppercase mb-1">
-                  INVOICE DATE <span className="text-red-500">*</span>
-                </label>
-                <input
-                  type="date"
-                  required
-                  value={formData.invoice_date}
-                  onChange={(e) => setFormData({ ...formData, invoice_date: e.target.value })}
-                  className="w-full px-3 py-2 rounded-xl border border-slate-300 focus:border-teal-600 text-xs"
-                />
-              </div>
-            </div>
-
-            {/* Row 2: Customer Name */}
-            <div>
-              <label className="block text-[11px] font-bold text-slate-700 uppercase mb-1">
-                CUSTOMER NAME <span className="text-red-500">*</span>
-              </label>
-              <select
-                value={formData.customer_name}
-                onChange={(e) => setFormData({ ...formData, customer_name: e.target.value })}
-                className="w-full px-3 py-2 rounded-xl border border-slate-300 focus:border-teal-600 text-xs bg-white cursor-pointer"
-              >
-                <option value="">-- Pilih Customer --</option>
-                {customers.map((c) => (
-                  <option key={c.id} value={c.customer_name}>
-                    {c.customer_name} {c.customer_id ? `(${c.customer_id})` : ''}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            {/* Row 3: Part Name */}
-            <div>
-              <label className="block text-[11px] font-bold text-slate-700 uppercase mb-1">
-                PART NAME & PART NO
-              </label>
-              <input
-                type="text"
-                list="parts-list-pl-modal"
-                placeholder="Pilih katalog atau ketik..."
-                value={formData.part_name}
-                onChange={handlePartSelect}
-                className="w-full px-3 py-2 rounded-xl border border-slate-300 focus:border-teal-600 text-xs"
-              />
-              <datalist id="parts-list-pl-modal">
-                {parts.map(p => (
-                  <option key={p.id} value={`${p.part_name} (${p.part_no})`} />
-                ))}
-              </datalist>
-            </div>
-
-            {/* Row 4: Customer PO & Terms of Delivery */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-[11px] font-bold text-slate-700 uppercase mb-1">
-                  CUSTOMER PO NO
-                </label>
-                <input
-                  type="text"
-                  placeholder="Contoh: PO-AHM-2026-99"
-                  value={formData.customer_po_no}
-                  onChange={(e) => setFormData({ ...formData, customer_po_no: e.target.value })}
-                  className="w-full px-3 py-2 rounded-xl border border-slate-300 focus:border-teal-600 text-xs"
-                />
-              </div>
-
-              <div>
-                <label className="block text-[11px] font-bold text-slate-700 uppercase mb-1">
-                  TERMS OF DELIVERY
-                </label>
-                <select
-                  value={formData.terms_of_delivery}
-                  onChange={(e) => setFormData({ ...formData, terms_of_delivery: e.target.value })}
-                  className="w-full px-3 py-2 rounded-xl border border-slate-300 focus:border-teal-600 text-xs bg-white"
-                >
-                  <option value="">-- Pilih Delivery Term --</option>
-                  {deliveryTerms.map((term) => (
-                    <option key={term.id} value={term.name}>{term.name}</option>
-                  ))}
-                </select>
-              </div>
-            </div>
-
-            {/* Row 5: Box Qty & Pallet Qty */}
-            <div className="grid grid-cols-2 gap-4 bg-slate-50 p-3.5 rounded-xl border border-slate-200">
-              <div>
-                <label className="block text-[11px] font-bold text-slate-700 uppercase mb-1">
-                  BOX QTY
-                </label>
-                <input
-                  type="number"
-                  min="0"
-                  placeholder="0"
-                  value={formData.box_qty}
-                  onChange={(e) => setFormData({ ...formData, box_qty: e.target.value })}
-                  className="w-full px-3 py-2 rounded-xl border border-slate-300 focus:border-teal-600 font-mono text-xs bg-white"
-                />
-              </div>
-
-              <div>
-                <label className="block text-[11px] font-bold text-slate-700 uppercase mb-1">
-                  PALLET QTY
-                </label>
-                <input
-                  type="number"
-                  min="0"
-                  placeholder="0"
-                  value={formData.pallet_qty}
-                  onChange={(e) => setFormData({ ...formData, pallet_qty: e.target.value })}
-                  className="w-full px-3 py-2 rounded-xl border border-slate-300 focus:border-teal-600 font-mono text-xs bg-white"
-                />
-              </div>
-            </div>
-
-            {/* Row 6: Dimensions (L x W x H) */}
-            <div className="bg-slate-50 p-3.5 rounded-xl border border-slate-200">
-              <label className="block text-[11px] font-bold text-slate-700 uppercase mb-2">
-                DIMENSIONS (L x W x H) & UNIT
-              </label>
-              <div className="grid grid-cols-3 sm:grid-cols-4 gap-3">
+            {/* Header Details Card */}
+            <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 space-y-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <span className="block text-[10px] font-semibold text-slate-500 mb-0.5">LENGTH</span>
+                  <label className="block text-[11px] font-bold text-slate-700 uppercase mb-1">
+                    INVOICE NUMBER <span className="text-red-500">*</span>
+                  </label>
                   <input
-                    type="number"
-                    step="any"
-                    placeholder="P"
-                    value={formData.length}
-                    onChange={(e) => setFormData({ ...formData, length: e.target.value })}
-                    className="w-full px-2.5 py-1.5 rounded-lg border border-slate-300 font-mono text-xs bg-white"
+                    type="text"
+                    required
+                    placeholder="Contoh: INV/2026/09/001"
+                    value={formData.invoice_number}
+                    onChange={(e) => setFormData({ ...formData, invoice_number: e.target.value })}
+                    className="w-full px-3 py-2 rounded-xl border border-slate-300 focus:border-teal-600 font-mono text-xs font-bold text-slate-900 bg-white"
                   />
                 </div>
+
                 <div>
-                  <span className="block text-[10px] font-semibold text-slate-500 mb-0.5">WIDTH</span>
+                  <label className="block text-[11px] font-bold text-slate-700 uppercase mb-1">
+                    INVOICE DATE <span className="text-red-500">*</span>
+                  </label>
                   <input
-                    type="number"
-                    step="any"
-                    placeholder="L"
-                    value={formData.width}
-                    onChange={(e) => setFormData({ ...formData, width: e.target.value })}
-                    className="w-full px-2.5 py-1.5 rounded-lg border border-slate-300 font-mono text-xs bg-white"
+                    type="date"
+                    required
+                    value={formData.invoice_date}
+                    onChange={(e) => setFormData({ ...formData, invoice_date: e.target.value })}
+                    className="w-full px-3 py-2 rounded-xl border border-slate-300 focus:border-teal-600 text-xs bg-white"
                   />
                 </div>
+              </div>
+
+              {/* Row 2: Customer Name & Delivery Term */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <span className="block text-[10px] font-semibold text-slate-500 mb-0.5">HEIGHT</span>
-                  <input
-                    type="number"
-                    step="any"
-                    placeholder="T"
-                    value={formData.height}
-                    onChange={(e) => setFormData({ ...formData, height: e.target.value })}
-                    className="w-full px-2.5 py-1.5 rounded-lg border border-slate-300 font-mono text-xs bg-white"
-                  />
-                </div>
-                <div className="col-span-3 sm:col-span-1">
-                  <span className="block text-[10px] font-semibold text-slate-500 mb-0.5">UNIT</span>
+                  <label className="block text-[11px] font-bold text-slate-700 uppercase mb-1">
+                    CUSTOMER NAME <span className="text-red-500">*</span>
+                  </label>
                   <select
-                    value={formData.unit_note}
-                    onChange={(e) => setFormData({ ...formData, unit_note: e.target.value })}
-                    className="w-full px-2.5 py-1.5 rounded-lg border border-slate-300 text-xs bg-white"
+                    value={formData.customer_name}
+                    onChange={(e) => setFormData({ ...formData, customer_name: e.target.value })}
+                    className="w-full px-3 py-2 rounded-xl border border-slate-300 focus:border-teal-600 text-xs bg-white cursor-pointer font-semibold"
                   >
-                    <option value="mm">mm</option>
-                    <option value="cm">cm</option>
-                    <option value="inch">inch</option>
-                    <option value="meter">meter</option>
+                    <option value="">-- Pilih Customer --</option>
+                    {customers.map((c) => (
+                      <option key={c.id} value={c.customer_name}>
+                        {c.customer_name} {c.customer_id ? `(${c.customer_id})` : ''}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-700 uppercase mb-1">
+                    TERMS OF DELIVERY
+                  </label>
+                  <select
+                    value={formData.terms_of_delivery}
+                    onChange={(e) => setFormData({ ...formData, terms_of_delivery: e.target.value })}
+                    className="w-full px-3 py-2 rounded-xl border border-slate-300 focus:border-teal-600 text-xs bg-white"
+                  >
+                    <option value="">-- Pilih Delivery Term --</option>
+                    {deliveryTerms.map((term) => (
+                      <option key={term.id} value={term.name}>{term.name}</option>
+                    ))}
                   </select>
                 </div>
               </div>
+            </div>
+
+            {/* Section 2: Data Produk Multi-Item & Spesifikasi Kemasan (Opsi A) */}
+            <div className="bg-teal-50/50 p-4 rounded-xl border border-teal-200 space-y-4">
+              <div className="flex items-center justify-between pb-2 border-b border-teal-200">
+                <div className="flex items-center gap-2 text-xs font-bold text-teal-950 uppercase tracking-wider">
+                  <Package className="w-4 h-4 text-teal-700" />
+                  Daftar Produk & Dimensi Kemasan ({items.length} Item)
+                </div>
+                <button
+                  type="button"
+                  onClick={addItemRow}
+                  className="inline-flex items-center gap-1.5 px-3 py-1 bg-teal-700 hover:bg-teal-800 text-white rounded-lg text-[11px] font-bold tracking-wide cursor-pointer transition-colors shadow-xs"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  <span>+ Tambah Produk</span>
+                </button>
+              </div>
+
+              {/* Datalist parts catalog shared across rows */}
+              <datalist id="parts-list-pl-modal">
+                {parts.map(p => (
+                  <option key={p.id} value={`${p.part_name} (${p.part_no})`}>
+                    {p.part_name} - {p.part_no} | {p.length}x{p.width}x{p.height} {p.unit || 'mm'}
+                  </option>
+                ))}
+              </datalist>
+
+              {/* Item Cards List */}
+              <div className="space-y-3.5">
+                {items.map((item, index) => {
+                  const itemL = Number(item.length) || 0;
+                  const itemW = Number(item.width) || 0;
+                  const itemH = Number(item.height) || 0;
+                  const itemB = Number(item.box_qty) || 1;
+                  let itemVol = 0;
+                  if (item.unit_note === 'cm') itemVol = (itemL * itemW * itemH) / 1_000_000;
+                  else if (item.unit_note === 'inch') itemVol = (itemL * itemW * itemH * 0.000016387);
+                  else itemVol = (itemL * itemW * itemH) / 1_000_000_000;
+                  const estCbm = itemVol * itemB;
+
+                  return (
+                    <div 
+                      key={item.id || index}
+                      className="bg-white rounded-xl border border-teal-200 shadow-xs p-3.5 space-y-3 relative group"
+                    >
+                      {/* Item Card Header */}
+                      <div className="flex items-center justify-between border-b border-slate-100 pb-2">
+                        <div className="flex items-center gap-2">
+                          <span className="px-2 py-0.5 rounded-md bg-teal-100 text-teal-800 font-bold text-[10px] tracking-wide uppercase">
+                            Produk #{index + 1}
+                          </span>
+                          {item.part_name && (
+                            <span className="text-xs font-bold text-slate-800 truncate max-w-[200px] sm:max-w-xs">
+                              {item.part_name}
+                            </span>
+                          )}
+                        </div>
+
+                        <div className="flex items-center gap-3">
+                          {estCbm > 0 && (
+                            <span className="text-[10px] font-mono text-teal-700 bg-teal-50 px-2 py-0.5 rounded border border-teal-200">
+                              Est: {estCbm.toFixed(3)} m³
+                            </span>
+                          )}
+                          {items.length > 1 && (
+                            <button
+                              type="button"
+                              onClick={() => removeItemRow(index)}
+                              className="text-slate-400 hover:text-red-600 p-1 rounded-md hover:bg-red-50 transition-colors cursor-pointer flex items-center gap-1 text-[11px] font-medium"
+                              title="Hapus baris produk ini"
+                            >
+                              <Trash2 className="w-3.5 h-3.5 text-red-500" />
+                              <span className="hidden sm:inline text-red-600">Hapus</span>
+                            </button>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Row 1: Part Name, Part No, Cust PO No */}
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                        <div className="sm:col-span-1">
+                          <label className="block text-[10px] font-bold text-slate-700 uppercase mb-1">
+                            PILIH KATALOG / PART NAME *
+                          </label>
+                          <input
+                            type="text"
+                            list="parts-list-pl-modal"
+                            placeholder="Pilih katalog / ketik nama part..."
+                            value={item.part_name}
+                            onChange={(e) => handlePartSelectForItem(index, e.target.value)}
+                            className="w-full px-2.5 py-1.5 rounded-lg border border-teal-300 bg-white text-xs font-semibold focus:border-teal-600"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block text-[10px] font-bold text-slate-700 uppercase mb-1">
+                            PART NUMBER
+                          </label>
+                          <input
+                            type="text"
+                            placeholder="Contoh: BKT-ENG-001"
+                            value={item.part_no}
+                            onChange={(e) => handleItemChange(index, 'part_no', e.target.value)}
+                            className="w-full px-2.5 py-1.5 rounded-lg border border-slate-300 bg-white font-mono text-xs focus:border-teal-600"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block text-[10px] font-bold text-slate-700 uppercase mb-1">
+                            CUST PO NO
+                          </label>
+                          <input
+                            type="text"
+                            placeholder="Contoh: PO-AHM-2026-99"
+                            value={item.customer_po_no}
+                            onChange={(e) => handleItemChange(index, 'customer_po_no', e.target.value)}
+                            className="w-full px-2.5 py-1.5 rounded-lg border border-slate-300 bg-white font-mono text-xs focus:border-teal-600"
+                          />
+                        </div>
+                      </div>
+
+                      {/* Row 2: Quantities & Dimensions (Opsi A) */}
+                      <div className="grid grid-cols-2 sm:grid-cols-6 gap-2.5 pt-1">
+                        <div>
+                          <label className="block text-[9px] font-bold text-slate-600 uppercase mb-0.5">
+                            BOX QTY
+                          </label>
+                          <input
+                            type="number"
+                            min="0"
+                            placeholder="0"
+                            value={item.box_qty}
+                            onChange={(e) => handleItemChange(index, 'box_qty', e.target.value)}
+                            className="w-full px-2 py-1.5 rounded-lg border border-teal-300 bg-white font-mono text-xs font-bold text-slate-800 text-center"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block text-[9px] font-bold text-slate-600 uppercase mb-0.5">
+                            PALLET QTY
+                          </label>
+                          <input
+                            type="number"
+                            min="0"
+                            placeholder="0"
+                            value={item.pallet_qty}
+                            onChange={(e) => handleItemChange(index, 'pallet_qty', e.target.value)}
+                            className="w-full px-2 py-1.5 rounded-lg border border-teal-300 bg-white font-mono text-xs font-bold text-slate-800 text-center"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block text-[9px] font-bold text-slate-600 uppercase mb-0.5">
+                            LENGTH (P)
+                          </label>
+                          <input
+                            type="number"
+                            step="any"
+                            placeholder="P"
+                            value={item.length}
+                            onChange={(e) => handleItemChange(index, 'length', e.target.value)}
+                            className="w-full px-2 py-1.5 rounded-lg border border-slate-300 bg-white font-mono text-xs text-center"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block text-[9px] font-bold text-slate-600 uppercase mb-0.5">
+                            WIDTH (L)
+                          </label>
+                          <input
+                            type="number"
+                            step="any"
+                            placeholder="L"
+                            value={item.width}
+                            onChange={(e) => handleItemChange(index, 'width', e.target.value)}
+                            className="w-full px-2 py-1.5 rounded-lg border border-slate-300 bg-white font-mono text-xs text-center"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block text-[9px] font-bold text-slate-600 uppercase mb-0.5">
+                            HEIGHT (T)
+                          </label>
+                          <input
+                            type="number"
+                            step="any"
+                            placeholder="T"
+                            value={item.height}
+                            onChange={(e) => handleItemChange(index, 'height', e.target.value)}
+                            className="w-full px-2 py-1.5 rounded-lg border border-slate-300 bg-white font-mono text-xs text-center"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block text-[9px] font-bold text-slate-600 uppercase mb-0.5">
+                            SATUAN
+                          </label>
+                          <select
+                            value={item.unit_note || 'mm'}
+                            onChange={(e) => handleItemChange(index, 'unit_note', e.target.value)}
+                            className="w-full px-2 py-1.5 rounded-lg border border-slate-300 bg-white text-xs font-semibold text-center cursor-pointer"
+                          >
+                            <option value="mm">mm</option>
+                            <option value="cm">cm</option>
+                            <option value="inch">inch</option>
+                            <option value="meter">meter</option>
+                          </select>
+                        </div>
+                      </div>
+
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Summary Bar */}
+              <div className="bg-teal-900 text-white p-3 rounded-xl flex flex-wrap items-center justify-between gap-3 text-xs shadow-xs">
+                <div className="flex items-center gap-2 font-bold uppercase tracking-wider text-teal-200">
+                  <Box className="w-4 h-4 text-teal-300" />
+                  TOTAL CARGO CARRIER:
+                </div>
+                <div className="flex items-center gap-4 font-mono font-bold">
+                  <span>Total Box: <strong className="text-white text-sm">{totalBox}</strong></span>
+                  <span>Total Pallet: <strong className="text-white text-sm">{totalPallet}</strong></span>
+                  {totalCbm > 0 && (
+                    <span className="bg-white/10 px-2 py-0.5 rounded text-teal-200">
+                      Total CBM: <strong className="text-white text-sm">{totalCbm.toFixed(3)} m³</strong>
+                    </span>
+                  )}
+                </div>
+              </div>
+
+            </div>
+
+            {/* Notes */}
+            <div>
+              <label className="block text-[11px] font-bold text-slate-700 uppercase mb-1">
+                CATATAN TAMBAHAN (OPSIONAL)
+              </label>
+              <textarea
+                rows={2}
+                placeholder="Instruksi penanganan kargo / nomor kontainer..."
+                value={formData.notes}
+                onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+                className="w-full px-3 py-2 rounded-xl border border-slate-300 focus:border-teal-600 text-xs"
+              />
             </div>
 
           </form>
@@ -491,7 +757,7 @@ export default function PackingListModal({ isOpen, onClose, openPrintTab, onSucc
           <button
             type="button"
             onClick={resetForm}
-            className="px-3 py-2 text-xs font-bold text-slate-500 hover:text-slate-800"
+            className="px-3 py-2 text-xs font-bold text-slate-500 hover:text-slate-800 cursor-pointer"
           >
             Reset Form
           </button>
@@ -500,7 +766,7 @@ export default function PackingListModal({ isOpen, onClose, openPrintTab, onSucc
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 border border-slate-300 rounded-xl text-xs font-semibold text-slate-700 hover:bg-slate-100"
+              className="px-4 py-2 border border-slate-300 rounded-xl text-xs font-semibold text-slate-700 hover:bg-slate-100 cursor-pointer"
             >
               Tutup
             </button>
@@ -508,7 +774,7 @@ export default function PackingListModal({ isOpen, onClose, openPrintTab, onSucc
               type="submit"
               form="packing-list-modal-form"
               disabled={isSubmitting}
-              className="inline-flex items-center gap-1.5 px-6 py-2 bg-teal-800 hover:bg-teal-900 text-white rounded-xl text-xs font-bold tracking-wider uppercase shadow-sm disabled:opacity-50 cursor-pointer"
+              className="inline-flex items-center gap-1.5 px-6 py-2 bg-teal-800 hover:bg-teal-900 text-white rounded-xl text-xs font-bold tracking-wider uppercase shadow-sm disabled:opacity-50 cursor-pointer transition-colors"
             >
               <Printer className="w-3.5 h-3.5" />
               <span>{isSubmitting ? 'Menyimpan...' : 'SUBMIT & CETAK PDF'}</span>

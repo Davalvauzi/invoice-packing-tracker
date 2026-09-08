@@ -75,14 +75,24 @@ export default function PrintPackingList({ id, onBack }) {
   const h = Number(packingList.height) || 0;
   const unit = packingList.unit_note || 'mm';
   
-  let cbm = 0;
-  if (unit === 'mm') {
-    cbm = (l * w * h) / 1_000_000_000;
-  } else if (unit === 'cm') {
-    cbm = (l * w * h) / 1_000_000;
-  } else {
-    cbm = (l * w * h);
-  }
+  const calcItemCbm = (itL, itW, itH, itUnit) => {
+    if (itUnit === 'cm') return (itL * itW * itH) / 1_000_000;
+    if (itUnit === 'inch') return (itL * itW * itH * 0.000016387);
+    return (itL * itW * itH) / 1_000_000_000; // default mm
+  };
+
+  const defaultCbm = calcItemCbm(l, w, h, unit);
+
+  const totalCbm = hasMultipleItems
+    ? items.reduce((acc, it) => {
+        const itemBox = Number(it.no_of_box) || Number(it.box_qty) || 1;
+        const itL = Number(it.length) || l;
+        const itW = Number(it.width) || w;
+        const itH = Number(it.height) || h;
+        const itUnit = it.unit_note || it.unit || unit;
+        return acc + (calcItemCbm(itL, itW, itH, itUnit) * itemBox);
+      }, 0)
+    : (defaultCbm * (totalBoxCount || 1));
 
   return (
     <div className="min-h-screen bg-slate-200 py-6 px-4 print:p-0 print:bg-white">
@@ -215,6 +225,12 @@ export default function PrintPackingList({ id, onBack }) {
                 items.map((item, idx) => {
                   const itemBox = Number(item.no_of_box) || Number(item.box_qty) || 0;
                   const itemPallet = Number(item.no_of_pallet) || Number(item.pallet_qty) || 0;
+                  const itL = Number(item.length) || l;
+                  const itW = Number(item.width) || w;
+                  const itH = Number(item.height) || h;
+                  const itUnit = item.unit_note || item.unit || unit;
+                  const itemCbm = calcItemCbm(itL, itW, itH, itUnit);
+
                   return (
                     <tr key={idx}>
                       <td className="border border-slate-300 px-3 py-3 text-center font-mono">{idx + 1}</td>
@@ -234,10 +250,10 @@ export default function PrintPackingList({ id, onBack }) {
                         {itemPallet}
                       </td>
                       <td className="border border-slate-300 px-3 py-3 text-center font-mono font-semibold text-xs text-slate-800">
-                        {l > 0 ? `${l} x ${w} x ${h} ${unit}` : '-'}
+                        {itL > 0 ? `${itL} x ${itW} x ${itH} ${itUnit}` : '-'}
                       </td>
                       <td className="border border-slate-300 px-3 py-3 text-right font-mono text-xs text-slate-800">
-                        {cbm > 0 ? `${(cbm * (itemBox || 1)).toFixed(3)} CBM` : '-'}
+                        {itemCbm > 0 ? `${(itemCbm * (itemBox || 1)).toFixed(3)} CBM` : '-'}
                       </td>
                     </tr>
                   );
@@ -259,7 +275,7 @@ export default function PrintPackingList({ id, onBack }) {
                     {l > 0 ? `${l} x ${w} x ${h} ${unit}` : '-'}
                   </td>
                   <td className="border border-slate-300 px-3 py-4 text-right font-mono text-xs text-slate-800">
-                    {cbm > 0 ? `${cbm.toFixed(3)} CBM` : '-'}
+                    {defaultCbm > 0 ? `${defaultCbm.toFixed(3)} CBM` : '-'}
                   </td>
                 </tr>
               )}
@@ -276,7 +292,7 @@ export default function PrintPackingList({ id, onBack }) {
                   {totalPalletCount} Pallet
                 </td>
                 <td colSpan={2} className="border border-slate-300 px-3 py-2.5 text-right font-mono text-xs text-slate-600">
-                  {cbm > 0 ? `Total CBM: ${(cbm * (totalBoxCount || 1)).toFixed(3)} m³` : 'Standard Package'}
+                  {totalCbm > 0 ? `Total CBM: ${totalCbm.toFixed(3)} m³` : 'Standard Package'}
                 </td>
               </tr>
             </tfoot>

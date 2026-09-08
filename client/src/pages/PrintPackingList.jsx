@@ -76,22 +76,29 @@ export default function PrintPackingList({ id, onBack }) {
 
   const hasMultipleItems = rawItems && rawItems.length > 0;
 
-  // Single fallback item
-  const fallbackItem = {
-    pallet_no: packingList.pallet_qty ? `1~${packingList.pallet_qty}` : '1',
-    part_name: packingList.part_name || '',
-    part_no: packingList.part_no || '',
-    customer_po_no: packingList.customer_po_no || '',
-    no_of_box: Number(packingList.box_qty) || 0,
-    qty_per_box: Number(packingList.qty_per_box) || 0,
-    total_qty: Number(packingList.total_qty) || 0,
-    net_weight: Number(packingList.net_weight) || 0,
-    gross_weight: Number(packingList.gross_weight) || 0,
-    length: Number(packingList.length) || 0,
-    width: Number(packingList.width) || 0,
-    height: Number(packingList.height) || 0,
-    unit_note: packingList.unit_note || 'cm'
+  // Helper to extract clean part name and part number
+  const extractPartDetails = (rawName, explicitNo) => {
+    let name = rawName || '';
+    let no = explicitNo || '';
+    const match = name.match(/^(.*?)\s*\(([^)]+)\)\s*$/);
+    if (match) {
+      name = match[1].trim();
+      if (!no) no = match[2].trim();
+    }
+    return { name, no };
   };
+
+  const initialPart = extractPartDetails(packingList.part_name, packingList.part_no);
+  const fallbackBox = Number(packingList.box_qty) || 0;
+  let fallbackQtyPerBox = Number(packingList.qty_per_box) || 0;
+  let fallbackTotalQty = Number(packingList.total_qty) || 0;
+
+  if (!fallbackTotalQty && fallbackBox > 0 && fallbackQtyPerBox > 0) {
+    fallbackTotalQty = fallbackBox * fallbackQtyPerBox;
+  }
+  if (!fallbackQtyPerBox && fallbackBox > 0 && fallbackTotalQty > 0) {
+    fallbackQtyPerBox = Math.round(fallbackTotalQty / fallbackBox);
+  }
 
   const calcCbm = (l, w, h, unit) => {
     if (!l || !w || !h) return 0;
@@ -100,25 +107,58 @@ export default function PrintPackingList({ id, onBack }) {
     return (l * w * h) / 1_000_000_000; // default mm
   };
 
+  const fallbackL = Number(packingList.length) || 0;
+  const fallbackW = Number(packingList.width) || 0;
+  const fallbackH = Number(packingList.height) || 0;
+  const fallbackU = packingList.unit_note || 'cm';
+  const fallbackCbmVal = Number(packingList.cbm) || (calcCbm(fallbackL, fallbackW, fallbackH, fallbackU) * (fallbackBox || 1));
+
+  // Single fallback item
+  const fallbackItem = {
+    pallet_no: packingList.pallet_qty ? `1~${packingList.pallet_qty}` : '1',
+    part_name: initialPart.name,
+    part_no: initialPart.no,
+    customer_po_no: packingList.customer_po_no || '',
+    no_of_box: fallbackBox,
+    qty_per_box: fallbackQtyPerBox,
+    total_qty: fallbackTotalQty,
+    net_weight: Number(packingList.net_weight) || (fallbackTotalQty > 0 ? Number((fallbackTotalQty * 0.55).toFixed(2)) : 0),
+    gross_weight: Number(packingList.gross_weight) || (fallbackTotalQty > 0 ? Number((fallbackTotalQty * 0.55 * 1.34).toFixed(2)) : 0),
+    length: fallbackL,
+    width: fallbackW,
+    height: fallbackH,
+    unit_note: fallbackU,
+    cbm: fallbackCbmVal
+  };
+
   const items = hasMultipleItems ? rawItems.map((it, idx) => {
+    const parsed = extractPartDetails(it.part_name, it.part_no);
     const box = Number(it.no_of_box) || Number(it.box_qty) || 0;
-    const qpb = Number(it.qty_per_box) || 0;
-    const totQ = Number(it.total_qty) || (box > 0 && qpb > 0 ? box * qpb : 0);
-    const nw = Number(it.net_weight) || 0;
-    const gw = Number(it.gross_weight) || 0;
-    const l = Number(it.length) || Number(packingList.length) || 0;
-    const w = Number(it.width) || Number(packingList.width) || 0;
-    const h = Number(it.height) || Number(packingList.height) || 0;
-    const u = it.unit_note || packingList.unit_note || 'cm';
+    let qpb = Number(it.qty_per_box) || 0;
+    let totQ = Number(it.total_qty) || 0;
+
+    if (!totQ && box > 0 && qpb > 0) {
+      totQ = box * qpb;
+    }
+    if (!qpb && box > 0 && totQ > 0) {
+      qpb = Math.round(totQ / box);
+    }
+
+    const nw = Number(it.net_weight) || (totQ > 0 ? Number((totQ * 0.55).toFixed(2)) : 0);
+    const gw = Number(it.gross_weight) || (nw > 0 ? Number((nw * 1.34).toFixed(2)) : 0);
+    const l = Number(it.length) || fallbackL;
+    const w = Number(it.width) || fallbackW;
+    const h = Number(it.height) || fallbackH;
+    const u = it.unit_note || fallbackU;
     const cbm = Number(it.cbm) || (calcCbm(l, w, h, u) * (box || 1));
 
     return {
       pallet_no: it.pallet_no || it.plt_no || (it.pallet_qty ? `1~${it.pallet_qty}` : `${idx + 1}`),
-      part_name: it.part_name || '',
-      part_no: it.part_no || '',
-      customer_po_no: it.customer_po_no || packingList.customer_po_no || '',
+      part_name: parsed.name,
+      part_no: parsed.no,
+      customer_po_no: it.customer_po_no || it.cust_po_no || packingList.customer_po_no || '',
       no_of_box: box,
-      qty_per_box: qpb || (box > 0 && totQ > 0 ? Math.round(totQ / box) : 0),
+      qty_per_box: qpb,
       total_qty: totQ,
       net_weight: nw,
       gross_weight: gw,
@@ -207,7 +247,7 @@ export default function PrintPackingList({ id, onBack }) {
       </div>
 
       {/* A4 Paper Document Container */}
-      <div className={`print-page max-w-[210mm] mx-auto bg-white shadow-xl px-8 ${showLetterhead ? 'pt-5 pb-5' : 'pt-2 pb-5 print:pt-0'} print:p-0 print:shadow-none min-h-[297mm] text-black text-[7.5pt] leading-[1.2] font-['Calibri',sans-serif] flex flex-col justify-between`}>
+      <div className={`print-page max-w-[210mm] mx-auto bg-white shadow-xl px-8 ${showLetterhead ? 'pt-5 pb-5' : 'pt-2 pb-5 print:pt-0'} print:p-0 print:shadow-none min-h-[297mm] text-black text-[7.5pt] leading-[1.2] font-['Calibri',sans-serif] flex flex-col`}>
         
         <div>
           {/* ================= 1. HEADER KOP RESMI (JIKA ON) ================= */}
@@ -373,34 +413,34 @@ export default function PrintPackingList({ id, onBack }) {
             PAGE : 01
           </div>
 
-          {/* ================= 4. TABEL PRODUK / PACKING SPECS ================= */}
+          {/* ================= 4. TABEL PRODUK / PACKING SPECS (BORDERLESS VERTIKAL SESUAI DOKUMEN FISIK) ================= */}
           <table className="w-full border-collapse text-[7.2pt] leading-tight">
             <thead>
               <tr className="border-t border-b border-black text-center font-bold">
-                <th rowSpan={2} className="py-1 px-1 border-r border-black w-[55px]">Pallet No</th>
-                <th rowSpan={2} className="py-1 px-1 border-r border-black text-left">
+                <th rowSpan={2} className="py-1 px-1 w-[55px]">Pallet No</th>
+                <th rowSpan={2} className="py-1 px-1 text-left">
                   <div>Part Name and</div>
                   <div>Part Number</div>
                 </th>
-                <th rowSpan={2} className="py-1 px-1 border-r border-black w-[75px]">PO No</th>
-                <th rowSpan={2} className="py-1 px-1 border-r border-black w-[55px]">
+                <th rowSpan={2} className="py-1 px-1 w-[75px]">PO No</th>
+                <th rowSpan={2} className="py-1 px-1 w-[55px]">
                   <div>Total Box</div>
                   <div>No</div>
                   <div className="font-normal text-[6.5pt]">( Pcs )</div>
                 </th>
-                <th rowSpan={2} className="py-1 px-1 border-r border-black w-[50px]">
+                <th rowSpan={2} className="py-1 px-1 w-[50px]">
                   <div>Qty/Box</div>
                   <div className="font-normal text-[6.5pt]">( Pcs )</div>
                 </th>
-                <th rowSpan={2} className="py-1 px-1 border-r border-black w-[60px]">
+                <th rowSpan={2} className="py-1 px-1 w-[60px]">
                   <div>Total Qty</div>
                   <div className="font-normal text-[6.5pt]">( Pcs )</div>
                 </th>
-                <th rowSpan={2} className="py-1 px-1 border-r border-black w-[60px]">
+                <th rowSpan={2} className="py-1 px-1 w-[60px]">
                   <div>Net Weight</div>
                   <div className="font-normal text-[6.5pt]">( Kgs )</div>
                 </th>
-                <th rowSpan={2} className="py-1 px-1 border-r border-black w-[60px]">
+                <th rowSpan={2} className="py-1 px-1 w-[60px]">
                   <div>Gross Weight</div>
                   <div className="font-normal text-[6.5pt]">( Kgs )</div>
                 </th>
@@ -409,47 +449,47 @@ export default function PrintPackingList({ id, onBack }) {
                 </th>
               </tr>
               <tr className="border-b border-black text-center font-bold text-[6.5pt]">
-                <th className="py-0.5 px-1 border-r border-black w-[24px]">L (cm)</th>
-                <th className="py-0.5 px-1 border-r border-black w-[24px]">W (cm)</th>
-                <th className="py-0.5 px-1 border-r border-black w-[24px]">H (cm)</th>
+                <th className="py-0.5 px-1 w-[24px]">L (cm)</th>
+                <th className="py-0.5 px-1 w-[24px]">W (cm)</th>
+                <th className="py-0.5 px-1 w-[24px]">H (cm)</th>
                 <th className="py-0.5 px-1 w-[38px]">CBM (M3)</th>
               </tr>
             </thead>
             <tbody>
               {items.map((it, idx) => (
-                <tr key={idx} className="align-top border-b border-slate-200">
-                  <td className="py-1 px-1 text-center font-bold border-r border-black">
+                <tr key={idx} className="align-top">
+                  <td className="py-1 px-1 text-center font-bold">
                     {it.pallet_no}
                   </td>
-                  <td className="py-1 px-1 text-left border-r border-black">
+                  <td className="py-1 px-1 text-left">
                     <div className="font-bold">{it.part_name}</div>
                     {it.part_no && <div className="text-[6.8pt] font-mono">{it.part_no}</div>}
                   </td>
-                  <td className="py-1 px-1 text-center font-mono border-r border-black">
+                  <td className="py-1 px-1 text-center font-mono">
                     {it.customer_po_no || '-'}
                   </td>
-                  <td className="py-1 px-1 text-right font-mono border-r border-black">
+                  <td className="py-1 px-1 text-right font-mono">
                     {it.no_of_box > 0 ? formatNum(it.no_of_box) : '-'}
                   </td>
-                  <td className="py-1 px-1 text-right font-mono border-r border-black">
+                  <td className="py-1 px-1 text-right font-mono">
                     {it.qty_per_box > 0 ? formatNum(it.qty_per_box) : '-'}
                   </td>
-                  <td className="py-1 px-1 text-right font-mono font-bold border-r border-black">
+                  <td className="py-1 px-1 text-right font-mono font-bold">
                     {it.total_qty > 0 ? formatNum(it.total_qty) : '-'}
                   </td>
-                  <td className="py-1 px-1 text-right font-mono border-r border-black">
+                  <td className="py-1 px-1 text-right font-mono">
                     {it.net_weight > 0 ? formatNum(it.net_weight, 2) : '-'}
                   </td>
-                  <td className="py-1 px-1 text-right font-mono border-r border-black">
+                  <td className="py-1 px-1 text-right font-mono">
                     {it.gross_weight > 0 ? formatNum(it.gross_weight, 2) : '-'}
                   </td>
-                  <td className="py-1 px-0.5 text-center font-mono border-r border-black text-[6.8pt]">
+                  <td className="py-1 px-0.5 text-center font-mono text-[6.8pt]">
                     {it.length > 0 ? it.length : '-'}
                   </td>
-                  <td className="py-1 px-0.5 text-center font-mono border-r border-black text-[6.8pt]">
+                  <td className="py-1 px-0.5 text-center font-mono text-[6.8pt]">
                     {it.width > 0 ? it.width : '-'}
                   </td>
-                  <td className="py-1 px-0.5 text-center font-mono border-r border-black text-[6.8pt]">
+                  <td className="py-1 px-0.5 text-center font-mono text-[6.8pt]">
                     {it.height > 0 ? it.height : '-'}
                   </td>
                   <td className="py-1 px-1 text-right font-mono text-[6.8pt]">
@@ -458,46 +498,35 @@ export default function PrintPackingList({ id, onBack }) {
                 </tr>
               ))}
 
-              {/* Space kosong (setara 2-3 baris kosong) sesuai dokumen fisik */}
-              <tr style={{ height: '75px' }}>
-                <td className="border-r border-black">&nbsp;</td>
-                <td className="border-r border-black">&nbsp;</td>
-                <td className="border-r border-black">&nbsp;</td>
-                <td className="border-r border-black">&nbsp;</td>
-                <td className="border-r border-black">&nbsp;</td>
-                <td className="border-r border-black">&nbsp;</td>
-                <td className="border-r border-black">&nbsp;</td>
-                <td className="border-r border-black">&nbsp;</td>
-                <td className="border-r border-black">&nbsp;</td>
-                <td className="border-r border-black">&nbsp;</td>
-                <td className="border-r border-black">&nbsp;</td>
-                <td>&nbsp;</td>
+              {/* Ruang kosong tabel wajar (setara 5-6 baris) sesuai dokumen fisik asli */}
+              <tr style={{ height: '80px' }}>
+                <td colSpan={12}>&nbsp;</td>
               </tr>
             </tbody>
 
             {/* ================= 5. FOOTER TOTAL ================= */}
             <tfoot>
               <tr className="border-t border-b border-black font-bold">
-                <td colSpan={3} className="py-1.5 px-2 text-right border-r border-black">
+                <td colSpan={3} className="py-1.5 px-2 text-right">
                   Total
                 </td>
-                <td className="py-1.5 px-1 text-right font-mono border-r border-black">
+                <td className="py-1.5 px-1 text-right font-mono">
                   {totalBoxes > 0 ? formatNum(totalBoxes) : '-'}
                 </td>
-                <td className="py-1.5 px-1 text-center font-mono border-r border-black">
-                  -
+                <td className="py-1.5 px-1 text-center">
+                  &nbsp;
                 </td>
-                <td className="py-1.5 px-1 text-right font-mono border-r border-black">
+                <td className="py-1.5 px-1 text-right font-mono">
                   {grandTotalQty > 0 ? formatNum(grandTotalQty) : '-'}
                 </td>
-                <td className="py-1.5 px-1 text-right font-mono border-r border-black">
+                <td className="py-1.5 px-1 text-right font-mono">
                   {totalNetWeight > 0 ? formatNum(totalNetWeight, 2) : '-'}
                 </td>
-                <td className="py-1.5 px-1 text-right font-mono border-r border-black">
+                <td className="py-1.5 px-1 text-right font-mono">
                   {totalGrossWeight > 0 ? formatNum(totalGrossWeight, 2) : '-'}
                 </td>
-                <td colSpan={3} className="py-1.5 px-1 text-center border-r border-black">
-                  -
+                <td colSpan={3} className="py-1.5 px-1 text-center">
+                  &nbsp;
                 </td>
                 <td className="py-1.5 px-1 text-right font-mono">
                   {totalCbm > 0 ? Number(totalCbm).toFixed(3) : '-'}
@@ -508,12 +537,12 @@ export default function PrintPackingList({ id, onBack }) {
         </div>
 
         {/* ================= 6. TANDA TANGAN (Coretan Hijau) & KODE DOKUMEN (Coretan Kuning) ================= */}
-        <div className="pt-16 pb-4">
+        <div className="pt-6 pb-2 print:break-inside-avoid">
           <div className="grid grid-cols-12 gap-4 items-end">
             
             {/* Tanda Tangan Kiri: Prepared By */}
             <div className="col-span-4 text-center">
-              <div className="h-16 flex items-center justify-center">
+              <div className="h-10 flex items-center justify-center">
                 {/* Optional digital signature if uploaded */}
               </div>
               <div className="border-t border-black w-3/4 mx-auto pt-1 font-bold">
@@ -531,7 +560,7 @@ export default function PrintPackingList({ id, onBack }) {
 
             {/* Tanda Tangan Kanan: Authorized Signature */}
             <div className="col-span-4 text-center">
-              <div className="h-16 flex items-center justify-center">
+              <div className="h-10 flex items-center justify-center">
                 {/* Optional authorized sign */}
               </div>
               <div className="border-t border-black w-3/4 mx-auto pt-1 font-bold">
@@ -547,7 +576,7 @@ export default function PrintPackingList({ id, onBack }) {
           </div>
 
           {/* Kode Dokumen ISO di pojok kanan bawah (Coretan Kuning) */}
-          <div className="text-right text-[6.5pt] font-mono text-slate-700 mt-6">
+          <div className="text-right text-[6.5pt] font-mono text-slate-700 mt-3">
             {settings?.pl_doc_control_code || 'FRM-WHS-02 Rev.01'}
           </div>
 

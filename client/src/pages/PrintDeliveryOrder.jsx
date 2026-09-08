@@ -76,32 +76,64 @@ export default function PrintDeliveryOrder({ id, onBack }) {
 
   const hasMultipleItems = rawItems && rawItems.length > 0;
 
+  // Helper to extract clean part name and part number
+  const extractPartDetails = (rawName, explicitNo) => {
+    let name = rawName || '';
+    let no = explicitNo || '';
+    const match = name.match(/^(.*?)\s*\(([^)]+)\)\s*$/);
+    if (match) {
+      name = match[1].trim();
+      if (!no) no = match[2].trim();
+    }
+    return { name, no };
+  };
+
+  const initialPart = extractPartDetails(deliveryOrder.part_name, deliveryOrder.part_no);
+  const fallbackBox = Number(deliveryOrder.box_qty) || 0;
+  let fallbackQtyPerCtn = Number(deliveryOrder.qty_per_box) || Number(deliveryOrder.qty_per_ctn) || 0;
+  let fallbackTotalQty = Number(deliveryOrder.total_qty) || 0;
+
+  if (!fallbackTotalQty && fallbackBox > 0 && fallbackQtyPerCtn > 0) {
+    fallbackTotalQty = fallbackBox * fallbackQtyPerCtn;
+  }
+  if (!fallbackQtyPerCtn && fallbackBox > 0 && fallbackTotalQty > 0) {
+    fallbackQtyPerCtn = Math.round(fallbackTotalQty / fallbackBox);
+  }
+
   // Single fallback item
   const fallbackItem = {
-    part_name: deliveryOrder.part_name || '',
-    part_no: deliveryOrder.part_no || '',
-    our_po_no: deliveryOrder.invoice_number || '',
+    part_name: initialPart.name,
+    part_no: initialPart.no,
+    our_po_no: deliveryOrder.our_po_no || '',
     cust_po_no: deliveryOrder.customer_po_no || '',
     plt_no: deliveryOrder.pallet_qty ? `1~${deliveryOrder.pallet_qty}` : '1',
-    no_of_ctn: Number(deliveryOrder.box_qty) || 0,
-    qty_per_ctn: Number(deliveryOrder.qty_per_box) || 0,
-    total_qty: Number(deliveryOrder.total_qty) || 0,
+    no_of_ctn: fallbackBox,
+    qty_per_ctn: fallbackQtyPerCtn,
+    total_qty: fallbackTotalQty,
     remark: deliveryOrder.notes || ''
   };
 
   const items = hasMultipleItems ? rawItems.map((it, idx) => {
+    const parsed = extractPartDetails(it.part_name, it.part_no);
     const ctn = Number(it.box_qty) || Number(it.no_of_ctn) || Number(it.no_of_box) || 0;
-    const qpc = Number(it.qty_per_box) || Number(it.qty_per_ctn) || 0;
-    const totQ = Number(it.total_qty) || (ctn > 0 && qpc > 0 ? ctn * qpc : 0);
+    let qpc = Number(it.qty_per_box) || Number(it.qty_per_ctn) || 0;
+    let totQ = Number(it.total_qty) || 0;
+
+    if (!totQ && ctn > 0 && qpc > 0) {
+      totQ = ctn * qpc;
+    }
+    if (!qpc && ctn > 0 && totQ > 0) {
+      qpc = Math.round(totQ / ctn);
+    }
 
     return {
-      part_name: it.part_name || '',
-      part_no: it.part_no || '',
-      our_po_no: it.our_po_no || deliveryOrder.invoice_number || '',
+      part_name: parsed.name,
+      part_no: parsed.no,
+      our_po_no: it.our_po_no || deliveryOrder.our_po_no || '',
       cust_po_no: it.customer_po_no || it.cust_po_no || deliveryOrder.customer_po_no || '',
       plt_no: it.plt_no || it.pallet_no || (it.pallet_qty ? `1~${it.pallet_qty}` : `${idx + 1}`),
       no_of_ctn: ctn,
-      qty_per_ctn: qpc || (ctn > 0 && totQ > 0 ? Math.round(totQ / ctn) : 0),
+      qty_per_ctn: qpc,
       total_qty: totQ,
       remark: it.remark || it.notes || ''
     };
@@ -198,7 +230,7 @@ export default function PrintDeliveryOrder({ id, onBack }) {
       </div>
 
       {/* A4 Paper Document Container */}
-      <div className={`print-page max-w-[210mm] mx-auto bg-white shadow-xl px-8 ${showLetterhead ? 'pt-5 pb-5' : 'pt-2 pb-5 print:pt-0'} print:p-0 print:shadow-none min-h-[297mm] text-black text-[7.5pt] leading-[1.2] font-['Calibri',sans-serif] flex flex-col justify-between`}>
+      <div className={`print-page max-w-[210mm] mx-auto bg-white shadow-xl px-8 ${showLetterhead ? 'pt-5 pb-5' : 'pt-2 pb-5 print:pt-0'} print:p-0 print:shadow-none min-h-[297mm] text-black text-[7.5pt] leading-[1.2] font-['Calibri',sans-serif] flex flex-col`}>
         
         <div>
           {/* ================= 1. HEADER KOP RESMI (JIKA ON) ================= */}
@@ -381,32 +413,32 @@ export default function PrintDeliveryOrder({ id, onBack }) {
             PAGE : 01
           </div>
 
-          {/* ================= 4. TABEL PRODUK DELIVERY ORDER ================= */}
+          {/* ================= 4. TABEL PRODUK DELIVERY ORDER (BORDERLESS VERTIKAL SESUAI DOKUMEN FISIK) ================= */}
           <table className="w-full border-collapse text-[7.2pt] leading-tight">
             <thead>
               <tr className="border-t border-b border-black text-center font-bold">
-                <th className="py-1.5 px-1 border-r border-black w-[35px]">NO</th>
-                <th className="py-1.5 px-1 border-r border-black text-left">
+                <th className="py-1.5 px-1 w-[35px]">NO</th>
+                <th className="py-1.5 px-1 text-left">
                   <div>Part Name and</div>
                   <div>Part Number</div>
                 </th>
-                <th className="py-1.5 px-1 border-r border-black w-[90px]">
+                <th className="py-1.5 px-1 w-[90px]">
                   <div>Our PO No.</div>
                   <div>Cust PO No.</div>
                 </th>
-                <th className="py-1.5 px-1 border-r border-black w-[50px]">
+                <th className="py-1.5 px-1 w-[50px]">
                   <div>Plt</div>
                   <div>No.</div>
                 </th>
-                <th className="py-1.5 px-1 border-r border-black w-[55px]">
+                <th className="py-1.5 px-1 w-[55px]">
                   <div>No of</div>
                   <div>Ctn/Tray</div>
                 </th>
-                <th className="py-1.5 px-1 border-r border-black w-[55px]">
+                <th className="py-1.5 px-1 w-[55px]">
                   <div>Qty per</div>
                   <div>Ctn/Tray</div>
                 </th>
-                <th className="py-1.5 px-1 border-r border-black w-[60px]">
+                <th className="py-1.5 px-1 w-[60px]">
                   <div>Total</div>
                   <div>Qty</div>
                 </th>
@@ -417,29 +449,29 @@ export default function PrintDeliveryOrder({ id, onBack }) {
             </thead>
             <tbody>
               {items.map((it, idx) => (
-                <tr key={idx} className="align-top border-b border-slate-200">
-                  <td className="py-1.5 px-1 text-center font-mono border-r border-black">
+                <tr key={idx} className="align-top">
+                  <td className="py-1.5 px-1 text-center font-mono">
                     {idx + 1}
                   </td>
-                  <td className="py-1.5 px-1 text-left border-r border-black">
+                  <td className="py-1.5 px-1 text-left">
                     <div className="font-bold">{it.part_name}</div>
                     {it.part_no && <div className="text-[6.8pt] font-mono">{it.part_no}</div>}
                   </td>
-                  <td className="py-1.5 px-1 text-center font-mono border-r border-black">
+                  <td className="py-1.5 px-1 text-center font-mono">
                     {it.our_po_no && <div>{it.our_po_no}</div>}
                     {it.cust_po_no && <div className="font-semibold">{it.cust_po_no}</div>}
                     {!it.our_po_no && !it.cust_po_no && '-'}
                   </td>
-                  <td className="py-1.5 px-1 text-center font-bold border-r border-black">
+                  <td className="py-1.5 px-1 text-center font-bold">
                     {it.plt_no}
                   </td>
-                  <td className="py-1.5 px-1 text-right font-mono border-r border-black">
+                  <td className="py-1.5 px-1 text-right font-mono">
                     {it.no_of_ctn > 0 ? formatNum(it.no_of_ctn) : '-'}
                   </td>
-                  <td className="py-1.5 px-1 text-right font-mono border-r border-black">
+                  <td className="py-1.5 px-1 text-right font-mono">
                     {it.qty_per_ctn > 0 ? formatNum(it.qty_per_ctn) : '-'}
                   </td>
-                  <td className="py-1.5 px-1 text-right font-mono font-bold border-r border-black">
+                  <td className="py-1.5 px-1 text-right font-mono font-bold">
                     {it.total_qty > 0 ? formatNum(it.total_qty) : '-'}
                   </td>
                   <td className="py-1.5 px-1 text-center text-[6.8pt]">
@@ -448,36 +480,29 @@ export default function PrintDeliveryOrder({ id, onBack }) {
                 </tr>
               ))}
 
-              {/* Space kosong (setara 2-3 baris kosong) sesuai dokumen fisik */}
-              <tr style={{ height: '75px' }}>
-                <td className="border-r border-black">&nbsp;</td>
-                <td className="border-r border-black">&nbsp;</td>
-                <td className="border-r border-black">&nbsp;</td>
-                <td className="border-r border-black">&nbsp;</td>
-                <td className="border-r border-black">&nbsp;</td>
-                <td className="border-r border-black">&nbsp;</td>
-                <td className="border-r border-black">&nbsp;</td>
-                <td>&nbsp;</td>
+              {/* Ruang kosong tabel wajar (setara 5-6 baris) sesuai dokumen fisik asli */}
+              <tr style={{ height: '80px' }}>
+                <td colSpan={8}>&nbsp;</td>
               </tr>
             </tbody>
 
             {/* ================= 5. FOOTER TOTAL ================= */}
             <tfoot>
               <tr className="border-t border-b border-black font-bold">
-                <td colSpan={4} className="py-1.5 px-2 text-right border-r border-black">
+                <td colSpan={4} className="py-1.5 px-2 text-right">
                   Total
                 </td>
-                <td className="py-1.5 px-1 text-right font-mono border-r border-black">
+                <td className="py-1.5 px-1 text-right font-mono">
                   {totalCtn > 0 ? formatNum(totalCtn) : '-'}
                 </td>
-                <td className="py-1.5 px-1 text-center border-r border-black">
-                  -
+                <td className="py-1.5 px-1 text-center">
+                  &nbsp;
                 </td>
-                <td className="py-1.5 px-1 text-right font-mono border-r border-black">
+                <td className="py-1.5 px-1 text-right font-mono">
                   {grandTotalQty > 0 ? formatNum(grandTotalQty) : '-'}
                 </td>
                 <td className="py-1.5 px-1 text-center">
-                  -
+                  &nbsp;
                 </td>
               </tr>
             </tfoot>
@@ -489,19 +514,22 @@ export default function PrintDeliveryOrder({ id, onBack }) {
             <span className="font-bold">{drawnInFavour}</span>
           </div>
 
+          {/* Garis Horizontal Pembatas Tanda Tangan (Solid Line Membentang Penuh sesuai Gambar 1) */}
+          <div className="border-b border-black w-full mt-2 mb-2"></div>
+
         </div>
 
         {/* ================= 7. TANDA TANGAN (6 Kolom Coretan Hijau Bawah) & KODE DOKUMEN (Kuning) ================= */}
-        <div className="pt-10 pb-4">
+        <div className="pt-1 pb-2 print:break-inside-avoid">
           
           {/* 6 Kolom Tanda Tangan Sejajar */}
           <div className="grid grid-cols-6 gap-2 text-center text-[7pt]">
             {signatureCols.map((col, idx) => (
               <div key={idx} className="flex flex-col items-center justify-end">
-                <div className="font-bold mb-14">
+                <div className="font-bold mb-9">
                   {col.title}
                 </div>
-                <div className="border-t border-black w-full pt-1">
+                <div className="border-t border-black w-4/5 mx-auto pt-1">
                   {col.name ? (
                     <span className="text-[6.8pt] font-semibold text-slate-800">({col.name})</span>
                   ) : (
@@ -513,7 +541,7 @@ export default function PrintDeliveryOrder({ id, onBack }) {
           </div>
 
           {/* Kode Dokumen ISO di pojok kanan bawah (Coretan Kuning) */}
-          <div className="text-right text-[6.5pt] font-mono text-slate-700 mt-6">
+          <div className="text-right text-[6.5pt] font-mono text-slate-700 mt-4">
             {settings?.do_doc_control_code || 'FRM-WHS-01 Rev.00'}
           </div>
 

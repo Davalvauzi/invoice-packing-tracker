@@ -1260,6 +1260,90 @@ app.get('/api/packing-lists/:id', (req, res) => {
     }
 
     if (!row) return res.status(404).json({ error: 'Packing list not found' });
+
+    // Auto-enrich data dari Invoice terkait & Master Part
+    try {
+      let linkedInvoice = null;
+      if (row.invoice_number) {
+        linkedInvoice = db.prepare('SELECT * FROM invoices WHERE invoice_number = ? LIMIT 1').get(row.invoice_number);
+      }
+
+      if (linkedInvoice) {
+        if (!row.items && linkedInvoice.items) {
+          row.items = linkedInvoice.items;
+        }
+        if (!row.customer_po_no && linkedInvoice.customer_po_no) {
+          row.customer_po_no = linkedInvoice.customer_po_no;
+        }
+        if (!row.ship_to && linkedInvoice.ship_to) {
+          row.ship_to = linkedInvoice.ship_to;
+        }
+        if (!row.terms_of_delivery && linkedInvoice.terms_of_delivery) {
+          row.terms_of_delivery = linkedInvoice.terms_of_delivery;
+        }
+        if (!row.qty_per_box && linkedInvoice.qty_per_box) {
+          row.qty_per_box = linkedInvoice.qty_per_box;
+        }
+        if (!row.total_qty && linkedInvoice.total_qty) {
+          row.total_qty = linkedInvoice.total_qty;
+        }
+      }
+
+      let rawPartName = row.part_name || linkedInvoice?.part_name || '';
+      let extractedName = rawPartName;
+      let extractedNo = row.part_no || '';
+      const matchP = rawPartName.match(/^(.*?)\s*\(([^)]+)\)\s*$/);
+      if (matchP) {
+        extractedName = matchP[1].trim();
+        if (!extractedNo) extractedNo = matchP[2].trim();
+      }
+
+      let partInfo = null;
+      if (extractedNo) {
+        partInfo = db.prepare('SELECT * FROM parts WHERE part_no = ? LIMIT 1').get(extractedNo);
+      }
+      if (!partInfo && extractedName) {
+        partInfo = db.prepare('SELECT * FROM parts WHERE part_name LIKE ? LIMIT 1').get(`%${extractedName}%`);
+      }
+
+      if (partInfo) {
+        if (!extractedNo) extractedNo = partInfo.part_no;
+        if (!row.qty_per_box) row.qty_per_box = partInfo.qty_per_box;
+        if (!row.length) row.length = partInfo.length;
+        if (!row.width) row.width = partInfo.width;
+        if (!row.height) row.height = partInfo.height;
+        if (!row.unit_note) row.unit_note = partInfo.unit;
+      }
+
+      row.part_name = extractedName;
+      row.part_no = extractedNo;
+
+      const bQty = Number(row.box_qty) || 0;
+      let qpb = Number(row.qty_per_box) || 0;
+      let totQ = Number(row.total_qty) || 0;
+
+      if (!totQ && bQty > 0 && qpb > 0) {
+        totQ = bQty * qpb;
+      }
+      if (!qpb && bQty > 0 && totQ > 0) {
+        qpb = Math.round(totQ / bQty);
+      }
+
+      row.box_qty = bQty;
+      row.qty_per_box = qpb;
+      row.total_qty = totQ;
+
+      // Net weight & gross weight estimation if not present
+      if (!row.net_weight && totQ > 0) {
+        row.net_weight = (totQ * 0.55).toFixed(2);
+      }
+      if (!row.gross_weight && row.net_weight) {
+        row.gross_weight = (Number(row.net_weight) * 1.34).toFixed(2);
+      }
+    } catch (e) {
+      console.error('PL enrichment error:', e);
+    }
+
     res.json(row);
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -1571,6 +1655,82 @@ app.get('/api/delivery-orders/:id', (req, res) => {
     }
 
     if (!row) return res.status(404).json({ error: 'Delivery order not found' });
+
+    // Auto-enrich data dari Invoice terkait & Master Part
+    try {
+      let linkedInvoice = null;
+      if (row.invoice_number) {
+        linkedInvoice = db.prepare('SELECT * FROM invoices WHERE invoice_number = ? LIMIT 1').get(row.invoice_number);
+      }
+
+      if (linkedInvoice) {
+        if (!row.items && linkedInvoice.items) {
+          row.items = linkedInvoice.items;
+        }
+        if (!row.customer_po_no && linkedInvoice.customer_po_no) {
+          row.customer_po_no = linkedInvoice.customer_po_no;
+        }
+        if (!row.bill_to && linkedInvoice.bill_to) {
+          row.bill_to = linkedInvoice.bill_to;
+        }
+        if (!row.ship_to && linkedInvoice.ship_to) {
+          row.ship_to = linkedInvoice.ship_to;
+        }
+        if (!row.qty_per_box && linkedInvoice.qty_per_box) {
+          row.qty_per_box = linkedInvoice.qty_per_box;
+        }
+        if (!row.total_qty && linkedInvoice.total_qty) {
+          row.total_qty = linkedInvoice.total_qty;
+        }
+      }
+
+      // Ekstrak nama part dan part_no jika format: "Part Name (PART-NO)"
+      let rawPartName = row.part_name || linkedInvoice?.part_name || '';
+      let extractedName = rawPartName;
+      let extractedNo = row.part_no || '';
+      const matchP = rawPartName.match(/^(.*?)\s*\(([^)]+)\)\s*$/);
+      if (matchP) {
+        extractedName = matchP[1].trim();
+        if (!extractedNo) extractedNo = matchP[2].trim();
+      }
+
+      // Cari di catalog part
+      let partInfo = null;
+      if (extractedNo) {
+        partInfo = db.prepare('SELECT * FROM parts WHERE part_no = ? LIMIT 1').get(extractedNo);
+      }
+      if (!partInfo && extractedName) {
+        partInfo = db.prepare('SELECT * FROM parts WHERE part_name LIKE ? LIMIT 1').get(`%${extractedName}%`);
+      }
+
+      if (partInfo) {
+        if (!extractedNo) extractedNo = partInfo.part_no;
+        if (!row.qty_per_box) row.qty_per_box = partInfo.qty_per_box;
+      }
+
+      row.part_name = extractedName;
+      row.part_no = extractedNo;
+
+      // Hitung qty_per_box dan total_qty jika salah satunya kosong
+      const bQty = Number(row.box_qty) || 0;
+      let qpb = Number(row.qty_per_box) || 0;
+      let totQ = Number(row.total_qty) || 0;
+
+      if (!totQ && bQty > 0 && qpb > 0) {
+        totQ = bQty * qpb;
+      }
+      if (!qpb && bQty > 0 && totQ > 0) {
+        qpb = Math.round(totQ / bQty);
+      }
+
+      row.box_qty = bQty;
+      row.qty_per_box = qpb;
+      row.total_qty = totQ;
+
+    } catch (e) {
+      console.error('DO enrichment error:', e);
+    }
+
     res.json(row);
   } catch (err) {
     res.status(500).json({ error: err.message });

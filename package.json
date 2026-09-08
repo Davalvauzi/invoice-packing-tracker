@@ -9,7 +9,8 @@
     "dev:client": "npm run dev --prefix client",
     "build": "npm run build --prefix client",
     "db:migrate": "node server/migrate.js",
-    "db:restore": "node server/restore.js"
+    "db:restore": "node server/restore.js",
+    "db:dump": "node server/dump.js"
   },
   "dependencies": {
     "dotenv": "^17.4.2",

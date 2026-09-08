@@ -715,6 +715,16 @@ export default function PackingListModal({ isOpen, onClose, openPrintTab, onSucc
                 })}
               </div>
 
+              {/* Large Add Product Action Button */}
+              <button
+                type="button"
+                onClick={addItemRow}
+                className="w-full py-2.5 px-4 rounded-xl border-2 border-dashed border-teal-300 hover:border-teal-600 bg-white/80 hover:bg-teal-50 text-teal-900 font-bold text-xs flex items-center justify-center gap-2 transition-all cursor-pointer shadow-xs"
+              >
+                <Plus className="w-4 h-4" />
+                <span>+ Tambah Produk Ke-{items.length + 1}</span>
+              </button>
+
               {/* Summary Bar */}
               <div className="bg-teal-900 text-white p-3 rounded-xl flex flex-wrap items-center justify-between gap-3 text-xs shadow-xs">
                 <div className="flex items-center gap-2 font-bold uppercase tracking-wider text-teal-200">

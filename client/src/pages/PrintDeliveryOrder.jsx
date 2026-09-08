@@ -113,6 +113,7 @@ export default function PrintDeliveryOrder({ id, onBack }) {
     remark: deliveryOrder.notes || ''
   };
 
+  let cumulativePallet = 1;
   const items = hasMultipleItems ? rawItems.map((it, idx) => {
     const parsed = extractPartDetails(it.part_name, it.part_no);
     const ctn = Number(it.box_qty) || Number(it.no_of_ctn) || Number(it.no_of_box) || 0;
@@ -126,12 +127,27 @@ export default function PrintDeliveryOrder({ id, onBack }) {
       qpc = Math.round(totQ / ctn);
     }
 
+    // Hitung range pallet berurutan jika tidak ada explicit plt_no
+    let pltDisplay = it.plt_no || it.pallet_no || '';
+    if (!pltDisplay) {
+      const pQty = Number(it.pallet_qty) || Number(it.no_of_pallet) || 0;
+      if (pQty > 1) {
+        pltDisplay = `${cumulativePallet}~${cumulativePallet + pQty - 1}`;
+        cumulativePallet += pQty;
+      } else if (pQty === 1) {
+        pltDisplay = `${cumulativePallet}`;
+        cumulativePallet += 1;
+      } else {
+        pltDisplay = `${idx + 1}`;
+      }
+    }
+
     return {
       part_name: parsed.name,
       part_no: parsed.no,
       our_po_no: it.our_po_no || deliveryOrder.our_po_no || '',
       cust_po_no: it.customer_po_no || it.cust_po_no || deliveryOrder.customer_po_no || '',
-      plt_no: it.plt_no || it.pallet_no || (it.pallet_qty ? `1~${it.pallet_qty}` : `${idx + 1}`),
+      plt_no: pltDisplay,
       no_of_ctn: ctn,
       qty_per_ctn: qpc,
       total_qty: totQ,
@@ -520,16 +536,16 @@ export default function PrintDeliveryOrder({ id, onBack }) {
         </div>
 
         {/* ================= 7. TANDA TANGAN (6 Kolom Coretan Hijau Bawah) & KODE DOKUMEN (Kuning) ================= */}
-        <div className="pt-1 pb-2 print:break-inside-avoid">
+        <div className="pt-2 pb-2 print:break-inside-avoid">
           
           {/* 6 Kolom Tanda Tangan Sejajar */}
-          <div className="grid grid-cols-6 gap-2 text-center text-[7pt]">
+          <div className="grid grid-cols-6 gap-3 text-center text-[7pt]">
             {signatureCols.map((col, idx) => (
               <div key={idx} className="flex flex-col items-center justify-end">
-                <div className="font-bold mb-9">
+                <div className="font-bold mb-16 leading-tight">
                   {col.title}
                 </div>
-                <div className="border-t border-black w-4/5 mx-auto pt-1">
+                <div className="border-t border-black w-3/4 mx-auto pt-1">
                   {col.name ? (
                     <span className="text-[6.8pt] font-semibold text-slate-800">({col.name})</span>
                   ) : (

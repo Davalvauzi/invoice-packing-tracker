@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict 8NsBRx71mj2i19LXs23Kbc4x1NkLWlCxwml4r5haz6eQLgmC6dM26gjH3zSGf1g
+\restrict n0AJQr2WkuB040LjSXetygYKlcP4bUF1tIXme6TcxlYSBLbHXx9aoM94yXP7b2g
 
 -- Dumped from database version 18.2
 -- Dumped by pg_dump version 18.2
@@ -643,6 +643,7 @@ COPY public.data_logger (id, doc_type, doc_number, doc_date, customer_name, cust
 218	DELIVERY_ORDER	DO/2026/08/011	2026-08-26	PT. Toyota Motor Manufacturing Indonesia	CUST-TMMIN-02	PO-PTTOY-3534	Bracket Engine Mount RH High-Tensile	54	3	Ref Inv: INV/2026/08/586	Ex-Works	400 x 250 x 200 mm	\N	\N	\N	88	15734.25	5.25	USD	1	0	2026-09-08 03:40:49
 219	INVOICE	INV/2026/08/703	2026-08-31	PT. Yamaha Indonesia Motor Mfg.	CUST-YIMM-04	PO-PTYAM-3719	Shaft Drive Axle Front Precision Ground	32	2	Franco Cikarang	Ex-Works	600 x 120 x 120 mm	\N	\N	\N	89	11366.4	12.8	USD	1	0	2026-09-08 03:40:49
 220	PACKING_LIST	INV/2026/08/703	2026-09-01	PT. Yamaha Indonesia Motor Mfg.	CUST-YIMM-04	PO-PTYAM-3719	Shaft Drive Axle Front Precision Ground	32	2	Ref Inv: INV/2026/08/703	Ex-Works	600 x 120 x 120 mm	\N	\N	\N	89	11366.4	12.8	USD	1	0	2026-09-08 03:40:49
+221	DELIVERY_ORDER	285992 - 89 - 10	2026-09-08	PT. Yamaha Indonesia Motor Mfg.	CUST-YIMM-04	PO-PTYAM-3719	2 Items: Shaft Drive Axle Front Precision Ground, Shaft Drive Axle Front Precision Ground	72	7	Ref Inv: INV/2026/08/703	\N	\N	\N		[{"id":1788847877463.7725,"part_name":"Shaft Drive Axle Front Precision Ground","part_no":"SHF-AX-554","customer_po_no":"PO-PTYAM-3719","pallet_qty":"2","box_qty":"32","qty_per_box":25,"total_qty":800},{"id":1788847880486.8364,"part_name":"Shaft Drive Axle Front Precision Ground","part_no":"SHF-AX-554","customer_po_no":"PO-PTYAM-3720","pallet_qty":"5","box_qty":"40","qty_per_box":25,"total_qty":1000}]	54	0	0	USD	0	0	2026-09-08 13:11:45.07108
 \.
 
 
@@ -659,6 +660,7 @@ COPY public.delivery_orders (id, do_number, do_date, invoice_number, customer_na
 51	DO/2026/08/654	2026-08-19	INV/2026/08/489	PT. Indonesia Epson Industry	CUST-EPSON-05	PO-PTIND-9327	Pinion Gear Transmission Planetary Type	2	40	Surat Jalan resmi pengiriman barang fisik sesuai PO: PO-PTIND-9327	\N	1	2026-09-08 03:40:49
 52	DO/2026/08/363	2026-08-23	INV/2026/08/133	PT. Indonesia Epson Industry	CUST-EPSON-05	PO-PTIND-7023	Pinion Gear Transmission Planetary Type	3	41	Surat Jalan resmi pengiriman barang fisik sesuai PO: PO-PTIND-7023	\N	1	2026-09-08 03:40:49
 53	DO/2026/08/011	2026-08-26	INV/2026/08/586	PT. Toyota Motor Manufacturing Indonesia	CUST-TMMIN-02	PO-PTTOY-3534	Bracket Engine Mount RH High-Tensile	3	54	Surat Jalan resmi pengiriman barang fisik sesuai PO: PO-PTTOY-3534	\N	1	2026-09-08 03:40:49
+54	285992 - 89 - 10	2026-09-08	INV/2026/08/703	PT. Yamaha Indonesia Motor Mfg.	CUST-YIMM-04	PO-PTYAM-3719	2 Items: Shaft Drive Axle Front Precision Ground, Shaft Drive Axle Front Precision Ground	7	72		[{"id":1788847877463.7725,"part_name":"Shaft Drive Axle Front Precision Ground","part_no":"SHF-AX-554","customer_po_no":"PO-PTYAM-3719","pallet_qty":"2","box_qty":"32","qty_per_box":25,"total_qty":800},{"id":1788847880486.8364,"part_name":"Shaft Drive Axle Front Precision Ground","part_no":"SHF-AX-554","customer_po_no":"PO-PTYAM-3720","pallet_qty":"5","box_qty":"40","qty_per_box":25,"total_qty":1000}]	0	2026-09-08 13:11:45.061622
 \.
 
 
@@ -773,14 +775,14 @@ SELECT pg_catalog.setval('public.customers_id_seq', 124, true);
 -- Name: data_logger_id_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
 --
 
-SELECT pg_catalog.setval('public.data_logger_id_seq', 220, true);
+SELECT pg_catalog.setval('public.data_logger_id_seq', 221, true);
 
 
 --
 -- Name: delivery_orders_id_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
 --
 
-SELECT pg_catalog.setval('public.delivery_orders_id_seq', 53, true);
+SELECT pg_catalog.setval('public.delivery_orders_id_seq', 54, true);
 
 
 --
@@ -997,5 +999,5 @@ ALTER TABLE ONLY public.part_price_history
 -- PostgreSQL database dump complete
 --
 
-\unrestrict 8NsBRx71mj2i19LXs23Kbc4x1NkLWlCxwml4r5haz6eQLgmC6dM26gjH3zSGf1g
+\unrestrict n0AJQr2WkuB040LjSXetygYKlcP4bUF1tIXme6TcxlYSBLbHXx9aoM94yXP7b2g
 

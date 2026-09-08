@@ -21,7 +21,10 @@ const createEmptyDOItem = () => ({
   part_no: '',
   customer_po_no: '',
   pallet_qty: '',
-  box_qty: ''
+  box_qty: '',
+  qty_per_box: '',
+  total_qty: '',
+  remark: ''
 });
 
 export default function DeliveryOrderModal({ isOpen, onClose, onSuccess }) {
@@ -141,24 +144,40 @@ export default function DeliveryOrderModal({ isOpen, onClose, onSuccess }) {
       }
 
       if (parsedItems && parsedItems.length > 0) {
-        const mapped = parsedItems.map(it => ({
-          id: it.id || (Date.now() + Math.random()),
-          part_name: it.part_name || '',
-          part_no: it.part_no || '',
-          customer_po_no: it.customer_po_no || found.customer_po_no || '',
-          pallet_qty: String(it.no_of_pallet || it.pallet_qty || ''),
-          box_qty: String(it.no_of_box || it.box_qty || '')
-        }));
+        const mapped = parsedItems.map(it => {
+          const b = Number(it.no_of_box || it.box_qty) || 0;
+          const q = Number(it.qty_per_box || it.qty_per_ctn) || 0;
+          let t = Number(it.total_qty) || 0;
+          if (!t && b > 0 && q > 0) t = b * q;
+          return {
+            id: it.id || (Date.now() + Math.random()),
+            part_name: it.part_name || '',
+            part_no: it.part_no || '',
+            customer_po_no: it.customer_po_no || found.customer_po_no || '',
+            pallet_qty: String(it.no_of_pallet || it.pallet_qty || ''),
+            box_qty: String(it.no_of_box || it.box_qty || ''),
+            qty_per_box: q ? String(q) : '',
+            total_qty: t ? String(t) : '',
+            remark: it.remark || ''
+          };
+        });
         setItems(mapped);
       } else if (found.part_name) {
         const matchPart = parts.find(p => p.part_name && found.part_name && p.part_name.toLowerCase() === found.part_name.toLowerCase());
+        const b = Number(found.no_of_box || found.box_qty) || 0;
+        const q = Number(found.qty_per_box || matchPart?.qty_per_box) || 0;
+        let t = Number(found.total_qty) || 0;
+        if (!t && b > 0 && q > 0) t = b * q;
         setItems([{
           id: Date.now() + Math.random(),
           part_name: found.part_name,
           part_no: matchPart?.part_no || '',
           customer_po_no: found.customer_po_no || '',
           pallet_qty: String(found.no_of_pallet || found.pallet_qty || ''),
-          box_qty: String(found.no_of_box || found.box_qty || '')
+          box_qty: String(found.no_of_box || found.box_qty || ''),
+          qty_per_box: q ? String(q) : '',
+          total_qty: t ? String(t) : '',
+          remark: ''
         }]);
       }
 
@@ -179,7 +198,17 @@ export default function DeliveryOrderModal({ isOpen, onClose, onSuccess }) {
   const handleItemChange = (index, field, value) => {
     setItems(prev => {
       const updated = [...prev];
-      updated[index] = { ...updated[index], [field]: value };
+      const row = { ...updated[index], [field]: value };
+      if (field === 'box_qty' || field === 'qty_per_box') {
+        const b = Number(field === 'box_qty' ? value : row.box_qty) || 0;
+        const q = Number(field === 'qty_per_box' ? value : row.qty_per_box) || 0;
+        if (b > 0 && q > 0) {
+          row.total_qty = String(b * q);
+        } else if (field === 'box_qty' && !value) {
+          row.total_qty = '';
+        }
+      }
+      updated[index] = row;
       return updated;
     });
   };
@@ -197,6 +226,13 @@ export default function DeliveryOrderModal({ isOpen, onClose, onSuccess }) {
       if (found) {
         row.part_name = found.part_name;
         row.part_no = found.part_no || '';
+        if (found.qty_per_box) {
+          row.qty_per_box = String(found.qty_per_box);
+          const b = Number(row.box_qty) || 0;
+          if (b > 0) {
+            row.total_qty = String(b * Number(found.qty_per_box));
+          }
+        }
       } else {
         row.part_name = selectedVal;
       }
@@ -294,6 +330,7 @@ export default function DeliveryOrderModal({ isOpen, onClose, onSuccess }) {
 
   const totalPallet = items.reduce((s, it) => s + (Number(it.pallet_qty) || 0), 0);
   const totalBox = items.reduce((s, it) => s + (Number(it.box_qty) || 0), 0);
+  const grandTotalQty = items.reduce((s, it) => s + (Number(it.total_qty) || 0), 0);
 
   return (
     <div 
@@ -558,8 +595,8 @@ export default function DeliveryOrderModal({ isOpen, onClose, onSuccess }) {
                       </div>
                     </div>
 
-                    {/* Row 2: Pallet Qty & Box Qty */}
-                    <div className="grid grid-cols-2 gap-3 pt-1">
+                    {/* Row 2: Pallet Qty, Box Qty, Qty Per Box, Total Qty */}
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 pt-1">
                       <div>
                         <label className="block text-[10px] font-bold text-slate-600 uppercase mb-0.5">
                           JUMLAH PALLET
@@ -587,11 +624,60 @@ export default function DeliveryOrderModal({ isOpen, onClose, onSuccess }) {
                           className="w-full px-2 py-1.5 rounded-lg border border-teal-300 bg-white font-mono text-xs font-bold text-slate-800 text-center"
                         />
                       </div>
+
+                      <div>
+                        <label className="block text-[10px] font-bold text-slate-600 uppercase mb-0.5">
+                          QTY / BOX (PCS)
+                        </label>
+                        <input
+                          type="number"
+                          min="0"
+                          placeholder="Isi / box"
+                          value={item.qty_per_box}
+                          onChange={(e) => handleItemChange(index, 'qty_per_box', e.target.value)}
+                          className="w-full px-2 py-1.5 rounded-lg border border-teal-300 bg-white font-mono text-xs font-bold text-slate-800 text-center"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-[10px] font-bold text-teal-800 uppercase mb-0.5">
+                          TOTAL QTY (PCS)
+                        </label>
+                        <input
+                          type="number"
+                          min="0"
+                          placeholder="Auto (Box × Qty)"
+                          value={item.total_qty}
+                          onChange={(e) => handleItemChange(index, 'total_qty', e.target.value)}
+                          className="w-full px-2 py-1.5 rounded-lg border border-teal-400 bg-teal-50/70 font-mono text-xs font-extrabold text-teal-950 text-center"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Row 3: Remark per item (optional) */}
+                    <div>
+                      <input
+                        type="text"
+                        placeholder="Remark / Catatan item (opsional, contoh: Surat Jalan resmi pengiriman barang fisik)..."
+                        value={item.remark || ''}
+                        onChange={(e) => handleItemChange(index, 'remark', e.target.value)}
+                        className="w-full px-2.5 py-1 rounded-lg border border-slate-200 bg-slate-50/80 text-[11px] text-slate-700 focus:bg-white focus:border-teal-600"
+                      />
                     </div>
 
                   </div>
                 ))}
               </div>
+
+              {/* Large Add Part Action Button */}
+              <button
+                type="button"
+                onClick={addItemRow}
+                className="w-full py-2.5 px-4 rounded-xl border-2 border-dashed border-teal-300 hover:border-teal-600 bg-white/80 hover:bg-teal-50 text-teal-900 font-bold text-xs flex items-center justify-center gap-2 transition-all cursor-pointer shadow-xs"
+              >
+                <Plus className="w-4 h-4" />
+                <span>+ Tambah Part Ke-{items.length + 1}</span>
+              </button>
 
               {/* Summary Bar */}
               <div className="bg-teal-950 text-white p-3 rounded-xl flex flex-wrap items-center justify-between gap-3 text-xs shadow-xs">
@@ -599,9 +685,14 @@ export default function DeliveryOrderModal({ isOpen, onClose, onSuccess }) {
                   <Box className="w-4 h-4 text-teal-300" />
                   TOTAL PENGIRIMAN SURAT JALAN:
                 </div>
-                <div className="flex items-center gap-6 font-mono font-bold">
+                <div className="flex items-center gap-4 sm:gap-6 font-mono font-bold">
                   <span>Total Pallet: <strong className="text-white text-sm">{totalPallet}</strong></span>
                   <span>Total Box: <strong className="text-white text-sm">{totalBox}</strong></span>
+                  {grandTotalQty > 0 && (
+                    <span className="bg-white/15 px-2.5 py-0.5 rounded text-teal-200">
+                      Total Qty: <strong className="text-white text-sm">{grandTotalQty.toLocaleString()} Pcs</strong>
+                    </span>
+                  )}
                 </div>
               </div>
 

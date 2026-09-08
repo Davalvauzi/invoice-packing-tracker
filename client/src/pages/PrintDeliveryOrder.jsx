@@ -12,6 +12,27 @@ export default function PrintDeliveryOrder({ id, onBack }) {
     fetchData();
   }, [id]);
 
+  useEffect(() => {
+    if (deliveryOrder) {
+      const prevTitle = document.title;
+      const code = deliveryOrder.do_number || deliveryOrder.invoice_number || deliveryOrder.id || '';
+      const cleanCode = String(code).replace(/[/\\?%*:|"<>]/g, '-').replace(/\s+/g, '').replace(/-+/g, '-').replace(/^-|-$/g, '');
+      document.title = cleanCode ? `delivery-order-${cleanCode}` : 'delivery-order';
+      return () => {
+        document.title = prevTitle;
+      };
+    }
+  }, [deliveryOrder]);
+
+  const handlePrint = () => {
+    if (deliveryOrder) {
+      const code = deliveryOrder.do_number || deliveryOrder.invoice_number || deliveryOrder.id || '';
+      const cleanCode = String(code).replace(/[/\\?%*:|"<>]/g, '-').replace(/\s+/g, '').replace(/-+/g, '-').replace(/^-|-$/g, '');
+      document.title = cleanCode ? `delivery-order-${cleanCode}` : 'delivery-order';
+    }
+    window.print();
+  };
+
   const fetchData = async () => {
     try {
       const [doRes, setRes] = await Promise.all([
@@ -243,7 +264,7 @@ export default function PrintDeliveryOrder({ id, onBack }) {
           </label>
 
           <button
-            onClick={() => window.print()}
+            onClick={handlePrint}
             className="inline-flex items-center gap-2 px-5 py-2 bg-slate-900 hover:bg-black text-white rounded text-xs font-bold shadow transition-colors cursor-pointer"
           >
             <Printer className="w-4 h-4" />

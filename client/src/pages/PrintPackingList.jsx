@@ -12,6 +12,27 @@ export default function PrintPackingList({ id, onBack }) {
     fetchData();
   }, [id]);
 
+  useEffect(() => {
+    if (packingList) {
+      const prevTitle = document.title;
+      const code = packingList.invoice_number || packingList.id || '';
+      const cleanCode = String(code).replace(/[/\\?%*:|"<>]/g, '-').replace(/\s+/g, '').replace(/-+/g, '-').replace(/^-|-$/g, '');
+      document.title = cleanCode ? `packing-list-${cleanCode}` : 'packing-list';
+      return () => {
+        document.title = prevTitle;
+      };
+    }
+  }, [packingList]);
+
+  const handlePrint = () => {
+    if (packingList) {
+      const code = packingList.invoice_number || packingList.id || '';
+      const cleanCode = String(code).replace(/[/\\?%*:|"<>]/g, '-').replace(/\s+/g, '').replace(/-+/g, '-').replace(/^-|-$/g, '');
+      document.title = cleanCode ? `packing-list-${cleanCode}` : 'packing-list';
+    }
+    window.print();
+  };
+
   const fetchData = async () => {
     try {
       const [plRes, setRes] = await Promise.all([
@@ -260,7 +281,7 @@ export default function PrintPackingList({ id, onBack }) {
           </label>
 
           <button
-            onClick={() => window.print()}
+            onClick={handlePrint}
             className="inline-flex items-center gap-2 px-5 py-2 bg-slate-900 hover:bg-black text-white rounded text-xs font-bold shadow transition-colors cursor-pointer"
           >
             <Printer className="w-4 h-4" />

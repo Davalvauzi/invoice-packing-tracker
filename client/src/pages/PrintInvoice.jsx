@@ -12,6 +12,27 @@ export default function PrintInvoice({ id, onBack }) {
     fetchInvoiceAndSettings();
   }, [id]);
 
+  useEffect(() => {
+    if (invoice) {
+      const prevTitle = document.title;
+      const code = invoice.invoice_number || invoice.id || '';
+      const cleanCode = String(code).replace(/[/\\?%*:|"<>]/g, '-').replace(/\s+/g, '').replace(/-+/g, '-').replace(/^-|-$/g, '');
+      document.title = cleanCode ? `invoice-${cleanCode}` : 'invoice';
+      return () => {
+        document.title = prevTitle;
+      };
+    }
+  }, [invoice]);
+
+  const handlePrint = () => {
+    if (invoice) {
+      const code = invoice.invoice_number || invoice.id || '';
+      const cleanCode = String(code).replace(/[/\\?%*:|"<>]/g, '-').replace(/\s+/g, '').replace(/-+/g, '-').replace(/^-|-$/g, '');
+      document.title = cleanCode ? `invoice-${cleanCode}` : 'invoice';
+    }
+    window.print();
+  };
+
   const fetchInvoiceAndSettings = async () => {
     try {
       const [invRes, setRes] = await Promise.all([
@@ -171,7 +192,7 @@ export default function PrintInvoice({ id, onBack }) {
           </label>
 
           <button
-            onClick={() => window.print()}
+            onClick={handlePrint}
             className="inline-flex items-center gap-2 px-5 py-2 bg-slate-900 hover:bg-black text-white rounded text-xs font-bold shadow transition-colors cursor-pointer"
           >
             <Printer className="w-4 h-4" />

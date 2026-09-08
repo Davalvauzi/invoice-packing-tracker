@@ -656,12 +656,10 @@ export default function PrintInvoice({ id, onBack }) {
 
         </div>
 
-        {/* Document Control Code at far bottom right */}
-        {settings?.doc_control_code && (
-          <div className="text-right text-[6.5pt] font-mono text-slate-400 mt-2">
-            {settings.doc_control_code}
-          </div>
-        )}
+        {/* Document Control Code at far bottom right (Coretan Kuning) */}
+        <div className="text-right text-[6.5pt] font-mono text-slate-700 mt-3">
+          {settings?.doc_control_code || 'FRM-ACC-01 Rev.02'}
+        </div>
 
       </div>
 

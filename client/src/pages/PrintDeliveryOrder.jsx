@@ -253,7 +253,7 @@ export default function PrintDeliveryOrder({ id, onBack }) {
                 ? 'bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border-emerald-300' 
                 : 'bg-amber-50 hover:bg-amber-100 text-amber-800 border-amber-300'
             }`}
-            title={showLetterhead ? 'Kop surat digital aktif. Klik untuk sembunyikan jika memakai kertas berkop cetak resmi.' : 'Kop surat digital nonaktif. Klik untuk memunculkan kop.'}
+            title={showLetterhead ? 'Kop surat digital aktif (logo & alamat tampil). Klik untuk beralih ke kertas pre-printed.' : 'Mode Pre-printed Paper aktif (kop surat kosong namun space tetap terjaga). Klik untuk menampilkan kop digital.'}
           >
             <input
               type="checkbox"
@@ -261,7 +261,7 @@ export default function PrintDeliveryOrder({ id, onBack }) {
               onChange={e => setShowLetterhead(e.target.checked)}
               className="rounded border-slate-400 text-emerald-800 focus:ring-emerald-700 w-3.5 h-3.5 cursor-pointer"
             />
-            <span>{showLetterhead ? 'Kop Surat Digital: ON' : 'Kertas Kop Resmi: ON'}</span>
+            <span>{showLetterhead ? 'Kop Surat Digital: ON' : 'Kop Surat: OFF (Pre-printed Paper)'}</span>
           </label>
 
           <button
@@ -281,12 +281,17 @@ export default function PrintDeliveryOrder({ id, onBack }) {
       </div>
 
       {/* A4 Paper Document Container */}
-      <div className={`print-page max-w-[210mm] mx-auto bg-white shadow-xl px-8 ${showLetterhead ? 'pt-5 pb-5' : 'pt-2 pb-5 print:pt-0'} print:p-0 print:shadow-none min-h-[297mm] text-black text-[7.5pt] leading-[1.2] font-['Calibri',sans-serif] flex flex-col`}>
+      <div className="print-page max-w-[210mm] mx-auto bg-white shadow-xl px-8 pt-5 pb-5 print:p-0 print:shadow-none min-h-[297mm] text-black text-[7.5pt] leading-[1.2] font-['Calibri',sans-serif] flex flex-col">
         
         <div>
-          {/* ================= 1. HEADER KOP RESMI (JIKA ON) ================= */}
-          {showLetterhead && (
-            <div className="flex items-start justify-between pb-1">
+          {/* ================= 1. HEADER KOP RESMI ================= */}
+          {/* JIKA OFF (PRE-PRINTED PAPER), KOP KOSONG TETAPI SPACE TETAP ADA */}
+          <div 
+            className={`flex items-start justify-between pb-1 ${
+              !showLetterhead ? 'invisible select-none pointer-events-none' : ''
+            }`}
+            aria-hidden={!showLetterhead}
+          >
               
               {/* Logo PATCO & Alamat */}
               <div className="flex items-start gap-3">
@@ -381,10 +386,9 @@ export default function PrintDeliveryOrder({ id, onBack }) {
                 )}
               </div>
             </div>
-          )}
 
           {/* ================= 2. TITLE: DELIVERY ORDER ================= */}
-          <div className={`text-center ${showLetterhead ? 'pt-3 pb-3' : 'pt-2 pb-3'}`}>
+          <div className="text-center pt-3 pb-3">
             <h1 className="text-[12pt] font-bold tracking-wider text-black uppercase leading-tight">
               DELIVERY ORDER
             </h1>

@@ -190,7 +190,7 @@ export default function PrintInvoice({ id, onBack }) {
                 ? 'bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border-emerald-300' 
                 : 'bg-amber-50 hover:bg-amber-100 text-amber-800 border-amber-300'
             }`}
-            title={showLetterhead ? 'Kop surat digital aktif. Klik untuk sembunyikan jika pakai kertas kop resmi.' : 'Kop surat digital nonaktif (kertas kop resmi). Klik untuk tampilkan kop.'}
+            title={showLetterhead ? 'Kop surat digital aktif (logo & alamat tampil). Klik untuk beralih ke kertas pre-printed.' : 'Mode Pre-printed Paper aktif (kop surat kosong namun space tetap terjaga). Klik untuk menampilkan kop digital.'}
           >
             <input
               type="checkbox"
@@ -198,7 +198,7 @@ export default function PrintInvoice({ id, onBack }) {
               onChange={e => setShowLetterhead(e.target.checked)}
               className="rounded border-slate-400 text-emerald-800 focus:ring-emerald-700 w-3.5 h-3.5 cursor-pointer"
             />
-            <span>{showLetterhead ? 'Kop Surat Digital: ON' : 'Kertas Kop Resmi: ON'}</span>
+            <span>{showLetterhead ? 'Kop Surat Digital: ON' : 'Kop Surat: OFF (Pre-printed Paper)'}</span>
           </label>
 
           <button
@@ -218,13 +218,18 @@ export default function PrintInvoice({ id, onBack }) {
       </div>
 
       {/* A4 Paper Document Container - Clean, compact, calibrated typography 1:1 */}
-      <div className={`print-page max-w-[210mm] mx-auto bg-white shadow-xl px-8 ${showLetterhead ? 'pt-5 pb-5' : 'pt-2 pb-5 print:pt-0'} print:p-0 print:shadow-none min-h-[297mm] text-black text-[7.5pt] leading-[1.2] font-['Calibri',sans-serif]`}>
+      <div className="print-page max-w-[210mm] mx-auto bg-white shadow-xl px-8 pt-5 pb-5 print:p-0 print:shadow-none min-h-[297mm] text-black text-[7.5pt] leading-[1.2] font-['Calibri',sans-serif]">
         
         {/* ========================================================= */}
         {/* 1. HEADER (KOP SURAT RESMI: LOGO BESAR, NAMA & ALAMAT BESAR) */}
+        {/* JIKA OFF (PRE-PRINTED PAPER), KOP KOSONG TETAPI SPACE TETAP ADA */}
         {/* ========================================================= */}
-        {showLetterhead && (
-          <div className="flex items-start justify-between pb-1">
+        <div 
+          className={`flex items-start justify-between pb-1 ${
+            !showLetterhead ? 'invisible select-none pointer-events-none' : ''
+          }`}
+          aria-hidden={!showLetterhead}
+        >
           
           {/* Logo PATCO & Info Perusahaan */}
           <div className="flex items-start gap-3">
@@ -326,12 +331,11 @@ export default function PrintInvoice({ id, onBack }) {
           </div>
 
         </div>
-        )}
 
         {/* ========================================================= */}
         {/* 2. TITLE: INVOICE (Centered cleanly above metadata)        */}
         {/* ========================================================= */}
-        <div className={`text-center ${showLetterhead ? 'pt-2 pb-2' : 'pt-0 pb-2'}`}>
+        <div className="text-center pt-2 pb-2">
           <h1 className="text-[12pt] font-bold tracking-wider text-black uppercase leading-tight">
             INVOICE
           </h1>

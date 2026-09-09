@@ -95,10 +95,24 @@ if (DB_TYPE === 'postgres') {
 
   console.log(`📡 Database Connected: PostgreSQL (database: ${process.env.PG_DATABASE || 'invoice_track'})`);
 
+  // Auto-ensure incremental schema columns
+  pool.query('ALTER TABLE parts ADD COLUMN IF NOT EXISTS box_per_pallet INTEGER DEFAULT 0')
+    .catch(() => { /* table might not exist yet */ });
+
 } else {
   // SQLite fallback
   const { DatabaseSync } = require('node:sqlite');
   const sqliteDb = new DatabaseSync(path.join(__dirname, 'data.sqlite'));
+
+  try {
+    const cols = sqliteDb.prepare("PRAGMA table_info(parts)").all();
+    if (cols && cols.length > 0 && !cols.some(c => c.name === 'box_per_pallet')) {
+      sqliteDb.exec("ALTER TABLE parts ADD COLUMN box_per_pallet INTEGER DEFAULT 0");
+      console.log('✅ Added box_per_pallet column to parts table (SQLite)');
+    }
+  } catch (e) {
+    // ignore if table doesn't exist yet
+  }
 
   dbInstance = {
     isPostgres: false,

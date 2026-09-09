@@ -24,9 +24,29 @@ function AppContent() {
 
   // Modal Overlay States
   const [isInvoiceModalOpen, setIsInvoiceModalOpen] = useState(false);
+  const [editingInvoice, setEditingInvoice] = useState(null);
   const [isPackingListModalOpen, setIsPackingListModalOpen] = useState(false);
+  const [packingListInvoice, setPackingListInvoice] = useState(null);
   const [isDeliveryOrderModalOpen, setIsDeliveryOrderModalOpen] = useState(false);
+  const [deliveryOrderInvoice, setDeliveryOrderInvoice] = useState(null);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
+
+  const handleEditInvoice = (inv) => {
+    setEditingInvoice(inv);
+    setIsInvoiceModalOpen(true);
+  };
+
+  const handleOpenPackingListModal = (inv = null) => {
+    const validInv = (inv && !inv.nativeEvent && (inv.invoice_number || inv.doc_number)) ? inv : null;
+    setPackingListInvoice(validInv);
+    setIsPackingListModalOpen(true);
+  };
+
+  const handleOpenDeliveryOrderModal = (inv = null) => {
+    const validInv = (inv && !inv.nativeEvent && (inv.invoice_number || inv.doc_number)) ? inv : null;
+    setDeliveryOrderInvoice(validInv);
+    setIsDeliveryOrderModalOpen(true);
+  };
 
   // Check URL parameters on mount (enables opening in a fresh new tab!)
   useEffect(() => {
@@ -96,9 +116,12 @@ function AppContent() {
       <Navbar 
         activeView={activeView} 
         setActiveView={setActiveView} 
-        onOpenInvoiceModal={() => setIsInvoiceModalOpen(true)}
-        onOpenPackingListModal={() => setIsPackingListModalOpen(true)}
-        onOpenDeliveryOrderModal={() => setIsDeliveryOrderModalOpen(true)}
+        onOpenInvoiceModal={() => {
+          setEditingInvoice(null);
+          setIsInvoiceModalOpen(true);
+        }}
+        onOpenPackingListModal={handleOpenPackingListModal}
+        onOpenDeliveryOrderModal={handleOpenDeliveryOrderModal}
       />
 
       {/* Main Content Area */}
@@ -107,9 +130,13 @@ function AppContent() {
           <Dashboard 
             setActiveView={setActiveView} 
             openPrintTab={openPrintTab}
-            onOpenInvoiceModal={() => setIsInvoiceModalOpen(true)}
-            onOpenPackingListModal={() => setIsPackingListModalOpen(true)}
-            onOpenDeliveryOrderModal={() => setIsDeliveryOrderModalOpen(true)}
+            onOpenInvoiceModal={() => {
+              setEditingInvoice(null);
+              setIsInvoiceModalOpen(true);
+            }}
+            onEditInvoice={handleEditInvoice}
+            onOpenPackingListModal={handleOpenPackingListModal}
+            onOpenDeliveryOrderModal={handleOpenDeliveryOrderModal}
             refreshTrigger={refreshTrigger}
           />
         )}
@@ -117,9 +144,13 @@ function AppContent() {
         {activeView === 'data-logger' && (
           <DataLogger 
             openPrintTab={openPrintTab} 
-            onOpenInvoiceModal={() => setIsInvoiceModalOpen(true)}
-            onOpenPackingListModal={() => setIsPackingListModalOpen(true)}
-            onOpenDeliveryOrderModal={() => setIsDeliveryOrderModalOpen(true)}
+            onOpenInvoiceModal={() => {
+              setEditingInvoice(null);
+              setIsInvoiceModalOpen(true);
+            }}
+            onEditInvoice={handleEditInvoice}
+            onOpenPackingListModal={handleOpenPackingListModal}
+            onOpenDeliveryOrderModal={handleOpenDeliveryOrderModal}
             refreshTrigger={refreshTrigger}
           />
         )}
@@ -140,24 +171,36 @@ function AppContent() {
       {/* Global Invoice Form Modal */}
       <InvoiceModal
         isOpen={isInvoiceModalOpen}
-        onClose={() => setIsInvoiceModalOpen(false)}
+        onClose={() => {
+          setIsInvoiceModalOpen(false);
+          setEditingInvoice(null);
+        }}
         openPrintTab={openPrintTab}
         onSuccess={handleDocumentSuccess}
+        invoiceToEdit={editingInvoice}
       />
 
       {/* Global Packing List Form Modal */}
       <PackingListModal
         isOpen={isPackingListModalOpen}
-        onClose={() => setIsPackingListModalOpen(false)}
+        onClose={() => {
+          setIsPackingListModalOpen(false);
+          setPackingListInvoice(null);
+        }}
         openPrintTab={openPrintTab}
         onSuccess={handleDocumentSuccess}
+        initialInvoice={packingListInvoice}
       />
 
       {/* Global Delivery Order Form Modal */}
       <DeliveryOrderModal
         isOpen={isDeliveryOrderModalOpen}
-        onClose={() => setIsDeliveryOrderModalOpen(false)}
+        onClose={() => {
+          setIsDeliveryOrderModalOpen(false);
+          setDeliveryOrderInvoice(null);
+        }}
         onSuccess={handleDocumentSuccess}
+        initialInvoice={deliveryOrderInvoice}
       />
 
       {/* Corporate Footer */}

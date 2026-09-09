@@ -58,6 +58,7 @@ export default function MasterData({ setActiveView }) {
     part_name: '',
     part_no: '',
     qty_per_box: '',
+    box_per_pallet: '',
     price: '',
     length: '',
     width: '',
@@ -268,6 +269,7 @@ export default function MasterData({ setActiveView }) {
       part_name: '',
       part_no: '',
       qty_per_box: '',
+      box_per_pallet: '',
       price: '',
       length: '',
       width: '',
@@ -393,6 +395,7 @@ export default function MasterData({ setActiveView }) {
       part_name: pt.part_name || '',
       part_no: pt.part_no || '',
       qty_per_box: pt.qty_per_box ?? '',
+      box_per_pallet: pt.box_per_pallet ?? '',
       price: pt.price ?? '',
       length: pt.length ?? '',
       width: pt.width ?? '',
@@ -715,8 +718,8 @@ export default function MasterData({ setActiveView }) {
                 </div>
               </div>
 
-              {/* Qty Per Box & Price */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 bg-emerald-100/40 p-3.5 rounded-xl border border-emerald-200">
+              {/* Qty Per Box, Box Per Pallet & Price */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 bg-emerald-100/40 p-3.5 rounded-xl border border-emerald-200">
                 <div>
                   <label className="block text-[11px] font-bold text-emerald-950 mb-1">
                     Qty Per Box (Pcs / Unit dalam 1 Box)
@@ -731,6 +734,23 @@ export default function MasterData({ setActiveView }) {
                   />
                   <p className="text-[10px] text-emerald-800 mt-1">
                     *Otomatis mengisi perhitungan Total Qty saat memilih part ini di Invoice.
+                  </p>
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-bold text-emerald-950 mb-1">
+                    Box Per Pallet (Kapasitas Box / Pallet)
+                  </label>
+                  <input
+                    type="number"
+                    min="1"
+                    placeholder="Contoh: 24"
+                    value={partForm.box_per_pallet}
+                    onChange={(e) => setPartForm({ ...partForm, box_per_pallet: e.target.value })}
+                    className="w-full px-3 py-2 text-xs rounded-lg border border-emerald-300 bg-white font-mono font-bold text-slate-900"
+                  />
+                  <p className="text-[10px] text-emerald-800 mt-1">
+                    *Otomatis menghitung Box & Total Qty saat input Pallet di Invoice/PL/DO.
                   </p>
                 </div>
 
@@ -944,6 +964,7 @@ export default function MasterData({ setActiveView }) {
                 <th className="px-5 py-3">Part Name</th>
                 <th className="px-5 py-3">Part Number</th>
                 <th className="px-5 py-3 text-center">Qty / Box</th>
+                <th className="px-5 py-3 text-center">Box / Pallet</th>
                 <th className="px-5 py-3 text-right">Harga Satuan & Riwayat</th>
                 <th className="px-5 py-3">Dimensi Default (L x W x H)</th>
                 <th className="px-5 py-3 text-right">Aksi</th>
@@ -952,7 +973,7 @@ export default function MasterData({ setActiveView }) {
             <tbody className="divide-y divide-slate-100">
               {parts.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="px-5 py-8 text-center text-slate-400">
+                  <td colSpan={7} className="px-5 py-8 text-center text-slate-400">
                     Belum ada katalog produk / part. Silakan klik tombol "Tambah Baru".
                   </td>
                 </tr>
@@ -963,6 +984,9 @@ export default function MasterData({ setActiveView }) {
                     <td className="px-5 py-3.5 font-mono font-bold text-emerald-800">{pt.part_no}</td>
                     <td className="px-5 py-3.5 text-center font-mono font-bold">
                       {pt.qty_per_box ? `${pt.qty_per_box} pcs` : '-'}
+                    </td>
+                    <td className="px-5 py-3.5 text-center font-mono font-bold text-emerald-800">
+                      {pt.box_per_pallet ? `${pt.box_per_pallet} box` : '-'}
                     </td>
                     <td className="px-5 py-3.5 text-right font-mono">
                       <div className="flex items-center justify-end gap-2">

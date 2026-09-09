@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { useNotification } from '../context/NotificationContext';
+import SearchableInvoiceSelect from '../components/SearchableInvoiceSelect';
 
 export default function PackingListForm({ setActiveView, openPrintTab }) {
   const { showSuccess, showError, showWarning } = useNotification();
@@ -96,20 +97,45 @@ export default function PackingListForm({ setActiveView, openPrintTab }) {
 
   // Copy data from an existing invoice for efficiency
   const copyFromInvoice = (inv) => {
+    if (!inv) return;
+
+    let palletCount = inv.no_of_pallet ?? inv.pallet_qty ?? '';
+    let boxCount = inv.no_of_box ?? inv.box_qty ?? '';
+    if ((!palletCount || Number(palletCount) === 0) && inv.items) {
+      try {
+        const parsed = Array.isArray(inv.items) ? inv.items : JSON.parse(inv.items);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          const sumP = parsed.reduce((s, it) => s + (Number(it.no_of_pallet || it.pallet_qty) || 0), 0);
+          if (sumP > 0) palletCount = sumP;
+          const sumB = parsed.reduce((s, it) => s + (Number(it.no_of_box || it.box_qty) || 0), 0);
+          if (sumB > 0) boxCount = sumB;
+        }
+      } catch (e) {}
+    }
+
     setFormData(prev => ({
       ...prev,
-      invoice_number: inv.invoice_number,
-      invoice_date: inv.invoice_date,
-      customer_name: inv.customer_name,
+      invoice_number: inv.invoice_number || '',
+      invoice_date: inv.invoice_date || '',
+      customer_name: inv.customer_name || '',
       customer_po_no: inv.customer_po_no || '',
       part_name: inv.part_name || '',
       terms_of_delivery: inv.terms_of_delivery || '',
-      box_qty: inv.no_of_box || '',
-      pallet_qty: inv.no_of_pallet || '',
+      box_qty: boxCount ? String(boxCount) : '',
+      pallet_qty: palletCount ? String(palletCount) : '',
       image_url: inv.image_url || ''
     }));
     if (inv.image_url) {
       setPreviewUrl(inv.image_url);
+    }
+  };
+
+  const handleInvoiceNumberChange = (val) => {
+    setFormData(prev => ({ ...prev, invoice_number: val }));
+    if (!val || !val.trim()) return;
+    const match = recentInvoices.find(i => (i.invoice_number || '').trim().toLowerCase() === val.trim().toLowerCase());
+    if (match) {
+      copyFromInvoice(match);
     }
   };
 
@@ -270,26 +296,17 @@ export default function PackingListForm({ setActiveView, openPrintTab }) {
 
       {/* Quick Fill helper from Invoice */}
       {recentInvoices.length > 0 && !submittedDoc && (
-        <div className="mb-6 p-4 bg-slate-50 border border-slate-200 rounded-xl flex items-center justify-between gap-4">
-          <div className="flex items-center gap-2 text-xs text-slate-600">
-            <Copy className="w-4 h-4 text-teal-700" />
-            <span>Tarik data otomatis dari Invoice yang sudah dibuat:</span>
+        <div className="mb-6 p-4 bg-teal-50/60 border border-teal-200 rounded-2xl">
+          <div className="flex items-center gap-2 text-xs font-semibold text-teal-900 mb-2.5">
+            <Copy className="w-4 h-4 text-teal-700 shrink-0" />
+            <span>Tarik data otomatis dari Invoice yang terdaftar:</span>
           </div>
-          <select 
-            onChange={(e) => {
-              const inv = recentInvoices.find(i => String(i.id) === e.target.value);
-              if (inv) copyFromInvoice(inv);
-            }}
-            defaultValue=""
-            className="text-xs font-mono py-1.5 px-3 rounded-lg border border-slate-300 bg-white cursor-pointer"
-          >
-            <option value="" disabled>-- Pilih Invoice Terakhir --</option>
-            {recentInvoices.slice(0, 5).map(inv => (
-              <option key={inv.id} value={inv.id}>
-                {inv.invoice_number} - {inv.customer_name}
-              </option>
-            ))}
-          </select>
+          <SearchableInvoiceSelect
+            invoices={recentInvoices}
+            selectedInvoiceNumber={formData.invoice_number}
+            onSelect={(inv) => copyFromInvoice(inv)}
+            placeholder="Ketik No Invoice, Customer, PO, atau Part..."
+          />
         </div>
       )}
 
@@ -325,7 +342,7 @@ export default function PackingListForm({ setActiveView, openPrintTab }) {
                 required
                 placeholder="Contoh: INV/2026/09/001"
                 value={formData.invoice_number}
-                onChange={(e) => setFormData({ ...formData, invoice_number: e.target.value })}
+                onChange={(e) => handleInvoiceNumberChange(e.target.value)}
                 className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 focus:border-teal-600 focus:ring-2 focus:ring-teal-600/20 font-mono text-sm transition-all"
               />
             </div>

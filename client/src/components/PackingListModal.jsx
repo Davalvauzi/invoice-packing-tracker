@@ -15,15 +15,17 @@ import {
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { useNotification } from '../context/NotificationContext';
+import SearchableInvoiceSelect from './SearchableInvoiceSelect';
 
 const createEmptyPLItem = () => ({
   id: Date.now() + Math.random(),
   part_name: '',
   part_no: '',
   customer_po_no: '',
-  box_qty: '',
   pallet_qty: '',
+  box_qty: '',
   qty_per_box: '',
+  box_per_pallet: '',
   total_qty: '',
   net_weight: '',
   gross_weight: '',
@@ -33,7 +35,7 @@ const createEmptyPLItem = () => ({
   unit_note: 'mm'
 });
 
-export default function PackingListModal({ isOpen, onClose, openPrintTab, onSuccess }) {
+export default function PackingListModal({ isOpen, onClose, openPrintTab, onSuccess, initialInvoice = null }) {
   const { showSuccess, showError, showWarning } = useNotification();
   const [customers, setCustomers] = useState([]);
   const [deliveryTerms, setDeliveryTerms] = useState([]);
@@ -90,6 +92,15 @@ export default function PackingListModal({ isOpen, onClose, openPrintTab, onSucc
     }
   }, [isOpen]);
 
+  useEffect(() => {
+    if (isOpen && initialInvoice) {
+      const invNum = initialInvoice.invoice_number || initialInvoice.doc_number;
+      if (invNum) {
+        copyFromInvoice(initialInvoice);
+      }
+    }
+  }, [isOpen, initialInvoice]);
+
   // Synchronize aggregate totals from items into formData
   useEffect(() => {
     const totalB = items.reduce((acc, it) => acc + (Number(it.box_qty) || 0), 0);
@@ -100,8 +111,8 @@ export default function PackingListModal({ isOpen, onClose, openPrintTab, onSucc
     
     setFormData(prev => ({
       ...prev,
-      box_qty: totalB > 0 ? String(totalB) : '',
-      pallet_qty: totalP > 0 ? String(totalP) : '',
+      box_qty: totalB > 0 ? String(totalB) : prev.box_qty,
+      pallet_qty: totalP > 0 ? String(totalP) : prev.pallet_qty,
       length: firstItem.length || prev.length || '',
       width: firstItem.width || prev.width || '',
       height: firstItem.height || prev.height || '',
@@ -145,17 +156,30 @@ export default function PackingListModal({ isOpen, onClose, openPrintTab, onSucc
     setItems(prev => {
       const updated = [...prev];
       const row = { ...updated[index], [field]: value };
-      if (field === 'box_qty' || field === 'qty_per_box') {
+
+      const pallet = Number(field === 'pallet_qty' ? value : row.pallet_qty) || 0;
+      const boxPerPallet = Number(row.box_per_pallet) || 0;
+
+      // Auto-calculate box_qty from pallet_qty if box_per_pallet is present
+      if (field === 'pallet_qty') {
+        if (pallet > 0 && boxPerPallet > 0) {
+          row.box_qty = String(Math.round(pallet * boxPerPallet));
+        } else if (!value && boxPerPallet > 0) {
+          row.box_qty = '';
+        }
+      }
+
+      if (field === 'pallet_qty' || field === 'box_qty' || field === 'qty_per_box') {
         const b = Number(field === 'box_qty' ? value : row.box_qty) || 0;
         const q = Number(field === 'qty_per_box' ? value : row.qty_per_box) || 0;
         if (b > 0 && q > 0) {
           const tot = b * q;
           row.total_qty = String(tot);
-          if (!row.net_weight || field === 'box_qty' || field === 'qty_per_box') {
+          if (!row.net_weight || field === 'pallet_qty' || field === 'box_qty' || field === 'qty_per_box') {
             row.net_weight = String((tot * 0.55).toFixed(2));
             row.gross_weight = String((tot * 0.55 * 1.34).toFixed(2));
           }
-        } else if (field === 'box_qty' && !value) {
+        } else if ((field === 'box_qty' || field === 'pallet_qty') && !row.box_qty) {
           row.total_qty = '';
         }
       }
@@ -181,15 +205,22 @@ export default function PackingListModal({ isOpen, onClose, openPrintTab, onSucc
         row.width = found.width ? String(found.width) : (row.width || '');
         row.height = found.height ? String(found.height) : (row.height || '');
         row.unit_note = found.unit || row.unit_note || 'mm';
-        if (found.qty_per_box) {
-          row.qty_per_box = String(found.qty_per_box);
-          const b = Number(row.box_qty) || 0;
-          if (b > 0) {
-            const tot = b * Number(found.qty_per_box);
-            row.total_qty = String(tot);
-            row.net_weight = String((tot * 0.55).toFixed(2));
-            row.gross_weight = String((tot * 0.55 * 1.34).toFixed(2));
-          }
+        if (found.box_per_pallet) row.box_per_pallet = String(found.box_per_pallet);
+        if (found.qty_per_box) row.qty_per_box = String(found.qty_per_box);
+
+        const p = Number(row.pallet_qty) || 0;
+        const bp = Number(found.box_per_pallet) || 0;
+        if (p > 0 && bp > 0) {
+          row.box_qty = String(Math.round(p * bp));
+        }
+
+        const b = Number(row.box_qty) || 0;
+        const q = Number(row.qty_per_box) || 0;
+        if (b > 0 && q > 0) {
+          const tot = b * q;
+          row.total_qty = String(tot);
+          row.net_weight = String((tot * 0.55).toFixed(2));
+          row.gross_weight = String((tot * 0.55 * 1.34).toFixed(2));
         }
       } else {
         row.part_name = selectedVal;
@@ -214,8 +245,21 @@ export default function PackingListModal({ isOpen, onClose, openPrintTab, onSucc
     setItems(prev => prev.filter((_, idx) => idx !== index));
   };
 
+  const handleInvoiceNumberChange = (val) => {
+    setFormData(prev => ({ ...prev, invoice_number: val }));
+    if (!val || !val.trim()) return;
+    const match = recentInvoices.find(i => (i.invoice_number || '').trim().toLowerCase() === val.trim().toLowerCase());
+    if (match) {
+      copyFromInvoice(match);
+    }
+  };
+
   // Quick Copy & Auto-Extract from Invoice
   const copyFromInvoice = (inv) => {
+    if (!inv) return;
+    const invNum = (inv.invoice_number || inv.doc_number || '').trim();
+    if (!invNum) return;
+
     let parsedItems = null;
     if (Array.isArray(inv.items) && inv.items.length > 0) {
       parsedItems = inv.items;
@@ -227,21 +271,46 @@ export default function PackingListModal({ isOpen, onClose, openPrintTab, onSucc
       }
     }
 
-    if (parsedItems && parsedItems.length > 0) {
-      const mapped = parsedItems.map(it => {
+    let invPallet = inv.no_of_pallet ?? inv.pallet_qty ?? '';
+    let invBox = inv.no_of_box ?? inv.box_qty ?? '';
+
+    if (Array.isArray(parsedItems) && parsedItems.length > 0) {
+      const sumPallet = parsedItems.reduce((acc, it) => acc + (Number(it.no_of_pallet || it.pallet_qty) || 0), 0);
+      const sumBox = parsedItems.reduce((acc, it) => acc + (Number(it.no_of_box || it.box_qty) || 0), 0);
+      if (sumPallet > 0 && (!invPallet || Number(invPallet) === 0)) {
+        invPallet = sumPallet;
+      }
+      if (sumBox > 0 && (!invBox || Number(invBox) === 0)) {
+        invBox = sumBox;
+      }
+
+      const mapped = parsedItems.map((it, idx) => {
         // Find dimensions from parts catalog
         const matchPart = parts.find(p => 
           (p.part_no && it.part_no && p.part_no.toLowerCase() === it.part_no.toLowerCase()) ||
           (p.part_name && it.part_name && p.part_name.toLowerCase() === it.part_name.toLowerCase())
         );
+        const b = Number(it.no_of_box || it.box_qty) || 0;
+        const q = Number(it.qty_per_box || matchPart?.qty_per_box) || 0;
+        const tot = Number(it.total_qty) || (b > 0 && q > 0 ? b * q : 0);
+
+        let itPallet = it.no_of_pallet || it.pallet_qty;
+        if ((itPallet === undefined || itPallet === null || itPallet === '' || Number(itPallet) === 0) && parsedItems.length === 1 && invPallet) {
+          itPallet = invPallet;
+        }
 
         return {
-          id: it.id || (Date.now() + Math.random()),
+          id: it.id || (Date.now() + Math.random() + idx),
           part_name: it.part_name || '',
-          part_no: it.part_no || '',
+          part_no: it.part_no || matchPart?.part_no || '',
           customer_po_no: it.customer_po_no || inv.customer_po_no || '',
-          box_qty: String(it.no_of_box || it.box_qty || ''),
-          pallet_qty: String(it.no_of_pallet || it.pallet_qty || ''),
+          pallet_qty: itPallet !== undefined && itPallet !== null && String(itPallet) !== '0' ? String(itPallet) : (invPallet && parsedItems.length === 1 ? String(invPallet) : ''),
+          box_qty: String(it.no_of_box || it.box_qty || (invBox && parsedItems.length === 1 ? invBox : '')),
+          qty_per_box: q ? String(q) : '',
+          box_per_pallet: matchPart?.box_per_pallet ? String(matchPart.box_per_pallet) : (it.box_per_pallet ? String(it.box_per_pallet) : ''),
+          total_qty: tot ? String(tot) : '',
+          net_weight: it.net_weight ? String(it.net_weight) : (tot > 0 ? String((tot * 0.55).toFixed(2)) : ''),
+          gross_weight: it.gross_weight ? String(it.gross_weight) : (tot > 0 ? String((tot * 0.55 * 1.34).toFixed(2)) : ''),
           length: matchPart?.length ? String(matchPart.length) : '',
           width: matchPart?.width ? String(matchPart.width) : '',
           height: matchPart?.height ? String(matchPart.height) : '',
@@ -249,17 +318,27 @@ export default function PackingListModal({ isOpen, onClose, openPrintTab, onSucc
         };
       });
       setItems(mapped);
-    } else if (inv.part_name) {
+    } else {
       const matchPart = parts.find(p => 
-        (p.part_name && inv.part_name && p.part_name.toLowerCase() === inv.part_name.toLowerCase())
+        (p.part_name && inv.part_name && p.part_name.toLowerCase() === inv.part_name.toLowerCase()) ||
+        (p.part_no && inv.part_no && p.part_no.toLowerCase() === inv.part_no.toLowerCase())
       );
+      const b = Number(inv.no_of_box || inv.box_qty) || 0;
+      const q = Number(inv.qty_per_box || matchPart?.qty_per_box) || 0;
+      const tot = Number(inv.total_qty) || (b > 0 && q > 0 ? b * q : 0);
+
       setItems([{
         id: Date.now() + Math.random(),
-        part_name: inv.part_name,
+        part_name: inv.part_name || '',
         part_no: matchPart?.part_no || '',
         customer_po_no: inv.customer_po_no || '',
-        box_qty: String(inv.no_of_box || inv.box_qty || ''),
-        pallet_qty: String(inv.no_of_pallet || inv.pallet_qty || ''),
+        pallet_qty: invPallet ? String(invPallet) : '',
+        box_qty: invBox ? String(invBox) : '',
+        qty_per_box: q ? String(q) : '',
+        box_per_pallet: matchPart?.box_per_pallet ? String(matchPart.box_per_pallet) : '',
+        total_qty: tot ? String(tot) : (inv.total_qty ? String(inv.total_qty) : ''),
+        net_weight: tot > 0 ? String((tot * 0.55).toFixed(2)) : '',
+        gross_weight: tot > 0 ? String((tot * 0.55 * 1.34).toFixed(2)) : '',
         length: matchPart?.length ? String(matchPart.length) : '',
         width: matchPart?.width ? String(matchPart.width) : '',
         height: matchPart?.height ? String(matchPart.height) : '',
@@ -269,14 +348,16 @@ export default function PackingListModal({ isOpen, onClose, openPrintTab, onSucc
 
     setFormData(prev => ({
       ...prev,
-      invoice_number: inv.invoice_number,
-      invoice_date: inv.invoice_date,
-      customer_name: inv.customer_name,
+      invoice_number: inv.invoice_number || '',
+      invoice_date: inv.invoice_date || new Date().toISOString().slice(0, 10),
+      customer_name: inv.customer_name || prev.customer_name || '',
       customer_po_no: inv.customer_po_no || '',
-      terms_of_delivery: inv.terms_of_delivery || prev.terms_of_delivery || ''
+      terms_of_delivery: inv.terms_of_delivery || prev.terms_of_delivery || '',
+      pallet_qty: invPallet ? String(invPallet) : '',
+      box_qty: invBox ? String(invBox) : ''
     }));
 
-    showSuccess(`Data ${parsedItems?.length ? `${parsedItems.length} produk` : ''} berhasil ditarik dari Invoice ${inv.invoice_number}!`);
+    showSuccess(`Data ${parsedItems?.length ? `${parsedItems.length} produk` : ''} berhasil ditarik dari Invoice ${invNum}! (Pallet: ${invPallet || 0})`);
   };
 
   const handleSubmit = async (e) => {
@@ -363,16 +444,15 @@ export default function PackingListModal({ isOpen, onClose, openPrintTab, onSucc
   const grandTotalQty = items.reduce((s, it) => s + (Number(it.total_qty) || 0), 0);
   const totalNetWeight = items.reduce((s, it) => s + (Number(it.net_weight) || 0), 0);
   const totalGrossWeight = items.reduce((s, it) => s + (Number(it.gross_weight) || 0), 0);
+  // Rumus CBM: (L * W * H / 1.000.000) * pallet_qty
   const totalCbm = items.reduce((acc, it) => {
     const l = Number(it.length) || 0;
     const w = Number(it.width) || 0;
     const h = Number(it.height) || 0;
-    const b = Number(it.box_qty) || 1;
-    let vol = 0;
-    if (it.unit_note === 'cm') vol = (l * w * h) / 1_000_000;
-    else if (it.unit_note === 'inch') vol = (l * w * h * 0.000016387);
-    else vol = (l * w * h) / 1_000_000_000; // default mm
-    return acc + (vol * b);
+    const p = Number(it.pallet_qty) || Number(formData.pallet_qty) || 1;
+    if (!l || !w || !h) return acc;
+    const vol = ((l * w * h) / 1_000_000) * p;
+    return acc + vol;
   }, 0);
 
   return (
@@ -439,26 +519,17 @@ export default function PackingListModal({ isOpen, onClose, openPrintTab, onSucc
 
           {/* Quick Copy from Recent Invoice */}
           {recentInvoices.length > 0 && !submittedDoc && (
-            <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl flex items-center justify-between gap-3 text-xs">
-              <div className="flex items-center gap-1.5 text-slate-600 font-medium truncate">
+            <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+              <div className="flex items-center gap-1.5 text-slate-700 font-medium">
                 <Copy className="w-3.5 h-3.5 text-teal-700 shrink-0" />
-                <span className="truncate">Tarik data otomatis dari Invoice yang terdaftar:</span>
+                <span>Tarik data otomatis dari Invoice yang terdaftar:</span>
               </div>
-              <select 
-                onChange={(e) => {
-                  const inv = recentInvoices.find(i => String(i.id) === e.target.value);
-                  if (inv) copyFromInvoice(inv);
-                }}
-                defaultValue=""
-                className="text-xs font-mono py-1 px-2.5 rounded-lg border border-slate-300 bg-white cursor-pointer max-w-[240px]"
-              >
-                <option value="" disabled>-- Pilih Invoice --</option>
-                {recentInvoices.slice(0, 10).map(inv => (
-                  <option key={inv.id} value={inv.id}>
-                    {inv.invoice_number} - {inv.customer_name}
-                  </option>
-                ))}
-              </select>
+              <SearchableInvoiceSelect
+                invoices={recentInvoices}
+                selectedInvoiceNumber={formData.invoice_number}
+                onSelect={(inv) => copyFromInvoice(inv)}
+                placeholder="-- Cari / Pilih Invoice --"
+              />
             </div>
           )}
 
@@ -476,7 +547,7 @@ export default function PackingListModal({ isOpen, onClose, openPrintTab, onSucc
                     required
                     placeholder="Contoh: INV/2026/09/001"
                     value={formData.invoice_number}
-                    onChange={(e) => setFormData({ ...formData, invoice_number: e.target.value })}
+                    onChange={(e) => handleInvoiceNumberChange(e.target.value)}
                     className="w-full px-3 py-2 rounded-xl border border-slate-300 focus:border-teal-600 font-mono text-xs font-bold text-slate-900 bg-white"
                   />
                 </div>
@@ -531,6 +602,59 @@ export default function PackingListModal({ isOpen, onClose, openPrintTab, onSucc
                   </select>
                 </div>
               </div>
+
+              {/* Row 3: Pallet Qty & Box Qty (Sinkronisasi Otomatis dari Dokumen Invoice) */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2.5 border-t border-slate-200">
+                <div>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="block text-[11px] font-bold text-teal-950 uppercase">
+                      PALLET QTY (Jumlah Pallet)
+                    </label>
+                    <span className="text-[10px] text-teal-800 font-bold bg-teal-100 px-2 py-0.5 rounded-md border border-teal-200">
+                      Dari Form Invoice
+                    </span>
+                  </div>
+                  <input
+                    type="number"
+                    min="0"
+                    placeholder="0"
+                    value={formData.pallet_qty}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setFormData(prev => ({ ...prev, pallet_qty: val }));
+                      if (items.length === 1) {
+                        handleItemChange(0, 'pallet_qty', val);
+                      }
+                    }}
+                    className="w-full px-3 py-2 rounded-xl border border-teal-400 focus:border-teal-600 font-mono text-xs font-bold text-teal-950 bg-teal-50/50"
+                  />
+                </div>
+
+                <div>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="block text-[11px] font-bold text-slate-700 uppercase">
+                      BOX QTY (Jumlah Box)
+                    </label>
+                    <span className="text-[10px] text-slate-600 font-semibold bg-slate-200/70 px-2 py-0.5 rounded-md">
+                      Dari Form Invoice
+                    </span>
+                  </div>
+                  <input
+                    type="number"
+                    min="0"
+                    placeholder="0"
+                    value={formData.box_qty}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setFormData(prev => ({ ...prev, box_qty: val }));
+                      if (items.length === 1) {
+                        handleItemChange(0, 'box_qty', val);
+                      }
+                    }}
+                    className="w-full px-3 py-2 rounded-xl border border-slate-300 focus:border-teal-600 font-mono text-xs font-bold text-slate-900 bg-white"
+                  />
+                </div>
+              </div>
             </div>
 
             {/* Section 2: Data Produk Multi-Item & Spesifikasi Kemasan (Opsi A) */}
@@ -554,7 +678,7 @@ export default function PackingListModal({ isOpen, onClose, openPrintTab, onSucc
               <datalist id="parts-list-pl-modal">
                 {parts.map(p => (
                   <option key={p.id} value={`${p.part_name} (${p.part_no})`}>
-                    {p.part_name} - {p.part_no} | {p.length}x{p.width}x{p.height} {p.unit || 'mm'}
+                    {p.part_name} - {p.part_no} | {p.qty_per_box ? `${p.qty_per_box} pcs/box` : ''} | {p.box_per_pallet ? `${p.box_per_pallet} box/plt` : ''} | {p.length}x{p.width}x{p.height} {p.unit || 'mm'}
                   </option>
                 ))}
               </datalist>
@@ -565,12 +689,10 @@ export default function PackingListModal({ isOpen, onClose, openPrintTab, onSucc
                   const itemL = Number(item.length) || 0;
                   const itemW = Number(item.width) || 0;
                   const itemH = Number(item.height) || 0;
-                  const itemB = Number(item.box_qty) || 1;
-                  let itemVol = 0;
-                  if (item.unit_note === 'cm') itemVol = (itemL * itemW * itemH) / 1_000_000;
-                  else if (item.unit_note === 'inch') itemVol = (itemL * itemW * itemH * 0.000016387);
-                  else itemVol = (itemL * itemW * itemH) / 1_000_000_000;
-                  const estCbm = itemVol * itemB;
+                  const itemP = Number(item.pallet_qty) || Number(formData.pallet_qty) || 1;
+                  const estCbm = (itemL > 0 && itemW > 0 && itemH > 0) 
+                    ? ((itemL * itemW * itemH) / 1_000_000) * itemP 
+                    : 0;
 
                   return (
                     <div 
@@ -670,16 +792,23 @@ export default function PackingListModal({ isOpen, onClose, openPrintTab, onSucc
                         </div>
 
                         <div>
-                          <label className="block text-[9px] font-bold text-slate-600 uppercase mb-0.5">
-                            PALLET QTY
-                          </label>
+                          <div className="flex items-center justify-between mb-0.5">
+                            <label className="block text-[9px] font-bold text-slate-600 uppercase">
+                              PALLET QTY
+                            </label>
+                            {Number(item.box_per_pallet) > 0 && (
+                              <span className="text-[8px] font-semibold text-teal-700 font-mono" title={`Kapasitas: ${item.box_per_pallet} box / pallet`}>
+                                @{item.box_per_pallet}b
+                              </span>
+                            )}
+                          </div>
                           <input
                             type="number"
                             min="0"
                             placeholder="0"
                             value={item.pallet_qty}
                             onChange={(e) => handleItemChange(index, 'pallet_qty', e.target.value)}
-                            className="w-full px-2 py-1.5 rounded-lg border border-teal-300 bg-white font-mono text-xs font-bold text-slate-800 text-center"
+                            className="w-full px-2 py-1.5 rounded-lg border border-teal-300 bg-white font-mono text-xs font-bold text-slate-800 text-center focus:border-teal-600"
                           />
                         </div>
 

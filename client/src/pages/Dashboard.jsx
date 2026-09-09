@@ -7,6 +7,7 @@ import {
   Settings, 
   ArrowRight, 
   Printer, 
+  Edit3,
   Clock, 
   CheckCircle2,
   Layers,
@@ -14,13 +15,16 @@ import {
   ChevronDown,
   ListTree,
   List,
-  CornerDownRight
+  CornerDownRight,
+  Eye,
+  X
 } from 'lucide-react';
 
 export default function Dashboard({ 
   setActiveView, 
   openPrintTab, 
   onOpenInvoiceModal, 
+  onEditInvoice,
   onOpenPackingListModal,
   onOpenDeliveryOrderModal,
   refreshTrigger 
@@ -28,6 +32,7 @@ export default function Dashboard({
   const [allLogs, setAllLogs] = useState([]);
   const [viewMode, setViewMode] = useState('tree');
   const [expandedRows, setExpandedRows] = useState({});
+  const [selectedDoc, setSelectedDoc] = useState(null);
   const [stats, setStats] = useState({
     totalInvoices: 0,
     totalPackingLists: 0,
@@ -182,7 +187,7 @@ export default function Dashboard({
 
         {/* Card 2: Packing List Form (Opens Modal) */}
         <div 
-          onClick={onOpenPackingListModal}
+          onClick={() => onOpenPackingListModal && onOpenPackingListModal(null)}
           className="group relative bg-gradient-to-br from-teal-700 to-emerald-900 rounded-2xl p-4 sm:p-5 text-white shadow-md shadow-teal-900/15 cursor-pointer transform hover:-translate-y-1 transition-all duration-200 overflow-hidden flex flex-col justify-between"
         >
           <div className="absolute right-[-10px] top-[-10px] w-24 h-24 bg-white/10 rounded-full blur-xl group-hover:scale-150 transition-transform"></div>
@@ -208,7 +213,7 @@ export default function Dashboard({
 
         {/* Card 3: Delivery Order Form (Opens Modal) */}
         <div 
-          onClick={onOpenDeliveryOrderModal}
+          onClick={() => onOpenDeliveryOrderModal && onOpenDeliveryOrderModal(null)}
           className="group relative bg-gradient-to-br from-[#0b4d53] to-[#083a3f] rounded-2xl p-4 sm:p-5 text-white shadow-md shadow-teal-950/15 cursor-pointer transform hover:-translate-y-1 transition-all duration-200 overflow-hidden flex flex-col justify-between"
         >
           <div className="absolute right-[-10px] top-[-10px] w-24 h-24 bg-white/10 rounded-full blur-xl group-hover:scale-150 transition-transform"></div>
@@ -412,21 +417,17 @@ export default function Dashboard({
                 <th className="px-4 py-3 w-12 text-center">
                   {viewMode === 'tree' ? 'Tree' : 'No'}
                 </th>
-                <th className="px-4 py-3">Tipe</th>
+                <th className="px-4 py-3 w-32">Tipe</th>
                 <th className="px-4 py-3">No. Dokumen</th>
-                <th className="px-4 py-3">Tanggal</th>
+                <th className="px-4 py-3 w-32">Tanggal</th>
                 <th className="px-4 py-3">Customer</th>
-                <th className="px-4 py-3">Customer PO</th>
-                <th className="px-4 py-3">Part Specification</th>
-                <th className="px-3 py-3 text-center">Box</th>
-                <th className="px-3 py-3 text-center">Pallet</th>
-                <th className="px-4 py-3 text-right">Aksi</th>
+                <th className="px-4 py-3 text-right w-60">Aksi</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
               {allLogs.length === 0 ? (
                 <tr>
-                  <td colSpan={10} className="px-6 py-10 text-center text-slate-400">
+                  <td colSpan={6} className="px-6 py-10 text-center text-slate-400">
                     Belum ada transaksi yang diinput. Klik tombol menu di atas untuk membuat dokumen pertama.
                   </td>
                 </tr>
@@ -443,8 +444,11 @@ export default function Dashboard({
                     return (
                       <React.Fragment key={`dash-tree-${inv.id}`}>
                         {/* Parent Invoice Row */}
-                        <tr className="bg-white hover:bg-emerald-50/40 transition-colors group">
-                          <td className="px-2 py-3 text-center" onClick={() => toggleRow(inv.doc_number)}>
+                        <tr 
+                          className="bg-white hover:bg-emerald-50/50 transition-colors group cursor-pointer"
+                          onClick={() => setSelectedDoc(inv)}
+                        >
+                          <td className="px-2 py-3 text-center" onClick={(e) => { e.stopPropagation(); toggleRow(inv.doc_number); }}>
                             {hasChildren ? (
                               <button
                                 type="button"
@@ -486,30 +490,58 @@ export default function Dashboard({
                           <td className="px-4 py-3 text-slate-500 whitespace-nowrap">
                             {inv.doc_date}
                           </td>
-                          <td className="px-4 py-3 font-semibold text-slate-800 max-w-[170px] truncate">
+                          <td className="px-4 py-3 font-semibold text-slate-800">
                             {inv.customer_name}
                           </td>
-                          <td className="px-4 py-3 font-mono text-slate-600 whitespace-nowrap">
-                            {inv.po_no || '-'}
-                          </td>
-                          <td className="px-4 py-3 text-slate-700 max-w-[180px] truncate">
-                            {inv.part_name || '-'}
-                          </td>
-                          <td className="px-3 py-3 text-center font-mono font-bold text-slate-900">
-                            {inv.box_qty || 0}
-                          </td>
-                          <td className="px-3 py-3 text-center font-mono font-bold text-slate-900">
-                            {inv.pallet_qty || 0}
-                          </td>
-                          <td className="px-4 py-3 text-right whitespace-nowrap">
-                            <button
-                              onClick={() => openPrintTab('print-invoice', inv.ref_id)}
-                              className="inline-flex items-center gap-1 px-2.5 py-1 bg-emerald-50 text-emerald-800 hover:bg-emerald-100 rounded-lg text-xs font-bold transition-colors cursor-pointer"
-                              title="Buka / Cetak PDF"
-                            >
-                              <Printer className="w-3.5 h-3.5" />
-                              <span>PDF</span>
-                            </button>
+                          <td className="px-4 py-3 text-right whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
+                            <div className="flex items-center justify-end gap-1.5">
+                              <button
+                                onClick={() => setSelectedDoc(inv)}
+                                className="inline-flex items-center gap-1 px-2.5 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-bold transition-colors cursor-pointer"
+                                title="Lihat Detail Transaksi"
+                              >
+                                <Eye className="w-3.5 h-3.5 text-slate-600" />
+                                <span>Detail</span>
+                              </button>
+                              {onEditInvoice && (
+                                <button
+                                  onClick={() => onEditInvoice(inv)}
+                                  className="inline-flex items-center gap-1 px-2.5 py-1 bg-amber-50 text-amber-800 hover:bg-amber-100 rounded-lg text-xs font-bold transition-colors cursor-pointer"
+                                  title="Edit Data Invoice"
+                                >
+                                  <Edit3 className="w-3.5 h-3.5" />
+                                  <span>Edit</span>
+                                </button>
+                              )}
+                              {onOpenPackingListModal && (
+                                <button
+                                  onClick={() => onOpenPackingListModal(inv)}
+                                  className="inline-flex items-center gap-1 px-2.5 py-1 bg-teal-50 text-teal-800 hover:bg-teal-100 rounded-lg text-xs font-bold transition-colors cursor-pointer"
+                                  title="Buat Packing List dari Invoice ini"
+                                >
+                                  <Package className="w-3.5 h-3.5" />
+                                  <span>+ PL</span>
+                                </button>
+                              )}
+                              {onOpenDeliveryOrderModal && (
+                                <button
+                                  onClick={() => onOpenDeliveryOrderModal(inv)}
+                                  className="inline-flex items-center gap-1 px-2.5 py-1 bg-cyan-50 text-cyan-800 hover:bg-cyan-100 rounded-lg text-xs font-bold transition-colors cursor-pointer"
+                                  title="Buat Delivery Order dari Invoice ini"
+                                >
+                                  <Truck className="w-3.5 h-3.5" />
+                                  <span>+ DO</span>
+                                </button>
+                              )}
+                              <button
+                                onClick={() => openPrintTab('print-invoice', inv.ref_id)}
+                                className="inline-flex items-center gap-1 px-2.5 py-1 bg-emerald-50 text-emerald-800 hover:bg-emerald-100 rounded-lg text-xs font-bold transition-colors cursor-pointer"
+                                title="Buka / Cetak PDF"
+                              >
+                                <Printer className="w-3.5 h-3.5" />
+                                <span>PDF</span>
+                              </button>
+                            </div>
                           </td>
                         </tr>
 
@@ -517,7 +549,8 @@ export default function Dashboard({
                         {isExpanded && group.children.map((child) => (
                           <tr 
                             key={`dash-child-${child.id}`}
-                            className="bg-slate-50/70 hover:bg-slate-100/90 transition-colors border-l-4 border-l-emerald-600"
+                            onClick={() => setSelectedDoc(child)}
+                            className="bg-slate-50/70 hover:bg-slate-100/90 transition-colors border-l-4 border-l-emerald-600 cursor-pointer"
                           >
                             <td className="px-2 py-2.5 text-center text-slate-400">
                               <CornerDownRight className="w-3.5 h-3.5 ml-auto mr-1 text-slate-400" />
@@ -538,32 +571,39 @@ export default function Dashboard({
                             <td className="px-4 py-2.5 text-slate-500 whitespace-nowrap">
                               {child.doc_date}
                             </td>
-                            <td className="px-4 py-2.5 font-semibold text-slate-700 max-w-[170px] truncate">
+                            <td className="px-4 py-2.5 font-semibold text-slate-700">
                               {child.customer_name}
                             </td>
-                            <td className="px-4 py-2.5 font-mono text-slate-500 whitespace-nowrap">
-                              {child.po_no || '-'}
-                            </td>
-                            <td className="px-4 py-2.5 text-slate-600 max-w-[180px] truncate">
-                              {child.part_name || '-'}
-                            </td>
-                            <td className="px-3 py-2.5 text-center font-mono font-bold text-slate-700">
-                              {child.box_qty || 0}
-                            </td>
-                            <td className="px-3 py-2.5 text-center font-mono font-bold text-slate-700">
-                              {child.pallet_qty || 0}
-                            </td>
-                            <td className="px-4 py-2.5 text-right whitespace-nowrap">
-                              {child.doc_type === 'PACKING_LIST' && (
+                            <td className="px-4 py-2.5 text-right whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
+                              <div className="flex items-center justify-end gap-1.5">
                                 <button
-                                  onClick={() => openPrintTab('print-packing-list', child.ref_id)}
-                                  className="inline-flex items-center gap-1 px-2.5 py-1 bg-teal-50 text-teal-800 hover:bg-teal-100 rounded-lg text-xs font-bold transition-colors cursor-pointer"
-                                  title="Buka / Cetak PDF"
+                                  onClick={() => setSelectedDoc(child)}
+                                  className="inline-flex items-center gap-1 px-2.5 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-bold transition-colors cursor-pointer"
+                                  title="Lihat Detail Transaksi"
                                 >
-                                  <Printer className="w-3.5 h-3.5" />
-                                  <span>PDF</span>
+                                  <Eye className="w-3.5 h-3.5 text-slate-600" />
+                                  <span>Detail</span>
                                 </button>
-                              )}
+                                {child.doc_type === 'PACKING_LIST' ? (
+                                  <button
+                                    onClick={() => openPrintTab('print-packing-list', child.ref_id)}
+                                    className="inline-flex items-center gap-1 px-2.5 py-1 bg-teal-50 text-teal-800 hover:bg-teal-100 rounded-lg text-xs font-bold transition-colors cursor-pointer"
+                                    title="Buka / Cetak PDF"
+                                  >
+                                    <Printer className="w-3.5 h-3.5" />
+                                    <span>PDF</span>
+                                  </button>
+                                ) : (
+                                  <button
+                                    onClick={() => openPrintTab('print-delivery-order', child.ref_id)}
+                                    className="inline-flex items-center gap-1 px-2.5 py-1 bg-cyan-50 text-[#0b4d53] hover:bg-cyan-100 rounded-lg text-xs font-bold transition-colors cursor-pointer"
+                                    title="Buka / Cetak PDF"
+                                  >
+                                    <Printer className="w-3.5 h-3.5" />
+                                    <span>PDF</span>
+                                  </button>
+                                )}
+                              </div>
                             </td>
                           </tr>
                         ))}
@@ -575,12 +615,16 @@ export default function Dashboard({
                   {treeData.orphans.length > 0 && (
                     <>
                       <tr className="bg-slate-100/80 border-t-2 border-slate-300">
-                        <td colSpan={10} className="px-4 py-2 font-bold text-slate-600 text-[11px] uppercase tracking-wider">
+                        <td colSpan={6} className="px-4 py-2 font-bold text-slate-600 text-[11px] uppercase tracking-wider">
                           📁 Dokumen Lainnya / Tanpa Induk Invoice Terhubung ({treeData.orphans.length})
                         </td>
                       </tr>
                       {treeData.orphans.map((orphan, oIdx) => (
-                        <tr key={`dash-orphan-${orphan.id}`} className="hover:bg-slate-50/80 transition-colors">
+                        <tr 
+                          key={`dash-orphan-${orphan.id}`} 
+                          onClick={() => setSelectedDoc(orphan)}
+                          className="hover:bg-slate-50/80 transition-colors cursor-pointer"
+                        >
                           <td className="px-4 py-3 text-center text-slate-400 font-mono text-[11px]">
                             {oIdx + 1}
                           </td>
@@ -599,32 +643,39 @@ export default function Dashboard({
                           <td className="px-4 py-3 text-slate-500 whitespace-nowrap">
                             {orphan.doc_date}
                           </td>
-                          <td className="px-4 py-3 font-semibold text-slate-800 max-w-[170px] truncate">
+                          <td className="px-4 py-3 font-semibold text-slate-800">
                             {orphan.customer_name}
                           </td>
-                          <td className="px-4 py-3 font-mono text-slate-600 whitespace-nowrap">
-                            {orphan.po_no || '-'}
-                          </td>
-                          <td className="px-4 py-3 text-slate-700 max-w-[180px] truncate">
-                            {orphan.part_name || '-'}
-                          </td>
-                          <td className="px-3 py-3 text-center font-mono font-bold text-slate-900">
-                            {orphan.box_qty || 0}
-                          </td>
-                          <td className="px-3 py-3 text-center font-mono font-bold text-slate-900">
-                            {orphan.pallet_qty || 0}
-                          </td>
-                          <td className="px-4 py-3 text-right whitespace-nowrap">
-                            {orphan.doc_type === 'PACKING_LIST' && (
+                          <td className="px-4 py-3 text-right whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
+                            <div className="flex items-center justify-end gap-1.5">
                               <button
-                                onClick={() => openPrintTab('print-packing-list', orphan.ref_id)}
-                                className="inline-flex items-center gap-1 px-2.5 py-1 bg-teal-50 text-teal-800 hover:bg-teal-100 rounded-lg text-xs font-bold transition-colors cursor-pointer"
-                                title="Buka / Cetak PDF"
+                                onClick={() => setSelectedDoc(orphan)}
+                                className="inline-flex items-center gap-1 px-2.5 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-bold transition-colors cursor-pointer"
+                                title="Lihat Detail Transaksi"
                               >
-                                <Printer className="w-3.5 h-3.5" />
-                                <span>PDF</span>
+                                <Eye className="w-3.5 h-3.5 text-slate-600" />
+                                <span>Detail</span>
                               </button>
-                            )}
+                              {orphan.doc_type === 'PACKING_LIST' ? (
+                                <button
+                                  onClick={() => openPrintTab('print-packing-list', orphan.ref_id)}
+                                  className="inline-flex items-center gap-1 px-2.5 py-1 bg-teal-50 text-teal-800 hover:bg-teal-100 rounded-lg text-xs font-bold transition-colors cursor-pointer"
+                                  title="Buka / Cetak PDF"
+                                >
+                                  <Printer className="w-3.5 h-3.5" />
+                                  <span>PDF</span>
+                                </button>
+                              ) : (
+                                <button
+                                  onClick={() => openPrintTab('print-delivery-order', orphan.ref_id)}
+                                  className="inline-flex items-center gap-1 px-2.5 py-1 bg-cyan-50 text-[#0b4d53] hover:bg-cyan-100 rounded-lg text-xs font-bold transition-colors cursor-pointer"
+                                  title="Buka / Cetak PDF"
+                                >
+                                  <Printer className="w-3.5 h-3.5" />
+                                  <span>PDF</span>
+                                </button>
+                              )}
+                            </div>
                           </td>
                         </tr>
                       ))}
@@ -634,7 +685,11 @@ export default function Dashboard({
               ) : (
                 /* FLAT VIEW MODE */
                 stats.recentLogs.map((log, index) => (
-                  <tr key={log.id} className="hover:bg-slate-50/80 transition-colors">
+                  <tr 
+                    key={log.id} 
+                    onClick={() => setSelectedDoc(log)}
+                    className="hover:bg-slate-50/80 transition-colors cursor-pointer"
+                  >
                     <td className="px-4 py-3 text-center text-slate-400 font-mono text-[11px]">
                       {index + 1}
                     </td>
@@ -655,32 +710,62 @@ export default function Dashboard({
                     <td className="px-4 py-3 text-slate-500 whitespace-nowrap">
                       {log.doc_date}
                     </td>
-                    <td className="px-4 py-3 font-medium text-slate-800 max-w-[170px] truncate">
+                    <td className="px-4 py-3 font-medium text-slate-800">
                       {log.customer_name}
                     </td>
-                    <td className="px-4 py-3 font-mono text-slate-600 whitespace-nowrap">
-                      {log.po_no || '-'}
-                    </td>
-                    <td className="px-4 py-3 text-slate-700 max-w-[180px] truncate">
-                      {log.part_name || '-'}
-                    </td>
-                    <td className="px-3 py-3 text-center font-mono font-bold text-slate-900">
-                      {log.box_qty || 0}
-                    </td>
-                    <td className="px-3 py-3 text-center font-mono font-bold text-slate-900">
-                      {log.pallet_qty || 0}
-                    </td>
-                    <td className="px-4 py-3 text-right whitespace-nowrap">
-                      {log.doc_type !== 'DELIVERY_ORDER' && (
+                    <td className="px-4 py-3 text-right whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
+                      <div className="flex items-center justify-end gap-1.5">
                         <button
-                          onClick={() => openPrintTab(log.doc_type.toLowerCase() === 'invoice' ? 'print-invoice' : 'print-packing-list', log.ref_id)}
+                          onClick={() => setSelectedDoc(log)}
+                          className="inline-flex items-center gap-1 px-2.5 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-bold transition-colors cursor-pointer"
+                          title="Lihat Detail Transaksi"
+                        >
+                          <Eye className="w-3.5 h-3.5 text-slate-600" />
+                          <span>Detail</span>
+                        </button>
+                        {log.doc_type === 'INVOICE' && onEditInvoice && (
+                          <button
+                            onClick={() => onEditInvoice(log)}
+                            className="inline-flex items-center gap-1 px-2.5 py-1 bg-amber-50 text-amber-800 hover:bg-amber-100 rounded-lg text-xs font-bold transition-colors cursor-pointer"
+                            title="Edit Data Invoice"
+                          >
+                            <Edit3 className="w-3.5 h-3.5" />
+                            <span>Edit</span>
+                          </button>
+                        )}
+                        {log.doc_type === 'INVOICE' && onOpenPackingListModal && (
+                          <button
+                            onClick={() => onOpenPackingListModal(log)}
+                            className="inline-flex items-center gap-1 px-2.5 py-1 bg-teal-50 text-teal-800 hover:bg-teal-100 rounded-lg text-xs font-bold transition-colors cursor-pointer"
+                            title="Buat Packing List dari Invoice ini"
+                          >
+                            <Package className="w-3.5 h-3.5" />
+                            <span>+ PL</span>
+                          </button>
+                        )}
+                        {log.doc_type === 'INVOICE' && onOpenDeliveryOrderModal && (
+                          <button
+                            onClick={() => onOpenDeliveryOrderModal(log)}
+                            className="inline-flex items-center gap-1 px-2.5 py-1 bg-cyan-50 text-cyan-800 hover:bg-cyan-100 rounded-lg text-xs font-bold transition-colors cursor-pointer"
+                            title="Buat Delivery Order dari Invoice ini"
+                          >
+                            <Truck className="w-3.5 h-3.5" />
+                            <span>+ DO</span>
+                          </button>
+                        )}
+                        <button
+                          onClick={() => openPrintTab(
+                            log.doc_type === 'INVOICE' ? 'print-invoice' :
+                            log.doc_type === 'PACKING_LIST' ? 'print-packing-list' : 'print-delivery-order',
+                            log.ref_id
+                          )}
                           className="inline-flex items-center gap-1 px-2.5 py-1 bg-emerald-50 text-emerald-800 hover:bg-emerald-100 rounded-lg text-xs font-bold transition-colors cursor-pointer"
                           title="Buka / Cetak PDF"
                         >
                           <Printer className="w-3.5 h-3.5" />
                           <span>PDF</span>
                         </button>
-                      )}
+                      </div>
                     </td>
                   </tr>
                 ))
@@ -689,6 +774,217 @@ export default function Dashboard({
           </table>
         </div>
       </div>
+
+      {/* Modal Detail Transaksi */}
+      {selectedDoc && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl max-w-2xl w-full p-6 shadow-2xl border border-slate-100 max-h-[90vh] overflow-y-auto animate-in fade-in zoom-in duration-150">
+            
+            {/* Modal Header */}
+            <div className="flex items-center justify-between pb-4 border-b border-slate-100">
+              <div className="flex items-center gap-2.5">
+                <span className={`px-2.5 py-1 rounded text-xs font-extrabold tracking-wide ${
+                  selectedDoc.doc_type === 'INVOICE'
+                    ? 'bg-emerald-100 text-emerald-800'
+                    : selectedDoc.doc_type === 'PACKING_LIST'
+                    ? 'bg-teal-100 text-teal-800'
+                    : 'bg-cyan-100 text-[#0b4d53]'
+                }`}>
+                  {selectedDoc.doc_type}
+                </span>
+                <span className="font-mono font-bold text-slate-800 text-lg">
+                  {selectedDoc.doc_number}
+                </span>
+              </div>
+              <button
+                onClick={() => setSelectedDoc(null)}
+                className="p-1.5 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-slate-100 transition-colors cursor-pointer"
+                title="Tutup Modal"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <div className="py-4 space-y-3 text-xs">
+              {/* Customer & Date Info */}
+              <div className="grid grid-cols-2 gap-4 bg-slate-50 p-3.5 rounded-xl border border-slate-200">
+                <div>
+                  <span className="text-[10px] text-slate-400 font-semibold block uppercase">Nama Customer</span>
+                  <p className="font-bold text-slate-900 text-sm">{selectedDoc.customer_name}</p>
+                  {selectedDoc.customer_id && (
+                    <p className="text-slate-500 font-mono mt-0.5">ID: {selectedDoc.customer_id}</p>
+                  )}
+                </div>
+                <div>
+                  <span className="text-[10px] text-slate-400 font-semibold block uppercase">Tanggal Dokumen</span>
+                  <p className="font-bold text-slate-900 text-sm">{selectedDoc.doc_date}</p>
+                  {selectedDoc.created_at && (
+                    <p className="text-slate-500 font-mono mt-0.5">Input: {selectedDoc.created_at}</p>
+                  )}
+                </div>
+              </div>
+
+              {/* PO No & Delivery Terms */}
+              <div className="grid grid-cols-2 gap-3 text-slate-700">
+                <div className="p-3 bg-white border border-slate-200 rounded-lg">
+                  <span className="text-[10px] text-slate-400 font-semibold block">CUSTOMER PO NO</span>
+                  <span className="font-mono font-bold text-slate-900 text-sm">{selectedDoc.po_no || '-'}</span>
+                </div>
+                <div className="p-3 bg-white border border-slate-200 rounded-lg">
+                  <span className="text-[10px] text-slate-400 font-semibold block">TERMS OF DELIVERY</span>
+                  <span className="font-semibold text-slate-900">{selectedDoc.terms_of_delivery || '-'}</span>
+                </div>
+              </div>
+
+              {/* Part Specification & Dimensions */}
+              <div className="p-3 bg-white border border-slate-200 rounded-lg">
+                <span className="text-[10px] text-slate-400 font-semibold block">PART SPECIFICATION / NAMA PRODUK</span>
+                <p className="font-bold text-slate-900 text-sm">{selectedDoc.part_name || '-'}</p>
+                {selectedDoc.dimensions && (
+                  <p className="text-slate-500 font-mono mt-1">Dimensi (L x W x H): {selectedDoc.dimensions}</p>
+                )}
+              </div>
+
+              {/* Multi-item Breakdown Table (if items array exists and length > 1) */}
+              {(() => {
+                let parsedItems = [];
+                try {
+                  if (selectedDoc.items) {
+                    parsedItems = typeof selectedDoc.items === 'string' ? JSON.parse(selectedDoc.items) : selectedDoc.items;
+                  }
+                } catch (e) {}
+
+                if (Array.isArray(parsedItems) && parsedItems.length > 1) {
+                  return (
+                    <div className="p-3 bg-white border border-slate-200 rounded-lg overflow-x-auto">
+                      <span className="text-[10px] text-slate-500 font-bold block mb-2 uppercase tracking-wider">
+                        Rincian Item Produk ({parsedItems.length} Produk)
+                      </span>
+                      <table className="w-full text-left text-xs border border-slate-100 rounded">
+                        <thead className="bg-slate-50 text-[10px] text-slate-500 font-semibold uppercase">
+                          <tr>
+                            <th className="p-1.5 border-b text-center w-8">No</th>
+                            <th className="p-1.5 border-b">Cust PO No</th>
+                            <th className="p-1.5 border-b">Part Name / Specification</th>
+                            <th className="p-1.5 border-b text-right">Qty</th>
+                            <th className="p-1.5 border-b text-center">Box</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100">
+                          {parsedItems.map((item, itIdx) => (
+                            <tr key={itIdx} className="hover:bg-slate-50/80">
+                              <td className="p-1.5 text-slate-400 font-mono text-center">{itIdx + 1}</td>
+                              <td className="p-1.5 font-mono font-bold text-slate-800">{item.po_no || '-'}</td>
+                              <td className="p-1.5 font-medium text-slate-700">{item.part_name || '-'}</td>
+                              <td className="p-1.5 text-right font-mono font-semibold text-slate-900">
+                                {item.qty != null ? Number(item.qty).toLocaleString() : '-'} {item.unit || 'PCS'}
+                              </td>
+                              <td className="p-1.5 text-center font-mono font-bold text-slate-800">{item.box_qty || '-'}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  );
+                }
+                return null;
+              })()}
+
+              {/* Total Box & Pallet Count Cards */}
+              <div className="grid grid-cols-2 gap-3">
+                <div className="p-3 bg-slate-50 border border-slate-200 rounded-lg text-center">
+                  <span className="text-[10px] text-slate-500 font-semibold block">TOTAL BOX QTY</span>
+                  <span className="text-lg font-black font-mono text-slate-900">{selectedDoc.box_qty || 0} Box</span>
+                </div>
+                <div className="p-3 bg-slate-50 border border-slate-200 rounded-lg text-center">
+                  <span className="text-[10px] text-slate-500 font-semibold block">TOTAL PALLET QTY</span>
+                  <span className="text-lg font-black font-mono text-slate-900">{selectedDoc.pallet_qty || 0} Pallet</span>
+                </div>
+              </div>
+
+              {/* Drawing Preview if available */}
+              {selectedDoc.image_url && (
+                <div className="p-3 bg-slate-50 border border-slate-200 rounded-lg">
+                  <span className="text-[10px] text-slate-500 font-semibold block mb-1">LAMPIRAN GAMBAR / DRAWING</span>
+                  <img
+                    src={selectedDoc.image_url}
+                    alt="Drawing attachment"
+                    className="max-h-48 object-contain mx-auto rounded border border-slate-200 bg-white"
+                  />
+                </div>
+              )}
+            </div>
+
+            {/* Modal Footer */}
+            <div className="pt-4 border-t border-slate-100 flex items-center justify-between">
+              <button
+                onClick={() => setSelectedDoc(null)}
+                className="px-4 py-2 border border-slate-300 rounded-xl text-xs font-semibold text-slate-700 hover:bg-slate-50 transition-colors cursor-pointer"
+              >
+                Tutup
+              </button>
+              <div className="flex items-center gap-2">
+                {selectedDoc.doc_type === 'INVOICE' && onEditInvoice && (
+                  <button
+                    onClick={() => {
+                      const docToEdit = selectedDoc;
+                      setSelectedDoc(null);
+                      onEditInvoice(docToEdit);
+                    }}
+                    className="inline-flex items-center gap-1.5 px-3 py-2 bg-amber-50 text-amber-800 hover:bg-amber-100 rounded-xl text-xs font-bold border border-amber-200 transition-colors cursor-pointer"
+                    title="Edit Data Dokumen"
+                  >
+                    <Edit3 className="w-3.5 h-3.5" />
+                    <span>Edit Data</span>
+                  </button>
+                )}
+                {selectedDoc.doc_type === 'INVOICE' && onOpenPackingListModal && (
+                  <button
+                    onClick={() => {
+                      const docForPL = selectedDoc;
+                      setSelectedDoc(null);
+                      onOpenPackingListModal(docForPL);
+                    }}
+                    className="inline-flex items-center gap-1.5 px-3 py-2 bg-teal-50 text-teal-800 hover:bg-teal-100 rounded-xl text-xs font-bold border border-teal-200 transition-colors cursor-pointer"
+                    title="Buat Packing List"
+                  >
+                    <Package className="w-3.5 h-3.5" />
+                    <span>+ Buat PL</span>
+                  </button>
+                )}
+                {selectedDoc.doc_type === 'INVOICE' && onOpenDeliveryOrderModal && (
+                  <button
+                    onClick={() => {
+                      const docForDO = selectedDoc;
+                      setSelectedDoc(null);
+                      onOpenDeliveryOrderModal(docForDO);
+                    }}
+                    className="inline-flex items-center gap-1.5 px-3 py-2 bg-cyan-50 text-cyan-800 hover:bg-cyan-100 rounded-xl text-xs font-bold border border-cyan-200 transition-colors cursor-pointer"
+                    title="Buat Delivery Order"
+                  >
+                    <Truck className="w-3.5 h-3.5" />
+                    <span>+ Buat DO</span>
+                  </button>
+                )}
+                <button
+                  onClick={() => {
+                    const view = selectedDoc.doc_type === 'DELIVERY_ORDER'
+                      ? 'print-delivery-order'
+                      : (selectedDoc.doc_type === 'INVOICE' ? 'print-invoice' : 'print-packing-list');
+                    openPrintTab(view, selectedDoc.ref_id || selectedDoc.id || selectedDoc.doc_number);
+                  }}
+                  className="inline-flex items-center gap-1.5 px-4 py-2 bg-emerald-800 hover:bg-emerald-900 text-white rounded-xl text-xs font-bold shadow-xs transition-colors cursor-pointer"
+                >
+                  <Printer className="w-3.5 h-3.5" />
+                  <span>Buka / Cetak PDF</span>
+                </button>
+              </div>
+            </div>
+
+          </div>
+        </div>
+      )}
 
     </div>
   );

@@ -40,8 +40,8 @@ export default function InvoiceForm({ setActiveView, openPrintTab }) {
     total_qty: '',
     unit_price: '',
     total_amount: '',
-    vat_rate: 11,
-    vat_amount: '',
+    vat_rate: 0,
+    vat_amount: '0.00',
     grand_total: '',
     currency: 'USD',
     notes: '',
@@ -99,21 +99,19 @@ export default function InvoiceForm({ setActiveView, openPrintTab }) {
     }));
   };
 
-  const recalculateFinancials = (boxes, qtyPerB, unitP, vatR) => {
+  const recalculateFinancials = (boxes, qtyPerB, unitP) => {
     const numBoxes = Number(boxes) || 0;
     const numQtyBox = Number(qtyPerB) || 0;
     const computedTotalQty = numBoxes * numQtyBox;
     const numPrice = Number(unitP) || 0;
     const computedTotalAmount = computedTotalQty * numPrice;
-    const numVatRate = vatR !== undefined ? Number(vatR) : 11;
-    const computedVatAmount = computedTotalAmount * (numVatRate / 100);
-    const computedGrandTotal = computedTotalAmount + computedVatAmount;
 
     return {
       total_qty: computedTotalQty > 0 ? computedTotalQty : '',
       total_amount: computedTotalAmount > 0 ? computedTotalAmount.toFixed(2) : '',
-      vat_amount: computedVatAmount > 0 ? computedVatAmount.toFixed(2) : '',
-      grand_total: computedGrandTotal > 0 ? computedGrandTotal.toFixed(2) : ''
+      vat_rate: 0,
+      vat_amount: '0.00',
+      grand_total: computedTotalAmount > 0 ? computedTotalAmount.toFixed(2) : ''
     };
   };
 
@@ -139,10 +137,16 @@ export default function InvoiceForm({ setActiveView, openPrintTab }) {
         setFormData(prev => {
           const qBox = matched.qty_per_box || prev.qty_per_box;
           const uPrice = data.price !== undefined ? data.price : prev.unit_price;
-          const fin = recalculateFinancials(prev.no_of_box, qBox, uPrice, prev.vat_rate);
+          let boxVal = prev.no_of_box;
+          const palletNum = parseFloat(prev.no_of_pallet) || 0;
+          if (palletNum > 0 && Number(matched.box_per_pallet) > 0) {
+            boxVal = String(Math.round(palletNum * Number(matched.box_per_pallet)));
+          }
+          const fin = recalculateFinancials(boxVal, qBox, uPrice, prev.vat_rate);
           return {
             ...prev,
             part_name: `${matched.part_name} (${matched.part_no})`,
+            no_of_box: boxVal,
             qty_per_box: qBox,
             unit_price: uPrice,
             currency: data.currency || prev.currency || 'USD',
@@ -169,6 +173,24 @@ export default function InvoiceForm({ setActiveView, openPrintTab }) {
     const val = e.target.value;
     setFormData(prev => ({ ...prev, part_name: val }));
     lookupPriceForPart(val, formData.invoice_date);
+  };
+
+  const handlePalletChange = (e) => {
+    const val = e.target.value;
+    const palletNum = parseFloat(val) || 0;
+    const matched = parts.find(p => 
+      `${p.part_name} (${p.part_no})`.toLowerCase() === (formData.part_name || '').toLowerCase() ||
+      p.part_name.toLowerCase() === (formData.part_name || '').toLowerCase() ||
+      p.part_no.toLowerCase() === (formData.part_name || '').toLowerCase()
+    );
+
+    let newBox = formData.no_of_box;
+    if (matched && Number(matched.box_per_pallet) > 0) {
+      newBox = palletNum > 0 ? String(Math.round(palletNum * Number(matched.box_per_pallet))) : '';
+    }
+
+    const fin = recalculateFinancials(newBox, formData.qty_per_box, formData.unit_price, formData.vat_rate);
+    setFormData(prev => ({ ...prev, no_of_pallet: val, no_of_box: newBox, ...fin }));
   };
 
   const handleBoxChange = (e) => {
@@ -514,7 +536,7 @@ export default function InvoiceForm({ setActiveView, openPrintTab }) {
                 min="0"
                 placeholder="0"
                 value={formData.no_of_pallet}
-                onChange={(e) => setFormData({ ...formData, no_of_pallet: e.target.value })}
+                onChange={handlePalletChange}
                 className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 focus:border-emerald-600 focus:ring-2 focus:ring-emerald-600/20 font-mono text-sm bg-white transition-all"
               />
             </div>
@@ -643,24 +665,12 @@ export default function InvoiceForm({ setActiveView, openPrintTab }) {
               </div>
             </div>
 
-            {/* Subtotal summary bar */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-3 border-t border-emerald-200/50">
-              <div className="bg-white/80 p-3 rounded-xl border border-emerald-200 flex items-center justify-between">
-                <span className="text-[11px] text-slate-600 font-medium">Subtotal</span>
-                <span className="font-mono font-bold text-slate-900 text-xs">
+            {/* Total Amount summary bar */}
+            <div className="pt-3 border-t border-emerald-200/50 flex justify-end">
+              <div className="bg-emerald-800 text-white px-5 py-3 rounded-xl shadow-xs flex items-center gap-4">
+                <span className="text-xs font-extrabold uppercase tracking-wide">TOTAL AMOUNT USD</span>
+                <span className="font-mono font-black text-base text-emerald-200">
                   {formData.currency} {Number(formData.total_amount || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                </span>
-              </div>
-              <div className="bg-white/80 p-3 rounded-xl border border-emerald-200 flex items-center justify-between">
-                <span className="text-[11px] text-slate-600 font-medium">PPN / VAT ({formData.vat_rate}%)</span>
-                <span className="font-mono font-bold text-slate-900 text-xs">
-                  {formData.currency} {Number(formData.vat_amount || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                </span>
-              </div>
-              <div className="bg-emerald-800 text-white p-3 rounded-xl shadow-xs flex items-center justify-between">
-                <span className="text-[11px] font-extrabold uppercase tracking-wide">Grand Total</span>
-                <span className="font-mono font-black text-sm text-emerald-200">
-                  {formData.currency} {Number(formData.grand_total || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                 </span>
               </div>
             </div>

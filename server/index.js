@@ -103,25 +103,25 @@ app.get('/api/dashboard/stats', async (req, res) => {
   try {
     const counts = await db.prepare(`
       SELECT 
-        SUM(CASE WHEN doc_type = 'INVOICE' AND (is_deleted IS NULL OR is_deleted = 0) THEN 1 ELSE 0 END) AS totalInvoices,
-        SUM(CASE WHEN doc_type = 'PACKING_LIST' AND (is_deleted IS NULL OR is_deleted = 0) THEN 1 ELSE 0 END) AS totalPackingLists,
-        SUM(CASE WHEN doc_type = 'DELIVERY_ORDER' AND (is_deleted IS NULL OR is_deleted = 0) THEN 1 ELSE 0 END) AS totalDeliveryOrders
+        SUM(CASE WHEN doc_type = 'INVOICE' AND (is_deleted IS NULL OR is_deleted = 0) THEN 1 ELSE 0 END) AS total_invoices,
+        SUM(CASE WHEN doc_type = 'PACKING_LIST' AND (is_deleted IS NULL OR is_deleted = 0) THEN 1 ELSE 0 END) AS total_packing_lists,
+        SUM(CASE WHEN doc_type = 'DELIVERY_ORDER' AND (is_deleted IS NULL OR is_deleted = 0) THEN 1 ELSE 0 END) AS total_delivery_orders
       FROM data_logger
     `).get();
 
-    const customerCount = (await db.prepare('SELECT COUNT(*) as count FROM customers').get())?.count || 0;
+    const customerCount = Number((await db.prepare('SELECT COUNT(*) as count FROM customers').get())?.count || 0);
 
-    // Retrieve recent logs for tree display (top 20)
+    // Retrieve recent logs for tree display (top 50)
     const recentLogs = await db.prepare(`
       SELECT * FROM data_logger 
       WHERE (is_deleted IS NULL OR is_deleted = 0)
-      ORDER BY id DESC LIMIT 20
+      ORDER BY id DESC LIMIT 50
     `).all();
 
     res.json({
-      totalInvoices: counts?.totalInvoices || 0,
-      totalPackingLists: counts?.totalPackingLists || 0,
-      totalDeliveryOrders: counts?.totalDeliveryOrders || 0,
+      totalInvoices: Number(counts?.total_invoices || 0),
+      totalPackingLists: Number(counts?.total_packing_lists || 0),
+      totalDeliveryOrders: Number(counts?.total_delivery_orders || 0),
       totalCustomers: customerCount || 0,
       recentLogs: recentLogs || []
     });
@@ -637,11 +637,11 @@ app.get('/api/parts', async (req, res) => {
 
 app.post('/api/parts', async (req, res) => {
   try {
-    const { part_name, part_no, length, width, height, unit, qty_per_box, price, currency = 'USD' } = req.body;
+    const { part_name, part_no, length, width, height, unit, qty_per_box, box_per_pallet, price, currency = 'USD' } = req.body;
     if (!part_name) return res.status(400).json({ error: 'Part name is required' });
     const stmt = await db.prepare(`
-      INSERT INTO parts (part_name, part_no, length, width, height, unit, qty_per_box, price)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO parts (part_name, part_no, length, width, height, unit, qty_per_box, box_per_pallet, price)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
     const info = await stmt.run(
       part_name,
@@ -651,6 +651,7 @@ app.post('/api/parts', async (req, res) => {
       Number(height) || 0,
       unit || 'mm',
       Number(qty_per_box) || 0,
+      Number(box_per_pallet) || 0,
       Number(price) || 0
     );
     const newPartId = info.lastInsertRowid;
@@ -669,10 +670,10 @@ app.post('/api/parts', async (req, res) => {
 
 app.put('/api/parts/:id', async (req, res) => {
   try {
-    const { part_name, part_no, length, width, height, unit, qty_per_box, price } = req.body;
+    const { part_name, part_no, length, width, height, unit, qty_per_box, box_per_pallet, price } = req.body;
     await db.prepare(`
       UPDATE parts
-      SET part_name = ?, part_no = ?, length = ?, width = ?, height = ?, unit = ?, qty_per_box = ?, price = ?
+      SET part_name = ?, part_no = ?, length = ?, width = ?, height = ?, unit = ?, qty_per_box = ?, box_per_pallet = ?, price = ?
       WHERE id = ?
     `).run(
       part_name || '',
@@ -682,6 +683,7 @@ app.put('/api/parts/:id', async (req, res) => {
       Number(height) || 0,
       unit || 'mm',
       Number(qty_per_box) || 0,
+      Number(box_per_pallet) || 0,
       Number(price) || 0,
       req.params.id
     );
@@ -923,6 +925,194 @@ app.get('/api/invoices/:id', async (req, res) => {
   }
 });
 
+async function updateInvoiceHelper(targetId, data) {
+  const {
+    invoice_number,
+    invoice_date,
+    customer_name,
+    customer_id,
+    bill_to,
+    ship_to,
+    payment_term,
+    terms_of_delivery,
+    customer_po_no,
+    part_name,
+    no_of_pallet,
+    no_of_box,
+    qty_per_box,
+    total_qty,
+    unit_price,
+    total_amount,
+    vat_rate,
+    vat_amount,
+    grand_total,
+    currency,
+    hts_code,
+    notes,
+    items
+  } = data;
+
+  const oldInv = await db.prepare('SELECT * FROM invoices WHERE id = ?').get(targetId);
+  if (!oldInv) {
+    throw new Error('Invoice not found');
+  }
+
+  let parsedItems = null;
+  if (Array.isArray(items) && items.length > 0) {
+    parsedItems = items;
+  } else if (typeof items === 'string' && items.trim().startsWith('[')) {
+    try {
+      parsedItems = JSON.parse(items);
+    } catch (e) {
+      parsedItems = null;
+    }
+  }
+
+  let finalPartName = part_name || '';
+  let finalPoNo = customer_po_no || '';
+  let numPallets = Number(no_of_pallet) || 0;
+  let numBoxes = Number(no_of_box) || 0;
+  let numQtyPerBox = Number(qty_per_box) || 0;
+  let computedTotalQty = Number(total_qty) || 0;
+  let numUnitPrice = Number(unit_price) || 0;
+  let computedTotalAmount = Number(total_amount) || 0;
+  const numVatRate = vat_rate !== undefined ? Number(vat_rate) : 0;
+
+  if (parsedItems && parsedItems.length > 0) {
+    numPallets = parsedItems.reduce((acc, it) => acc + (Number(it.no_of_pallet) || 0), 0);
+    numBoxes = parsedItems.reduce((acc, it) => acc + (Number(it.no_of_box) || 0), 0);
+    computedTotalQty = parsedItems.reduce((acc, it) => {
+      const itemBoxes = Number(it.no_of_box) || 0;
+      const itemPerBox = Number(it.qty_per_box) || 0;
+      return acc + (Number(it.total_qty) || (itemBoxes * itemPerBox));
+    }, 0);
+    computedTotalAmount = parsedItems.reduce((acc, it) => acc + (Number(it.total_amount) || 0), 0);
+    
+    finalPartName = parsedItems.length === 1
+      ? (parsedItems[0].part_name || '')
+      : `${parsedItems.length} Items: ${parsedItems.map(i => i.part_name).filter(Boolean).slice(0, 3).join(', ')}${parsedItems.length > 3 ? '...' : ''}`;
+    
+    const distinctPo = [...new Set(parsedItems.map(i => i.customer_po_no).filter(Boolean))];
+    if (distinctPo.length > 0) {
+      finalPoNo = distinctPo.join(', ');
+    }
+    numUnitPrice = parsedItems[0]?.unit_price ? Number(parsedItems[0].unit_price) : numUnitPrice;
+    numQtyPerBox = parsedItems[0]?.qty_per_box ? Number(parsedItems[0].qty_per_box) : numQtyPerBox;
+  } else {
+    computedTotalQty = computedTotalQty || (numBoxes * numQtyPerBox);
+    computedTotalAmount = computedTotalAmount || (computedTotalQty * numUnitPrice);
+  }
+
+  const computedVatAmount = Number(vat_amount) || (numVatRate > 0 ? (computedTotalAmount * (numVatRate / 100)) : 0);
+  const computedGrandTotal = Number(grand_total) || (computedTotalAmount + computedVatAmount);
+  const itemsJson = parsedItems ? JSON.stringify(parsedItems) : null;
+
+  await db.prepare(`
+    UPDATE invoices
+    SET invoice_number = ?, invoice_date = ?, customer_name = ?, customer_id = ?,
+        bill_to = ?, ship_to = ?, payment_term = ?, terms_of_delivery = ?, customer_po_no = ?, part_name = ?,
+        no_of_pallet = ?, no_of_box = ?, qty_per_box = ?, total_qty = ?, unit_price = ?,
+        total_amount = ?, vat_rate = ?, vat_amount = ?, grand_total = ?, currency = ?,
+        hts_code = ?, notes = ?, items = ?
+    WHERE id = ?
+  `).run(
+    invoice_number || oldInv.invoice_number,
+    invoice_date || oldInv.invoice_date,
+    customer_name || oldInv.customer_name,
+    customer_id || oldInv.customer_id,
+    bill_to !== undefined ? bill_to : oldInv.bill_to,
+    ship_to !== undefined ? ship_to : oldInv.ship_to,
+    payment_term !== undefined ? payment_term : oldInv.payment_term,
+    terms_of_delivery !== undefined ? terms_of_delivery : oldInv.terms_of_delivery,
+    finalPoNo,
+    finalPartName,
+    numPallets,
+    numBoxes,
+    numQtyPerBox,
+    computedTotalQty,
+    numUnitPrice,
+    computedTotalAmount,
+    numVatRate,
+    computedVatAmount,
+    computedGrandTotal,
+    currency || oldInv.currency || 'USD',
+    hts_code || oldInv.hts_code || '',
+    notes !== undefined ? notes : oldInv.notes,
+    itemsJson,
+    targetId
+  );
+
+  // Sync update to data_logger
+  const existingLog = await db.prepare("SELECT id FROM data_logger WHERE doc_type = 'INVOICE' AND (ref_id = ? OR doc_number = ?)").get(targetId, oldInv.invoice_number);
+  if (existingLog) {
+    await db.prepare(`
+      UPDATE data_logger
+      SET doc_number = ?, doc_date = ?, customer_name = ?, customer_id = ?,
+          po_no = ?, part_name = ?, box_qty = ?, pallet_qty = ?,
+          terms_of_delivery = ?, payment_term = ?, notes = ?, items = ?,
+          grand_total = ?, unit_price = ?, currency = ?, ref_id = ?
+      WHERE id = ?
+    `).run(
+      invoice_number || oldInv.invoice_number,
+      invoice_date || oldInv.invoice_date,
+      customer_name || oldInv.customer_name,
+      customer_id || oldInv.customer_id,
+      finalPoNo,
+      finalPartName,
+      numBoxes,
+      numPallets,
+      terms_of_delivery || '',
+      payment_term || '',
+      notes || '',
+      itemsJson,
+      computedGrandTotal,
+      numUnitPrice,
+      currency || 'USD',
+      targetId,
+      existingLog.id
+    );
+  } else {
+    await db.prepare(`
+      INSERT INTO data_logger (
+        doc_type, doc_number, doc_date, customer_name, customer_id, po_no,
+        part_name, box_qty, pallet_qty, terms_of_delivery, payment_term, dimensions, image_url, notes, items, ref_id,
+        grand_total, unit_price, currency
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(
+      'INVOICE',
+      invoice_number || oldInv.invoice_number,
+      invoice_date || oldInv.invoice_date,
+      customer_name || oldInv.customer_name,
+      customer_id || oldInv.customer_id,
+      finalPoNo,
+      finalPartName,
+      numBoxes,
+      numPallets,
+      terms_of_delivery || '',
+      payment_term || '',
+      null,
+      '',
+      notes || '',
+      itemsJson,
+      targetId,
+      computedGrandTotal,
+      numUnitPrice,
+      currency || 'USD'
+    );
+  }
+
+  // If invoice_number changed, update references in children so they don't become orphans
+  if (oldInv.invoice_number && invoice_number && oldInv.invoice_number !== invoice_number) {
+    const oldRefStr = `Ref Inv: ${oldInv.invoice_number}`;
+    const newRefStr = `Ref Inv: ${invoice_number}`;
+    await db.prepare("UPDATE data_logger SET terms_of_delivery = REPLACE(terms_of_delivery, ?, ?) WHERE terms_of_delivery LIKE ?").run(oldRefStr, newRefStr, `%${oldRefStr}%`);
+    await db.prepare("UPDATE data_logger SET doc_number = ? WHERE doc_number = ? AND doc_type != 'INVOICE'").run(invoice_number, oldInv.invoice_number);
+    await db.prepare("UPDATE packing_lists SET invoice_number = ? WHERE invoice_number = ?").run(invoice_number, oldInv.invoice_number);
+  }
+
+  return await db.prepare('SELECT * FROM invoices WHERE id = ?').get(targetId);
+}
+
 app.post('/api/invoices', async (req, res) => {
   try {
     const {
@@ -952,7 +1142,21 @@ app.post('/api/invoices', async (req, res) => {
       items
     } = req.body;
 
-    // Multi-item handling
+    // Check if updating existing invoice by ID or if invoice_number already exists
+    let existingId = req.body.id;
+    if (!existingId && invoice_number && req.body.force_new !== true) {
+      const existing = await db.prepare('SELECT id FROM invoices WHERE invoice_number = ?').get(invoice_number);
+      if (existing) {
+        existingId = existing.id;
+      }
+    }
+
+    if (existingId) {
+      const updated = await updateInvoiceHelper(existingId, req.body);
+      return res.status(200).json(updated);
+    }
+
+    // Multi-item handling for new invoice
     let parsedItems = null;
     if (Array.isArray(items) && items.length > 0) {
       parsedItems = items;
@@ -972,7 +1176,7 @@ app.post('/api/invoices', async (req, res) => {
     let computedTotalQty = Number(total_qty) || 0;
     let numUnitPrice = Number(unit_price) || 0;
     let computedTotalAmount = Number(total_amount) || 0;
-    const numVatRate = vat_rate !== undefined ? Number(vat_rate) : 11;
+    const numVatRate = vat_rate !== undefined ? Number(vat_rate) : 0;
 
     if (parsedItems && parsedItems.length > 0) {
       // Calculate sums across items
@@ -1001,7 +1205,7 @@ app.post('/api/invoices', async (req, res) => {
       computedTotalAmount = computedTotalAmount || (computedTotalQty * numUnitPrice);
     }
 
-    const computedVatAmount = Number(vat_amount) || (computedTotalAmount * (numVatRate / 100));
+    const computedVatAmount = Number(vat_amount) || (numVatRate > 0 ? (computedTotalAmount * (numVatRate / 100)) : 0);
     const computedGrandTotal = Number(grand_total) || (computedTotalAmount + computedVatAmount);
     const itemsJson = parsedItems ? JSON.stringify(parsedItems) : null;
 
@@ -1083,143 +1287,7 @@ app.post('/api/invoices', async (req, res) => {
 
 app.put('/api/invoices/:id', async (req, res) => {
   try {
-    const {
-      invoice_number,
-      invoice_date,
-      customer_name,
-      customer_id,
-      bill_to,
-      ship_to,
-      payment_term,
-      terms_of_delivery,
-      customer_po_no,
-      part_name,
-      no_of_pallet,
-      no_of_box,
-      qty_per_box,
-      total_qty,
-      unit_price,
-      total_amount,
-      vat_rate,
-      vat_amount,
-      grand_total,
-      currency,
-      hts_code,
-      notes,
-      items
-    } = req.body;
-
-    let parsedItems = null;
-    if (Array.isArray(items) && items.length > 0) {
-      parsedItems = items;
-    } else if (typeof items === 'string' && items.trim().startsWith('[')) {
-      try {
-        parsedItems = JSON.parse(items);
-      } catch (e) {
-        parsedItems = null;
-      }
-    }
-
-    let finalPartName = part_name || '';
-    let finalPoNo = customer_po_no || '';
-    let numPallets = Number(no_of_pallet) || 0;
-    let numBoxes = Number(no_of_box) || 0;
-    let numQtyPerBox = Number(qty_per_box) || 0;
-    let computedTotalQty = Number(total_qty) || 0;
-    let numUnitPrice = Number(unit_price) || 0;
-    let computedTotalAmount = Number(total_amount) || 0;
-    const numVatRate = vat_rate !== undefined ? Number(vat_rate) : 11;
-
-    if (parsedItems && parsedItems.length > 0) {
-      numPallets = parsedItems.reduce((acc, it) => acc + (Number(it.no_of_pallet) || 0), 0);
-      numBoxes = parsedItems.reduce((acc, it) => acc + (Number(it.no_of_box) || 0), 0);
-      computedTotalQty = parsedItems.reduce((acc, it) => {
-        const itemBoxes = Number(it.no_of_box) || 0;
-        const itemPerBox = Number(it.qty_per_box) || 0;
-        return acc + (Number(it.total_qty) || (itemBoxes * itemPerBox));
-      }, 0);
-      computedTotalAmount = parsedItems.reduce((acc, it) => acc + (Number(it.total_amount) || 0), 0);
-      
-      finalPartName = parsedItems.length === 1
-        ? (parsedItems[0].part_name || '')
-        : `${parsedItems.length} Items: ${parsedItems.map(i => i.part_name).filter(Boolean).slice(0, 3).join(', ')}${parsedItems.length > 3 ? '...' : ''}`;
-      
-      const distinctPo = [...new Set(parsedItems.map(i => i.customer_po_no).filter(Boolean))];
-      if (distinctPo.length > 0) {
-        finalPoNo = distinctPo.join(', ');
-      }
-    } else {
-      computedTotalQty = computedTotalQty || (numBoxes * numQtyPerBox);
-      computedTotalAmount = computedTotalAmount || (computedTotalQty * numUnitPrice);
-    }
-
-    const computedVatAmount = Number(vat_amount) || (computedTotalAmount * (numVatRate / 100));
-    const computedGrandTotal = Number(grand_total) || (computedTotalAmount + computedVatAmount);
-    const itemsJson = parsedItems ? JSON.stringify(parsedItems) : null;
-
-    await db.prepare(`
-      UPDATE invoices
-      SET invoice_number = ?, invoice_date = ?, customer_name = ?, customer_id = ?,
-          bill_to = ?, ship_to = ?, payment_term = ?, terms_of_delivery = ?, customer_po_no = ?, part_name = ?,
-          no_of_pallet = ?, no_of_box = ?, qty_per_box = ?, total_qty = ?, unit_price = ?,
-          total_amount = ?, vat_rate = ?, vat_amount = ?, grand_total = ?, currency = ?,
-          hts_code = ?, notes = ?, items = ?
-      WHERE id = ?
-    `).run(
-      invoice_number || '',
-      invoice_date || '',
-      customer_name || '',
-      customer_id || '',
-      bill_to || '',
-      ship_to || '',
-      payment_term || '',
-      terms_of_delivery || '',
-      finalPoNo,
-      finalPartName,
-      numPallets,
-      numBoxes,
-      numQtyPerBox,
-      computedTotalQty,
-      numUnitPrice,
-      computedTotalAmount,
-      numVatRate,
-      computedVatAmount,
-      computedGrandTotal,
-      currency || 'USD',
-      hts_code || '',
-      notes || '',
-      itemsJson,
-      req.params.id
-    );
-
-    // Sync update to data_logger
-    await db.prepare(`
-      UPDATE data_logger
-      SET doc_number = ?, doc_date = ?, customer_name = ?, customer_id = ?,
-          po_no = ?, part_name = ?, box_qty = ?, pallet_qty = ?,
-          terms_of_delivery = ?, payment_term = ?, notes = ?, items = ?,
-          grand_total = ?, unit_price = ?, currency = ?
-      WHERE doc_type = 'INVOICE' AND ref_id = ?
-    `).run(
-      invoice_number || '',
-      invoice_date || '',
-      customer_name || '',
-      customer_id || '',
-      finalPoNo,
-      finalPartName,
-      numBoxes,
-      numPallets,
-      terms_of_delivery || '',
-      payment_term || '',
-      notes || '',
-      itemsJson,
-      computedGrandTotal,
-      numUnitPrice,
-      currency || 'USD',
-      req.params.id
-    );
-
-    const updated = await db.prepare('SELECT * FROM invoices WHERE id = ?').get(req.params.id);
+    const updated = await updateInvoiceHelper(req.params.id, req.body);
     res.json(updated);
   } catch (err) {
     console.error('Invoice update error:', err);
@@ -1981,6 +2049,7 @@ app.post('/api/delivery-orders', async (req, res) => {
     }
 
     const itemsJson = parsedItems ? JSON.stringify(parsedItems) : null;
+    const finalDoNumber = (do_number?.trim() || invoice_number?.trim() || '').trim();
 
     const stmt = await db.prepare(`
       INSERT INTO delivery_orders (
@@ -1990,7 +2059,7 @@ app.post('/api/delivery-orders', async (req, res) => {
     `);
 
     const info = await stmt.run(
-      do_number || '',
+      finalDoNumber || (invoice_number?.trim() || ''),
       do_date || new Date().toISOString().slice(0, 10),
       invoice_number || '',
       customer_name || '',
@@ -2014,7 +2083,7 @@ app.post('/api/delivery-orders', async (req, res) => {
     `);
     await loggerStmt.run(
       'DELIVERY_ORDER',
-      do_number || `DO-${refId}`,
+      finalDoNumber || (invoice_number?.trim() || `DO-${refId}`),
       do_date || new Date().toISOString().slice(0, 10),
       customer_name || '',
       customer_id || '',
@@ -2086,6 +2155,7 @@ app.put('/api/delivery-orders/:id', async (req, res) => {
     }
 
     const itemsJson = parsedItems ? JSON.stringify(parsedItems) : null;
+    const finalDoNumber = (do_number?.trim() || invoice_number?.trim() || '').trim();
 
     await db.prepare(`
       UPDATE delivery_orders
@@ -2094,7 +2164,7 @@ app.put('/api/delivery-orders/:id', async (req, res) => {
           box_qty = ?, notes = ?, items = ?
       WHERE id = ?
     `).run(
-      do_number || '',
+      finalDoNumber || (invoice_number?.trim() || ''),
       do_date || '',
       invoice_number || '',
       customer_name || '',
@@ -2116,7 +2186,7 @@ app.put('/api/delivery-orders/:id', async (req, res) => {
           terms_of_delivery = ?, notes = ?, items = ?
       WHERE doc_type = 'DELIVERY_ORDER' AND ref_id = ?
     `).run(
-      do_number || '',
+      finalDoNumber || (invoice_number?.trim() || ''),
       do_date || '',
       customer_name || '',
       customer_id || '',

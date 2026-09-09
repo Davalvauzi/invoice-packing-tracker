@@ -56,6 +56,7 @@ async function createPostgresSchema(client) {
       height NUMERIC DEFAULT 0,
       unit VARCHAR(20) DEFAULT 'mm',
       qty_per_box INTEGER DEFAULT 0,
+      box_per_pallet INTEGER DEFAULT 0,
       price NUMERIC DEFAULT 0,
       is_dummy SMALLINT DEFAULT 0,
       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -231,6 +232,9 @@ async function createPostgresSchema(client) {
     CREATE INDEX IF NOT EXISTS idx_inv_number ON invoices(invoice_number);
     CREATE INDEX IF NOT EXISTS idx_pl_inv_number ON packing_lists(invoice_number);
     CREATE INDEX IF NOT EXISTS idx_do_number ON delivery_orders(do_number);
+
+    -- Ensure incremental schema updates
+    ALTER TABLE parts ADD COLUMN IF NOT EXISTS box_per_pallet INTEGER DEFAULT 0;
   `);
 
   console.log('✅ Skema PostgreSQL berhasil dibuat.');

@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Printer, ArrowLeft } from 'lucide-react';
+import { formatIndoDate } from '../utils/dateFormatter';
 
 export default function PrintDeliveryOrder({ id, onBack }) {
   const [deliveryOrder, setDeliveryOrder] = useState(null);
@@ -446,7 +447,7 @@ export default function PrintDeliveryOrder({ id, onBack }) {
                 <div className="grid grid-cols-12">
                   <span className="col-span-4">Date</span>
                   <span className="col-span-1">:</span>
-                  <span className="col-span-7">{deliveryOrder.do_date || '-'}</span>
+                  <span className="col-span-7">{formatIndoDate(deliveryOrder.do_date)}</span>
                 </div>
               </div>
 

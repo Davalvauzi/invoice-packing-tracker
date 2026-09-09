@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { useNotification } from '../context/NotificationContext';
+import SearchableInvoiceSelect from './SearchableInvoiceSelect';
 
 const createEmptyDOItem = () => ({
   id: Date.now() + Math.random(),
@@ -23,11 +24,12 @@ const createEmptyDOItem = () => ({
   pallet_qty: '',
   box_qty: '',
   qty_per_box: '',
+  box_per_pallet: '',
   total_qty: '',
   remark: ''
 });
 
-export default function DeliveryOrderModal({ isOpen, onClose, onSuccess }) {
+export default function DeliveryOrderModal({ isOpen, onClose, onSuccess, initialInvoice = null }) {
   const { showSuccess, showError, showWarning } = useNotification();
   const [customers, setCustomers] = useState([]);
   const [parts, setParts] = useState([]);
@@ -80,6 +82,16 @@ export default function DeliveryOrderModal({ isOpen, onClose, onSuccess }) {
     }
   }, [isOpen]);
 
+  // Auto-select invoice if initialInvoice is passed
+  useEffect(() => {
+    if (isOpen && initialInvoice) {
+      const invNum = initialInvoice.invoice_number || initialInvoice.doc_number;
+      if (invNum) {
+        handleInvoiceSelect(invNum);
+      }
+    }
+  }, [isOpen, initialInvoice, recentInvoices]);
+
   // Synchronize aggregate totals from items into formData
   useEffect(() => {
     const totalP = items.reduce((acc, it) => acc + (Number(it.pallet_qty) || 0), 0);
@@ -130,7 +142,10 @@ export default function DeliveryOrderModal({ isOpen, onClose, onSuccess }) {
   };
 
   const handleInvoiceSelect = (invNum) => {
-    const found = recentInvoices.find(i => i.invoice_number === invNum);
+    if (!invNum || typeof invNum !== 'string') return;
+    const found = recentInvoices.find(i => i.invoice_number === invNum || i.doc_number === invNum);
+    const targetInvNum = found?.invoice_number || found?.doc_number || invNum;
+
     if (found) {
       let parsedItems = null;
       if (Array.isArray(found.items) && found.items.length > 0) {
@@ -145,8 +160,12 @@ export default function DeliveryOrderModal({ isOpen, onClose, onSuccess }) {
 
       if (parsedItems && parsedItems.length > 0) {
         const mapped = parsedItems.map(it => {
+          const matchPart = parts.find(p => 
+            (p.part_no && it.part_no && p.part_no.toLowerCase() === it.part_no.toLowerCase()) ||
+            (p.part_name && it.part_name && p.part_name.toLowerCase() === it.part_name.toLowerCase())
+          );
           const b = Number(it.no_of_box || it.box_qty) || 0;
-          const q = Number(it.qty_per_box || it.qty_per_ctn) || 0;
+          const q = Number(it.qty_per_box || it.qty_per_ctn || matchPart?.qty_per_box) || 0;
           let t = Number(it.total_qty) || 0;
           if (!t && b > 0 && q > 0) t = b * q;
           return {
@@ -157,6 +176,7 @@ export default function DeliveryOrderModal({ isOpen, onClose, onSuccess }) {
             pallet_qty: String(it.no_of_pallet || it.pallet_qty || ''),
             box_qty: String(it.no_of_box || it.box_qty || ''),
             qty_per_box: q ? String(q) : '',
+            box_per_pallet: it.box_per_pallet || matchPart?.box_per_pallet ? String(it.box_per_pallet || matchPart?.box_per_pallet) : '',
             total_qty: t ? String(t) : '',
             remark: it.remark || ''
           };
@@ -176,6 +196,7 @@ export default function DeliveryOrderModal({ isOpen, onClose, onSuccess }) {
           pallet_qty: String(found.no_of_pallet || found.pallet_qty || ''),
           box_qty: String(found.no_of_box || found.box_qty || ''),
           qty_per_box: q ? String(q) : '',
+          box_per_pallet: matchPart?.box_per_pallet ? String(matchPart.box_per_pallet) : '',
           total_qty: t ? String(t) : '',
           remark: ''
         }]);
@@ -183,15 +204,20 @@ export default function DeliveryOrderModal({ isOpen, onClose, onSuccess }) {
 
       setFormData(prev => ({
         ...prev,
-        invoice_number: found.invoice_number,
+        do_number: targetInvNum, // No DO otomatis mengikuti No Invoice
+        invoice_number: targetInvNum,
         customer_name: found.customer_name || prev.customer_name,
         customer_id: found.customer_id || prev.customer_id,
         customer_po_no: found.customer_po_no || prev.customer_po_no
       }));
 
-      showSuccess(`Data ${parsedItems?.length ? `${parsedItems.length} produk` : ''} berhasil ditautkan dari Invoice ${found.invoice_number}!`);
+      showSuccess(`Data ${parsedItems?.length ? `${parsedItems.length} produk` : ''} berhasil ditautkan dari Invoice ${targetInvNum}! Nomor DO diselaraskan.`);
     } else {
-      setFormData(prev => ({ ...prev, invoice_number: invNum }));
+      setFormData(prev => ({ 
+        ...prev, 
+        do_number: invNum, 
+        invoice_number: invNum 
+      }));
     }
   };
 
@@ -199,12 +225,25 @@ export default function DeliveryOrderModal({ isOpen, onClose, onSuccess }) {
     setItems(prev => {
       const updated = [...prev];
       const row = { ...updated[index], [field]: value };
-      if (field === 'box_qty' || field === 'qty_per_box') {
+
+      const pallet = Number(field === 'pallet_qty' ? value : row.pallet_qty) || 0;
+      const boxPerPallet = Number(row.box_per_pallet) || 0;
+
+      // Auto-calculate box_qty from pallet_qty if box_per_pallet is present
+      if (field === 'pallet_qty') {
+        if (pallet > 0 && boxPerPallet > 0) {
+          row.box_qty = String(Math.round(pallet * boxPerPallet));
+        } else if (!value && boxPerPallet > 0) {
+          row.box_qty = '';
+        }
+      }
+
+      if (field === 'pallet_qty' || field === 'box_qty' || field === 'qty_per_box') {
         const b = Number(field === 'box_qty' ? value : row.box_qty) || 0;
         const q = Number(field === 'qty_per_box' ? value : row.qty_per_box) || 0;
         if (b > 0 && q > 0) {
           row.total_qty = String(b * q);
-        } else if (field === 'box_qty' && !value) {
+        } else if ((field === 'box_qty' || field === 'pallet_qty') && !row.box_qty) {
           row.total_qty = '';
         }
       }
@@ -226,12 +265,19 @@ export default function DeliveryOrderModal({ isOpen, onClose, onSuccess }) {
       if (found) {
         row.part_name = found.part_name;
         row.part_no = found.part_no || '';
-        if (found.qty_per_box) {
-          row.qty_per_box = String(found.qty_per_box);
-          const b = Number(row.box_qty) || 0;
-          if (b > 0) {
-            row.total_qty = String(b * Number(found.qty_per_box));
-          }
+        if (found.box_per_pallet) row.box_per_pallet = String(found.box_per_pallet);
+        if (found.qty_per_box) row.qty_per_box = String(found.qty_per_box);
+
+        const p = Number(row.pallet_qty) || 0;
+        const bp = Number(found.box_per_pallet) || 0;
+        if (p > 0 && bp > 0) {
+          row.box_qty = String(Math.round(p * bp));
+        }
+
+        const b = Number(row.box_qty) || 0;
+        const q = Number(row.qty_per_box) || 0;
+        if (b > 0 && q > 0) {
+          row.total_qty = String(b * q);
         }
       } else {
         row.part_name = selectedVal;
@@ -258,7 +304,8 @@ export default function DeliveryOrderModal({ isOpen, onClose, onSuccess }) {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!formData.do_number.trim()) {
+    const finalDoNumber = (formData.do_number || formData.invoice_number || '').trim();
+    if (!finalDoNumber) {
       showWarning('Mohon isi DELIVERY ORDER NUMBER');
       return;
     }
@@ -280,6 +327,7 @@ export default function DeliveryOrderModal({ isOpen, onClose, onSuccess }) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           ...formData,
+          do_number: finalDoNumber,
           items: JSON.stringify(items)
         })
       });
@@ -403,7 +451,7 @@ export default function DeliveryOrderModal({ isOpen, onClose, onSuccess }) {
             
             {/* Link to Invoice (Enables Tree Hierarchy) */}
             {recentInvoices.length > 0 && (
-              <div className="bg-teal-50/80 border border-teal-200 p-3 rounded-xl flex items-center justify-between gap-3">
+              <div className="bg-teal-50/80 border border-teal-200 p-3 rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                 <div className="flex items-center gap-2 text-teal-900 text-xs">
                   <LinkIcon className="w-4 h-4 text-teal-700 shrink-0" />
                   <div>
@@ -411,18 +459,12 @@ export default function DeliveryOrderModal({ isOpen, onClose, onSuccess }) {
                     <span className="text-[11px] text-teal-700">Pilih nomor invoice untuk mengisi otomatis data customer, PO, dan part secara instan.</span>
                   </div>
                 </div>
-                <select
-                  value={formData.invoice_number}
-                  onChange={(e) => handleInvoiceSelect(e.target.value)}
-                  className="px-2.5 py-1.5 rounded-lg border border-teal-300 bg-white text-xs font-semibold text-teal-900 cursor-pointer max-w-[200px]"
-                >
-                  <option value="">-- Pilih Invoice --</option>
-                  {recentInvoices.map((inv) => (
-                    <option key={inv.id} value={inv.invoice_number}>
-                      {inv.invoice_number}
-                    </option>
-                  ))}
-                </select>
+                <SearchableInvoiceSelect
+                  invoices={recentInvoices}
+                  selectedInvoiceNumber={formData.invoice_number}
+                  onSelect={(inv) => handleInvoiceSelect(inv.invoice_number)}
+                  placeholder="-- Cari / Pilih Invoice --"
+                />
               </div>
             )}
 
@@ -431,13 +473,18 @@ export default function DeliveryOrderModal({ isOpen, onClose, onSuccess }) {
               {/* Row 1: Delivery Order Number & Date */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-[11px] font-extrabold text-slate-800 uppercase mb-1">
-                    DELIVERY ORDER NUMBER <span className="text-red-500">*</span>
+                  <label className="block text-[11px] font-extrabold text-slate-800 uppercase mb-1 flex items-center justify-between">
+                    <span>DELIVERY ORDER NUMBER <span className="text-red-500">*</span></span>
+                    {formData.invoice_number && (
+                      <span className="text-[10px] font-semibold text-teal-700 bg-teal-50 border border-teal-200 px-1.5 py-0.2 rounded">
+                        Mengikuti Invoice
+                      </span>
+                    )}
                   </label>
                   <input
                     type="text"
                     required
-                    placeholder="Contoh: DO-2026-001"
+                    placeholder={formData.invoice_number || "Contoh: DO-2026-001"}
                     value={formData.do_number}
                     onChange={(e) => setFormData({ ...formData, do_number: e.target.value })}
                     className="w-full px-3 py-2 rounded-xl border border-slate-300 focus:border-teal-700 font-mono text-xs bg-white shadow-2xs font-bold text-slate-900"
@@ -514,7 +561,7 @@ export default function DeliveryOrderModal({ isOpen, onClose, onSuccess }) {
               <datalist id="do-parts-list">
                 {parts.map(p => (
                   <option key={p.id} value={`${p.part_name} (${p.part_no})`}>
-                    {p.part_name} - {p.part_no}
+                    {p.part_name} - {p.part_no} | {p.qty_per_box ? `${p.qty_per_box} pcs/box` : ''} | {p.box_per_pallet ? `${p.box_per_pallet} box/plt` : ''}
                   </option>
                 ))}
               </datalist>
@@ -598,16 +645,23 @@ export default function DeliveryOrderModal({ isOpen, onClose, onSuccess }) {
                     {/* Row 2: Pallet Qty, Box Qty, Qty Per Box, Total Qty */}
                     <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 pt-1">
                       <div>
-                        <label className="block text-[10px] font-bold text-slate-600 uppercase mb-0.5">
-                          JUMLAH PALLET
-                        </label>
+                        <div className="flex items-center justify-between mb-0.5">
+                          <label className="block text-[10px] font-bold text-slate-600 uppercase">
+                            JUMLAH PALLET
+                          </label>
+                          {Number(item.box_per_pallet) > 0 && (
+                            <span className="text-[8px] font-semibold text-teal-800 font-mono" title={`Kapasitas: ${item.box_per_pallet} box / pallet`}>
+                              @{item.box_per_pallet}b
+                            </span>
+                          )}
+                        </div>
                         <input
                           type="number"
                           min="0"
                           placeholder="0"
                           value={item.pallet_qty}
                           onChange={(e) => handleItemChange(index, 'pallet_qty', e.target.value)}
-                          className="w-full px-2 py-1.5 rounded-lg border border-teal-300 bg-white font-mono text-xs font-bold text-slate-800 text-center"
+                          className="w-full px-2 py-1.5 rounded-lg border border-teal-300 bg-white font-mono text-xs font-bold text-slate-800 text-center focus:border-teal-700"
                         />
                       </div>
 

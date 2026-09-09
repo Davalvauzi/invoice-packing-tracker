@@ -154,21 +154,21 @@ const SAMPLE_COMPANIES = [
 
 // 2. Kamus Katalog Produk & Part Presisi Manufaktur
 const SAMPLE_PARTS = [
-  { part_name: 'Pinion Gear Transmission Planetary Type', part_no: 'GR-PIN-902', category: 'stamping_mechanical', qty_per_box: 60, price_usd: 6.4500, length: 350, width: 250, height: 200, unit: 'mm' },
-  { part_name: 'Bracket Engine Mount RH High-Tensile', part_no: 'BKT-ENG-001', category: 'stamping_mechanical', qty_per_box: 50, price_usd: 5.2500, length: 400, width: 250, height: 200, unit: 'mm' },
-  { part_name: 'Cover Side Upper LH - Matte Black Spec', part_no: 'CVR-SD-102', category: 'gasket_seals_cases', qty_per_box: 80, price_usd: 2.8500, length: 500, width: 220, height: 160, unit: 'mm' },
-  { part_name: 'Housing Clutch Outer Stamping Spec A', part_no: 'HSG-CL-880', category: 'stamping_mechanical', qty_per_box: 40, price_usd: 8.4500, length: 320, width: 320, height: 180, unit: 'mm' },
-  { part_name: 'Shaft Drive Axle Front Precision Ground', part_no: 'SHF-AX-554', category: 'stamping_mechanical', qty_per_box: 25, price_usd: 12.8000, length: 600, width: 120, height: 120, unit: 'mm' },
-  { part_name: 'Terminal Connector 16-Pin Gold Plated', part_no: 'CON-16P-GLD', category: 'electrical_sensor', qty_per_box: 200, price_usd: 1.1500, length: 300, width: 200, height: 150, unit: 'mm' },
-  { part_name: 'Armature Rotor Assy 24V Brushless', part_no: 'RTR-ASY-24V', category: 'electrical_sensor', qty_per_box: 30, price_usd: 15.5000, length: 350, width: 250, height: 200, unit: 'mm' },
-  { part_name: 'Gasket Cylinder Head Multi-Layer Steel', part_no: 'GSK-CYL-012', category: 'gasket_seals_cases', qty_per_box: 150, price_usd: 3.2000, length: 420, width: 280, height: 100, unit: 'mm' },
-  { part_name: 'Pulley Crankshaft Damper V-Belt Type', part_no: 'PLY-CRK-440', category: 'stamping_mechanical', qty_per_box: 20, price_usd: 9.7500, length: 280, width: 280, height: 200, unit: 'mm' },
-  { part_name: 'Sensor Oxygen Exhaust Heated 4-Wire', part_no: 'SNS-O2-EXH', category: 'electrical_sensor', qty_per_box: 60, price_usd: 18.2500, length: 300, width: 200, height: 180, unit: 'mm' },
-  { part_name: 'Solenoid Valve Purge Control 12V DC', part_no: 'SOL-VLV-12V', category: 'electrical_sensor', qty_per_box: 50, price_usd: 7.6000, length: 320, width: 240, height: 160, unit: 'mm' },
-  { part_name: 'Insulator Manifold Intake Heat-Resistant', part_no: 'INS-MNF-008', category: 'gasket_seals_cases', qty_per_box: 100, price_usd: 2.4000, length: 350, width: 250, height: 180, unit: 'mm' },
-  { part_name: 'Stamping Plate Reinforcement B-Pillar', part_no: 'STP-PLT-B01', category: 'stamping_mechanical', qty_per_box: 40, price_usd: 6.8000, length: 550, width: 300, height: 150, unit: 'mm' },
-  { part_name: 'Oil Seal Crankshaft Rear Viton High Temp', part_no: 'SEAL-CRK-RR', category: 'gasket_seals_cases', qty_per_box: 250, price_usd: 1.8500, length: 250, width: 250, height: 120, unit: 'mm' },
-  { part_name: 'Wiring Harness Main Body Sub-Assy', part_no: 'WRG-HRN-SUB', category: 'electrical_sensor', qty_per_box: 15, price_usd: 34.5000, length: 650, width: 450, height: 300, unit: 'mm' }
+  { part_name: 'Pinion Gear Transmission Planetary Type', part_no: 'GR-PIN-902', category: 'stamping_mechanical', qty_per_box: 60, box_per_pallet: 24, price_usd: 6.4500, length: 350, width: 250, height: 200, unit: 'mm' },
+  { part_name: 'Bracket Engine Mount RH High-Tensile', part_no: 'BKT-ENG-001', category: 'stamping_mechanical', qty_per_box: 50, box_per_pallet: 20, price_usd: 5.2500, length: 400, width: 250, height: 200, unit: 'mm' },
+  { part_name: 'Cover Side Upper LH - Matte Black Spec', part_no: 'CVR-SD-102', category: 'gasket_seals_cases', qty_per_box: 80, box_per_pallet: 30, price_usd: 2.8500, length: 500, width: 220, height: 160, unit: 'mm' },
+  { part_name: 'Housing Clutch Outer Stamping Spec A', part_no: 'HSG-CL-880', category: 'stamping_mechanical', qty_per_box: 40, box_per_pallet: 24, price_usd: 8.4500, length: 320, width: 320, height: 180, unit: 'mm' },
+  { part_name: 'Shaft Drive Axle Front Precision Ground', part_no: 'SHF-AX-554', category: 'stamping_mechanical', qty_per_box: 25, box_per_pallet: 40, price_usd: 12.8000, length: 600, width: 120, height: 120, unit: 'mm' },
+  { part_name: 'Terminal Connector 16-Pin Gold Plated', part_no: 'CON-16P-GLD', category: 'electrical_sensor', qty_per_box: 200, box_per_pallet: 50, price_usd: 1.1500, length: 300, width: 200, height: 150, unit: 'mm' },
+  { part_name: 'Armature Rotor Assy 24V Brushless', part_no: 'RTR-ASY-24V', category: 'electrical_sensor', qty_per_box: 30, box_per_pallet: 20, price_usd: 15.5000, length: 350, width: 250, height: 200, unit: 'mm' },
+  { part_name: 'Gasket Cylinder Head Multi-Layer Steel', part_no: 'GSK-CYL-012', category: 'gasket_seals_cases', qty_per_box: 150, box_per_pallet: 30, price_usd: 3.2000, length: 420, width: 280, height: 100, unit: 'mm' },
+  { part_name: 'Pulley Crankshaft Damper V-Belt Type', part_no: 'PLY-CRK-440', category: 'stamping_mechanical', qty_per_box: 20, box_per_pallet: 24, price_usd: 9.7500, length: 280, width: 280, height: 200, unit: 'mm' },
+  { part_name: 'Sensor Oxygen Exhaust Heated 4-Wire', part_no: 'SNS-O2-EXH', category: 'electrical_sensor', qty_per_box: 60, box_per_pallet: 36, price_usd: 18.2500, length: 300, width: 200, height: 180, unit: 'mm' },
+  { part_name: 'Solenoid Valve Purge Control 12V DC', part_no: 'SOL-VLV-12V', category: 'electrical_sensor', qty_per_box: 50, box_per_pallet: 32, price_usd: 7.6000, length: 320, width: 240, height: 160, unit: 'mm' },
+  { part_name: 'Insulator Manifold Intake Heat-Resistant', part_no: 'INS-MNF-008', category: 'gasket_seals_cases', qty_per_box: 100, box_per_pallet: 28, price_usd: 2.4000, length: 350, width: 250, height: 180, unit: 'mm' },
+  { part_name: 'Stamping Plate Reinforcement B-Pillar', part_no: 'STP-PLT-B01', category: 'stamping_mechanical', qty_per_box: 40, box_per_pallet: 20, price_usd: 6.8000, length: 550, width: 300, height: 150, unit: 'mm' },
+  { part_name: 'Oil Seal Crankshaft Rear Viton High Temp', part_no: 'SEAL-CRK-RR', category: 'gasket_seals_cases', qty_per_box: 250, box_per_pallet: 60, price_usd: 1.8500, length: 250, width: 250, height: 120, unit: 'mm' },
+  { part_name: 'Wiring Harness Main Body Sub-Assy', part_no: 'WRG-HRN-SUB', category: 'electrical_sensor', qty_per_box: 15, box_per_pallet: 16, price_usd: 34.5000, length: 650, width: 450, height: 300, unit: 'mm' }
 ];
 
 const PAYMENT_TERMS = ['Net 30 Days', 'Net 45 Days', 'Net 60 Days', 'Ex-Works', 'COD (Cash On Delivery)'];
@@ -250,8 +250,8 @@ async function seedMasterTemplate(db, options = {}) {
 
   // C. Seed Master Parts (Mode: Append / Idempotent)
   const insertPart = db.prepare(`
-    INSERT INTO parts (part_name, part_no, length, width, height, unit, qty_per_box, price, is_dummy)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1)
+    INSERT INTO parts (part_name, part_no, length, width, height, unit, qty_per_box, box_per_pallet, price, is_dummy)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1)
   `);
   const insertPriceHistory = db.prepare(`
     INSERT INTO part_price_history (part_id, price, currency, effective_date, notes)
@@ -262,7 +262,7 @@ async function seedMasterTemplate(db, options = {}) {
     const existing = await db.prepare('SELECT id FROM parts WHERE part_name = ? OR part_no = ?').get(p.part_name, p.part_no);
     let partId = existing ? existing.id : null;
     if (!existing) {
-      const info = await insertPart.run(p.part_name, p.part_no, p.length, p.width, p.height, p.unit, p.qty_per_box, p.price_usd);
+      const info = await insertPart.run(p.part_name, p.part_no, p.length, p.width, p.height, p.unit, p.qty_per_box, p.box_per_pallet || 0, p.price_usd);
       partId = info.lastInsertRowid;
       insertedParts++;
 

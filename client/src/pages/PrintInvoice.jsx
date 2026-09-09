@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Printer, ArrowLeft } from 'lucide-react';
+import { formatIndoDate } from '../utils/dateFormatter';
 
 export default function PrintInvoice({ id, onBack }) {
   const [invoice, setInvoice] = useState(null);
@@ -127,14 +128,23 @@ export default function PrintInvoice({ id, onBack }) {
     ? items.reduce((sum, it) => sum + (Number(it.total_amount) || 0), 0)
     : (Number(invoice.total_amount) || (unitPrice > 0 && totalQty > 0 ? totalQty * unitPrice : 0));
 
-  const vatAmount = Number(invoice.vat_amount) || (totalAmount * 0.11);
-  const grandTotal = Number(invoice.grand_total) || (totalAmount + vatAmount);
+  const vatAmount = Number(invoice.vat_amount) || 0;
+  const grandTotal = Number(invoice.grand_total) || totalAmount;
 
   // Parse lines for Bill To and Ship To
   const rawBillTo = invoice.bill_to || customer?.bill_to || customer?.address || '';
   let billToLines = rawBillTo.split('\n').map(l => l.trim()).filter(Boolean);
   if (billToLines.length === 0 && invoice.customer_name) {
     billToLines = [invoice.customer_name];
+  }
+
+  // Ensure contact info is present in Bill To
+  const billToText = billToLines.join('\n').toLowerCase();
+  if (customer?.phone && !billToText.includes(customer.phone.toLowerCase()) && !/^(tel|phone):/im.test(billToText)) {
+    billToLines.push(`Tel: ${customer.phone}`);
+  }
+  if (customer?.contact_person && !billToText.includes(customer.contact_person.toLowerCase()) && !/^(attn|pic|up):/im.test(billToText)) {
+    billToLines.push(`Attn: ${customer.contact_person}`);
   }
 
   const rawShipTo = invoice.ship_to || customer?.ship_to || customer?.address || '';
@@ -372,7 +382,7 @@ export default function PrintInvoice({ id, onBack }) {
               <div className="flex">
                 <span className="w-28">Invoice Date</span>
                 <span className="w-3">:</span>
-                <span>{invoice.invoice_date}</span>
+                <span>{formatIndoDate(invoice.invoice_date)}</span>
               </div>
 
               {/* Payment Term */}
@@ -453,7 +463,14 @@ export default function PrintInvoice({ id, onBack }) {
                     <tr key={idx} className="align-top border-b border-slate-200/50">
                       <td className="pt-1.5 pb-1 px-0.5 text-center font-mono">{idx + 1}</td>
                       <td className="pt-1.5 pb-1 px-1 text-left">
-                        <div className="font-normal">{item.part_name || ''}</div>
+                        <div className="font-normal flex items-center flex-wrap gap-1">
+                          <span>{item.part_name || ''}</span>
+                          {item.is_sample && (
+                            <span className="text-[6pt] font-bold text-amber-900 bg-amber-100/80 px-1 py-0.2 rounded border border-amber-300 print:border-black print:text-black">
+                              SAMPLE
+                            </span>
+                          )}
+                        </div>
                         {item.part_no && (
                           <div className="text-[7pt] font-mono text-black">
                             {item.part_no}
@@ -464,16 +481,16 @@ export default function PrintInvoice({ id, onBack }) {
                         {item.customer_po_no || invoice.customer_po_no || ''}
                       </td>
                       <td className="pt-1.5 pb-1 px-0.5 text-center font-mono">
-                        {item.no_of_pallet || ''}
+                        {item.no_of_pallet || (item.is_sample ? '-' : '')}
                       </td>
                       <td className="pt-1.5 pb-1 px-0.5 text-center font-mono">
-                        {item.no_of_box || ''}
+                        {item.no_of_box || (item.is_sample ? '-' : '')}
                       </td>
                       <td className="pt-1.5 pb-1 px-0.5 text-center font-mono">
-                        {itemQtyPerBox > 0 ? formatMoney(itemQtyPerBox, 0) : ''}
+                        {itemQtyPerBox > 0 ? formatMoney(itemQtyPerBox, 0) : (item.is_sample ? '-' : '')}
                       </td>
                       <td className="pt-1.5 pb-1 px-0.5 text-center font-mono">
-                        {itemTotalQty > 0 ? formatMoney(itemTotalQty, 0) : ''}
+                        {itemTotalQty > 0 ? formatMoney(itemTotalQty, 0) : (item.total_qty ? formatMoney(item.total_qty, 0) : '0')}
                       </td>
                       <td className="pt-1.5 pb-1 px-0.5 text-right font-mono">
                         {itemPrice > 0 ? formatMoney(itemPrice, 4) : ''}
@@ -540,7 +557,7 @@ export default function PrintInvoice({ id, onBack }) {
                 </td>
               </tr>
 
-              {/* Row 2: VAT 11% USD */}
+              {/* Row 2: VAT 11% USD (Tetap ada di laporan PDF, bernilai 0.00) */}
               <tr>
                 <td colSpan={5} className="py-0.5"></td>
                 <td colSpan={3} className="py-0.5 text-left font-normal pl-2 whitespace-nowrap">
@@ -558,7 +575,7 @@ export default function PrintInvoice({ id, onBack }) {
                   TOTAL AMOUNT USD
                 </td>
                 <td className="py-0.5 pb-1 text-right font-mono font-bold pr-1">
-                  {grandTotal > 0 ? formatMoney(grandTotal, 2) : '0.00'}
+                  {grandTotal > 0 ? formatMoney(grandTotal, 2) : (totalAmount > 0 ? formatMoney(totalAmount, 2) : '0.00')}
                 </td>
               </tr>
             </tfoot>

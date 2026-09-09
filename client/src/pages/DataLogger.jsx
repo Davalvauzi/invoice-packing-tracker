@@ -31,6 +31,7 @@ import { useNotification } from '../context/NotificationContext';
 export default function DataLogger({ 
   openPrintTab, 
   onOpenInvoiceModal, 
+  onEditInvoice,
   onOpenPackingListModal, 
   onOpenDeliveryOrderModal,
   refreshTrigger 
@@ -448,7 +449,7 @@ export default function DataLogger({
           </button>
 
           <button
-            onClick={onOpenPackingListModal}
+            onClick={() => onOpenPackingListModal && onOpenPackingListModal(null)}
             className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-teal-800 text-white rounded-xl text-xs font-bold hover:bg-teal-900 shadow-xs transition-colors cursor-pointer"
           >
             <Package className="w-3.5 h-3.5" />
@@ -456,7 +457,7 @@ export default function DataLogger({
           </button>
 
           <button
-            onClick={onOpenDeliveryOrderModal}
+            onClick={() => onOpenDeliveryOrderModal && onOpenDeliveryOrderModal(null)}
             className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-[#0b4d53] text-white rounded-xl text-xs font-bold hover:bg-[#07363b] shadow-xs transition-colors cursor-pointer"
           >
             <Truck className="w-3.5 h-3.5" />
@@ -857,12 +858,36 @@ export default function DataLogger({
                           <td className="px-4 py-3 text-right whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
                             <div className="flex items-center justify-end gap-1.5">
                               <button
-                                onClick={() => handleOpenEdit(inv)}
-                                className="p-1.5 bg-amber-50 hover:bg-amber-100 text-amber-700 rounded-lg text-xs transition-colors"
-                                title="Edit Data / Koreksi Typo"
+                                onClick={() => {
+                                  if (onEditInvoice) {
+                                    onEditInvoice(inv);
+                                  } else {
+                                    handleOpenEdit(inv);
+                                  }
+                                }}
+                                className="p-1.5 bg-amber-50 hover:bg-amber-100 text-amber-700 rounded-lg text-xs transition-colors cursor-pointer"
+                                title="Edit Dokumen Invoice"
                               >
                                 <Edit3 className="w-3.5 h-3.5" />
                               </button>
+                              {onOpenPackingListModal && (
+                                <button
+                                  onClick={() => onOpenPackingListModal(inv)}
+                                  className="p-1.5 bg-teal-50 hover:bg-teal-100 text-teal-700 rounded-lg text-xs transition-colors cursor-pointer"
+                                  title="Buat Packing List dari Invoice ini"
+                                >
+                                  <Package className="w-3.5 h-3.5" />
+                                </button>
+                              )}
+                              {onOpenDeliveryOrderModal && (
+                                <button
+                                  onClick={() => onOpenDeliveryOrderModal(inv)}
+                                  className="p-1.5 bg-cyan-50 hover:bg-cyan-100 text-cyan-700 rounded-lg text-xs transition-colors cursor-pointer"
+                                  title="Buat Delivery Order dari Invoice ini"
+                                >
+                                  <Truck className="w-3.5 h-3.5" />
+                                </button>
+                              )}
                               <button
                                 onClick={() => setSelectedLog(inv)}
                                 className="p-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs transition-colors"
@@ -1089,12 +1114,36 @@ export default function DataLogger({
                     <td className="px-4 py-3 text-right whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
                       <div className="flex items-center justify-end gap-1.5">
                         <button
-                          onClick={() => handleOpenEdit(log)}
-                          className="p-1.5 bg-amber-50 hover:bg-amber-100 text-amber-700 rounded-lg text-xs transition-colors"
+                          onClick={() => {
+                            if (log.doc_type === 'INVOICE' && onEditInvoice) {
+                              onEditInvoice(log);
+                            } else {
+                              handleOpenEdit(log);
+                            }
+                          }}
+                          className="p-1.5 bg-amber-50 hover:bg-amber-100 text-amber-700 rounded-lg text-xs transition-colors cursor-pointer"
                           title="Edit Data / Koreksi Typo"
                         >
                           <Edit3 className="w-3.5 h-3.5" />
                         </button>
+                        {log.doc_type === 'INVOICE' && onOpenPackingListModal && (
+                          <button
+                            onClick={() => onOpenPackingListModal(log)}
+                            className="p-1.5 bg-teal-50 hover:bg-teal-100 text-teal-700 rounded-lg text-xs transition-colors cursor-pointer"
+                            title="Buat Packing List dari Invoice ini"
+                          >
+                            <Package className="w-3.5 h-3.5" />
+                          </button>
+                        )}
+                        {log.doc_type === 'INVOICE' && onOpenDeliveryOrderModal && (
+                          <button
+                            onClick={() => onOpenDeliveryOrderModal(log)}
+                            className="p-1.5 bg-cyan-50 hover:bg-cyan-100 text-cyan-700 rounded-lg text-xs transition-colors cursor-pointer"
+                            title="Buat Delivery Order dari Invoice ini"
+                          >
+                            <Truck className="w-3.5 h-3.5" />
+                          </button>
+                        )}
                         <button
                           onClick={() => setSelectedLog(log)}
                           className="p-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs transition-colors"
@@ -1333,14 +1382,46 @@ export default function DataLogger({
                 <Trash2 className="w-3.5 h-3.5" /> Hapus
               </button>
               <div className="flex items-center gap-2">
+                {selectedLog.doc_type === 'INVOICE' && onOpenPackingListModal && (
+                  <button
+                    onClick={() => {
+                      const docForPL = selectedLog;
+                      setSelectedLog(null);
+                      onOpenPackingListModal(docForPL);
+                    }}
+                    className="inline-flex items-center gap-1.5 px-3 py-2 bg-teal-50 text-teal-800 hover:bg-teal-100 rounded-xl text-xs font-bold border border-teal-200 transition-colors cursor-pointer"
+                    title="Buat Packing List"
+                  >
+                    <Package className="w-3.5 h-3.5" />
+                    <span>+ Buat PL</span>
+                  </button>
+                )}
+                {selectedLog.doc_type === 'INVOICE' && onOpenDeliveryOrderModal && (
+                  <button
+                    onClick={() => {
+                      const docForDO = selectedLog;
+                      setSelectedLog(null);
+                      onOpenDeliveryOrderModal(docForDO);
+                    }}
+                    className="inline-flex items-center gap-1.5 px-3 py-2 bg-cyan-50 text-cyan-800 hover:bg-cyan-100 rounded-xl text-xs font-bold border border-cyan-200 transition-colors cursor-pointer"
+                    title="Buat Delivery Order"
+                  >
+                    <Truck className="w-3.5 h-3.5" />
+                    <span>+ Buat DO</span>
+                  </button>
+                )}
                 <button
                   onClick={() => {
                     const toEdit = selectedLog;
                     setSelectedLog(null);
-                    handleOpenEdit(toEdit);
+                    if (toEdit && toEdit.doc_type === 'INVOICE' && onEditInvoice) {
+                      onEditInvoice(toEdit);
+                    } else {
+                      handleOpenEdit(toEdit);
+                    }
                   }}
-                  className="inline-flex items-center gap-1.5 px-3 py-2 bg-amber-500 hover:bg-amber-600 text-white rounded-xl text-xs font-bold shadow-xs transition-colors"
-                  title="Koreksi Salah Ketik (Typo)"
+                  className="inline-flex items-center gap-1.5 px-3 py-2 bg-amber-500 hover:bg-amber-600 text-white rounded-xl text-xs font-bold shadow-xs transition-colors cursor-pointer"
+                  title="Koreksi / Edit Dokumen"
                 >
                   <Edit3 className="w-3.5 h-3.5" />
                   <span>Edit Data</span>
@@ -1392,13 +1473,26 @@ export default function DataLogger({
                       EDIT {editingLog.doc_type}
                     </span>
                     <span className="font-mono font-bold text-xs opacity-90">{editingLog.doc_number}</span>
+                    {editingLog.doc_type === 'INVOICE' && onEditInvoice && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const toEdit = editingLog;
+                          setEditingLog(null);
+                          onEditInvoice(toEdit);
+                        }}
+                        className="text-[10px] font-bold text-amber-200 hover:text-white underline ml-2 cursor-pointer"
+                      >
+                        Buka Form Lengkap Invoice ➔
+                      </button>
+                    )}
                   </div>
                   <h2 className="text-base font-extrabold tracking-tight">Koreksi Data Dokumen</h2>
                 </div>
               </div>
               <button
                 onClick={() => !isSavingEdit && setEditingLog(null)}
-                className="p-1.5 rounded-lg text-amber-100 hover:text-white hover:bg-white/10 transition-colors"
+                className="p-1.5 rounded-lg text-amber-100 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
                 title="Tutup Modal (Esc)"
               >
                 <X className="w-5 h-5" />

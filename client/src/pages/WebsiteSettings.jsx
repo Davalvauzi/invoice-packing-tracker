@@ -31,7 +31,8 @@ import {
   Unlock,
   KeyRound,
   Eye,
-  EyeOff
+  EyeOff,
+  Clock
 } from 'lucide-react';
 import { useNotification } from '../context/NotificationContext';
 
@@ -94,9 +95,19 @@ export default function WebsiteSettings({ refreshTrigger }) {
   });
   const [uploadingField, setUploadingField] = useState(null);
 
-  // PIN Protection States
+  // PIN Protection States & 5-Minute Auto-Lock
   const [isPinUnlocked, setIsPinUnlocked] = useState(() => {
-    return sessionStorage.getItem('docutrack_admin_pin_unlocked') === 'true';
+    const unlocked = sessionStorage.getItem('docutrack_admin_pin_unlocked') === 'true';
+    const expireTime = sessionStorage.getItem('docutrack_admin_pin_expire');
+    if (unlocked && expireTime && parseInt(expireTime, 10) > Date.now()) {
+      return true;
+    }
+    return false;
+  });
+  const [pinRemainingSeconds, setPinRemainingSeconds] = useState(() => {
+    const expireTime = sessionStorage.getItem('docutrack_admin_pin_expire');
+    if (!expireTime) return 0;
+    return Math.max(0, Math.floor((parseInt(expireTime, 10) - Date.now()) / 1000));
   });
   const [showPinModal, setShowPinModal] = useState(false);
   const [pinInput, setPinInput] = useState('');
@@ -112,12 +123,46 @@ export default function WebsiteSettings({ refreshTrigger }) {
   const [changingPin, setChangingPin] = useState(false);
   const [changePinError, setChangePinError] = useState('');
 
+  // Countdown timer: otomatis kunci tab setelah 5 menit
+  useEffect(() => {
+    if (!isPinUnlocked) return;
+
+    const interval = setInterval(() => {
+      const expireTime = sessionStorage.getItem('docutrack_admin_pin_expire');
+      if (!expireTime) {
+        handleLockTab(true);
+        return;
+      }
+      const diff = Math.floor((parseInt(expireTime, 10) - Date.now()) / 1000);
+      if (diff <= 0) {
+        handleLockTab(true);
+      } else {
+        setPinRemainingSeconds(diff);
+      }
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [isPinUnlocked]);
+
+  const formatTimer = (seconds) => {
+    const m = Math.floor(seconds / 60);
+    const s = seconds % 60;
+    return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+  };
+
   const handleTabClick = (tabId) => {
-    if (tabId === 'demo-data' && !isPinUnlocked) {
-      setPinInput('');
-      setPinError('');
-      setShowPinModal(true);
-      return;
+    if (tabId === 'demo-data') {
+      const expireTime = sessionStorage.getItem('docutrack_admin_pin_expire');
+      const isExpired = !expireTime || parseInt(expireTime, 10) <= Date.now();
+      if (!isPinUnlocked || isExpired) {
+        if (isExpired && isPinUnlocked) {
+          handleLockTab(true);
+        }
+        setPinInput('');
+        setPinError('');
+        setShowPinModal(true);
+        return;
+      }
     }
     setActiveTab(tabId);
     sessionStorage.setItem('docutrack_settings_tab', tabId);
@@ -139,13 +184,17 @@ export default function WebsiteSettings({ refreshTrigger }) {
       });
       const data = await res.json();
       if (res.ok) {
+        const fiveMinutes = 5 * 60 * 1000;
+        const expireAt = Date.now() + fiveMinutes;
         sessionStorage.setItem('docutrack_admin_pin_unlocked', 'true');
         sessionStorage.setItem('docutrack_admin_pin_value', pinInput.trim());
+        sessionStorage.setItem('docutrack_admin_pin_expire', expireAt.toString());
+        setPinRemainingSeconds(5 * 60);
         setIsPinUnlocked(true);
         setShowPinModal(false);
         setActiveTab('demo-data');
         sessionStorage.setItem('docutrack_settings_tab', 'demo-data');
-        showSuccess('Akses menu Data Dummy & Reset berhasil dibuka!', 'Otorisasi Berhasil');
+        showSuccess('Akses menu Data Dummy & Reset berhasil dibuka (aktif selama 5 menit)!', 'Otorisasi Berhasil');
       } else {
         setPinError(data.error || 'PIN salah. Silakan coba lagi.');
       }
@@ -156,13 +205,19 @@ export default function WebsiteSettings({ refreshTrigger }) {
     }
   };
 
-  const handleLockTab = () => {
+  const handleLockTab = (isTimeout = false) => {
     sessionStorage.removeItem('docutrack_admin_pin_unlocked');
     sessionStorage.removeItem('docutrack_admin_pin_value');
+    sessionStorage.removeItem('docutrack_admin_pin_expire');
+    setPinRemainingSeconds(0);
     setIsPinUnlocked(false);
     setActiveTab('company');
     sessionStorage.setItem('docutrack_settings_tab', 'company');
-    showSuccess('Menu Data Dummy & Reset telah dikunci kembali.', 'Terkunci');
+    if (isTimeout) {
+      showWarning('Sesi otorisasi telah kedaluwarsa (5 menit). Tab otomatis dikunci kembali.', 'Sesi Berakhir');
+    } else {
+      showSuccess('Menu Data Dummy & Reset telah dikunci kembali.', 'Terkunci');
+    }
   };
 
   const handleChangePin = async (e) => {
@@ -1498,6 +1553,13 @@ export default function WebsiteSettings({ refreshTrigger }) {
                 )}
               </div>
               <div className="flex items-center gap-2">
+                <div 
+                  className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-amber-50 text-amber-900 border border-amber-200 rounded-lg text-xs font-mono font-bold" 
+                  title="Waktu tersisa sebelum tab otomatis terkunci kembali"
+                >
+                  <Clock className="w-3.5 h-3.5 text-amber-700 animate-pulse" />
+                  <span>{formatTimer(pinRemainingSeconds)}</span>
+                </div>
                 <button
                   type="button"
                   onClick={fetchDummyStats}
@@ -1506,7 +1568,7 @@ export default function WebsiteSettings({ refreshTrigger }) {
                   title="Perbarui status database"
                 >
                   <RefreshCw className={`w-3.5 h-3.5 ${statsLoading ? 'animate-spin' : ''}`} />
-                  <span>Refresh Status</span>
+                  <span>Refresh</span>
                 </button>
                 <span className="text-slate-300">|</span>
                 <button
@@ -1527,7 +1589,7 @@ export default function WebsiteSettings({ refreshTrigger }) {
                 <span className="text-slate-300">|</span>
                 <button
                   type="button"
-                  onClick={handleLockTab}
+                  onClick={() => handleLockTab(false)}
                   className="inline-flex items-center gap-1 text-rose-600 hover:text-rose-800 font-medium cursor-pointer transition-colors"
                   title="Kunci kembali tab ini"
                 >

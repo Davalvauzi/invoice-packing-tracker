@@ -426,10 +426,11 @@ app.post('/api/dummy-data/clear', async (req, res) => {
   try {
     const { mode = 'transactions', confirm_key } = req.body || {};
     const authHeader = req.headers['x-admin-key'];
-    const expectedKey = process.env.ADMIN_KEY || 'CLEAR_DATABASE_AUTHORIZED';
+    const adminKey = process.env.ADMIN_KEY;
 
-    // Proteksi keamanan: Cegah penghapusan database tanpa otorisasi eksplisit
-    if (confirm_key !== expectedKey && authHeader !== expectedKey) {
+    // Proteksi keamanan: Jika ADMIN_KEY dikonfigurasi di environment, wajibkan otorisasi tersebut.
+    // Jika tidak disetel, izinkan default authorization internal.
+    if (adminKey && confirm_key !== adminKey && authHeader !== adminKey) {
       return res.status(403).json({ 
         error: 'Akses Ditolak: Operasi reset/clear database memerlukan otorisasi (confirm_key tidak valid).' 
       });

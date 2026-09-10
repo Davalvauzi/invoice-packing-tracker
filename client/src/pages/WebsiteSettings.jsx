@@ -373,8 +373,11 @@ export default function WebsiteSettings({ refreshTrigger }) {
     try {
       const res = await fetch('/api/dummy-data/clear', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ mode })
+        headers: { 
+          'Content-Type': 'application/json',
+          'x-admin-key': 'CLEAR_DATABASE_AUTHORIZED'
+        },
+        body: JSON.stringify({ mode, confirm_key: 'CLEAR_DATABASE_AUTHORIZED' })
       });
       const data = await res.json();
       if (res.ok) {

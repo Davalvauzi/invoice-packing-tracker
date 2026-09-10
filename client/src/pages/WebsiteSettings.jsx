@@ -26,7 +26,12 @@ import {
   Square,
   Info,
   Boxes,
-  Layers
+  Layers,
+  Lock,
+  Unlock,
+  KeyRound,
+  Eye,
+  EyeOff
 } from 'lucide-react';
 import { useNotification } from '../context/NotificationContext';
 
@@ -88,6 +93,118 @@ export default function WebsiteSettings({ refreshTrigger }) {
     return sessionStorage.getItem('docutrack_settings_tab') || 'company';
   });
   const [uploadingField, setUploadingField] = useState(null);
+
+  // PIN Protection States
+  const [isPinUnlocked, setIsPinUnlocked] = useState(() => {
+    return sessionStorage.getItem('docutrack_admin_pin_unlocked') === 'true';
+  });
+  const [showPinModal, setShowPinModal] = useState(false);
+  const [pinInput, setPinInput] = useState('');
+  const [pinError, setPinError] = useState('');
+  const [verifyingPin, setVerifyingPin] = useState(false);
+  const [showPinPassword, setShowPinPassword] = useState(false);
+
+  // Ubah PIN States
+  const [showChangePinModal, setShowChangePinModal] = useState(false);
+  const [oldPin, setOldPin] = useState('');
+  const [newPin, setNewPin] = useState('');
+  const [confirmNewPin, setConfirmNewPin] = useState('');
+  const [changingPin, setChangingPin] = useState(false);
+  const [changePinError, setChangePinError] = useState('');
+
+  const handleTabClick = (tabId) => {
+    if (tabId === 'demo-data' && !isPinUnlocked) {
+      setPinInput('');
+      setPinError('');
+      setShowPinModal(true);
+      return;
+    }
+    setActiveTab(tabId);
+    sessionStorage.setItem('docutrack_settings_tab', tabId);
+  };
+
+  const handleVerifyPin = async (e) => {
+    if (e) e.preventDefault();
+    if (!pinInput.trim()) {
+      setPinError('Masukkan PIN keamanan.');
+      return;
+    }
+    setVerifyingPin(true);
+    setPinError('');
+    try {
+      const res = await fetch('/api/settings/verify-pin', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ pin: pinInput.trim() })
+      });
+      const data = await res.json();
+      if (res.ok) {
+        sessionStorage.setItem('docutrack_admin_pin_unlocked', 'true');
+        sessionStorage.setItem('docutrack_admin_pin_value', pinInput.trim());
+        setIsPinUnlocked(true);
+        setShowPinModal(false);
+        setActiveTab('demo-data');
+        sessionStorage.setItem('docutrack_settings_tab', 'demo-data');
+        showSuccess('Akses menu Data Dummy & Reset berhasil dibuka!', 'Otorisasi Berhasil');
+      } else {
+        setPinError(data.error || 'PIN salah. Silakan coba lagi.');
+      }
+    } catch (err) {
+      setPinError(err.message || 'Gagal memverifikasi PIN.');
+    } finally {
+      setVerifyingPin(false);
+    }
+  };
+
+  const handleLockTab = () => {
+    sessionStorage.removeItem('docutrack_admin_pin_unlocked');
+    sessionStorage.removeItem('docutrack_admin_pin_value');
+    setIsPinUnlocked(false);
+    setActiveTab('company');
+    sessionStorage.setItem('docutrack_settings_tab', 'company');
+    showSuccess('Menu Data Dummy & Reset telah dikunci kembali.', 'Terkunci');
+  };
+
+  const handleChangePin = async (e) => {
+    if (e) e.preventDefault();
+    if (!oldPin || !newPin || !confirmNewPin) {
+      setChangePinError('Semua kolom PIN wajib diisi.');
+      return;
+    }
+    if (newPin !== confirmNewPin) {
+      setChangePinError('Konfirmasi PIN baru tidak cocok.');
+      return;
+    }
+    if (newPin.trim().length < 3) {
+      setChangePinError('PIN baru minimal 3 karakter.');
+      return;
+    }
+
+    setChangingPin(true);
+    setChangePinError('');
+    try {
+      const res = await fetch('/api/settings/change-pin', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ old_pin: oldPin.trim(), new_pin: newPin.trim() })
+      });
+      const data = await res.json();
+      if (res.ok) {
+        showSuccess('PIN Keamanan Admin berhasil diperbarui!', 'Sukses');
+        sessionStorage.setItem('docutrack_admin_pin_value', newPin.trim());
+        setShowChangePinModal(false);
+        setOldPin('');
+        setNewPin('');
+        setConfirmNewPin('');
+      } else {
+        setChangePinError(data.error || 'Gagal mengubah PIN.');
+      }
+    } catch (err) {
+      setChangePinError(err.message || 'Terjadi kesalahan jaringan.');
+    } finally {
+      setChangingPin(false);
+    }
+  };
 
   useEffect(() => {
     sessionStorage.setItem('docutrack_settings_tab', activeTab);
@@ -371,13 +488,18 @@ export default function WebsiteSettings({ refreshTrigger }) {
 
     setClearingDummy(true);
     try {
+      const storedPin = sessionStorage.getItem('docutrack_admin_pin_value') || '123';
       const res = await fetch('/api/dummy-data/clear', {
         method: 'POST',
         headers: { 
           'Content-Type': 'application/json',
-          'x-admin-key': 'CLEAR_DATABASE_AUTHORIZED'
+          'x-admin-key': storedPin
         },
-        body: JSON.stringify({ mode, confirm_key: 'CLEAR_DATABASE_AUTHORIZED' })
+        body: JSON.stringify({ 
+          mode, 
+          pin: storedPin,
+          confirm_key: storedPin 
+        })
       });
       const data = await res.json();
       if (res.ok) {
@@ -454,7 +576,7 @@ export default function WebsiteSettings({ refreshTrigger }) {
           return (
             <button
               key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
+              onClick={() => handleTabClick(tab.id)}
               className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all whitespace-nowrap cursor-pointer ${
                 isActive
                   ? 'bg-emerald-800 text-white shadow-xs'
@@ -463,6 +585,13 @@ export default function WebsiteSettings({ refreshTrigger }) {
             >
               <Icon className="w-3.5 h-3.5" />
               <span>{tab.label}</span>
+              {tab.id === 'demo-data' && (
+                isPinUnlocked ? (
+                  <Unlock className={`w-3 h-3 ml-0.5 ${isActive ? 'text-emerald-200' : 'text-emerald-600'}`} />
+                ) : (
+                  <Lock className={`w-3 h-3 ml-0.5 ${isActive ? 'text-amber-300' : 'text-amber-500'}`} />
+                )
+              )}
             </button>
           );
         })}
@@ -1306,7 +1435,32 @@ export default function WebsiteSettings({ refreshTrigger }) {
         )}
 
         {/* TAB 6: Data Dummy & Reset */}
-        {activeTab === 'demo-data' && (
+        {activeTab === 'demo-data' && !isPinUnlocked && (
+          <div className="bg-white rounded-2xl border border-slate-200 p-8 text-center shadow-xs max-w-md mx-auto my-8 space-y-4">
+            <div className="w-14 h-14 rounded-2xl bg-amber-100 text-amber-800 flex items-center justify-center mx-auto shadow-2xs">
+              <Lock className="w-7 h-7" />
+            </div>
+            <div>
+              <h3 className="text-base font-bold text-slate-900">Akses Terkunci: PIN Admin</h3>
+              <p className="text-xs text-slate-500 mt-1">
+                Menu Data Dummy & Reset Database dilindungi oleh PIN keamanan.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => { setPinInput(''); setPinError(''); setShowPinModal(true); }}
+              className="inline-flex items-center justify-center gap-2 px-5 py-2.5 bg-emerald-800 hover:bg-emerald-900 text-white rounded-xl text-xs font-bold transition-all shadow-xs cursor-pointer"
+            >
+              <KeyRound className="w-4 h-4" />
+              <span>Buka Kunci dengan PIN</span>
+            </button>
+            <div className="text-[11px] text-slate-400">
+              PIN default: <strong>123</strong>
+            </div>
+          </div>
+        )}
+
+        {activeTab === 'demo-data' && isPinUnlocked && (
           <div className="space-y-4">
             
             {/* Bar Status Ringkas */}
@@ -1343,16 +1497,44 @@ export default function WebsiteSettings({ refreshTrigger }) {
                   <span className="text-slate-400">Memuat status...</span>
                 )}
               </div>
-              <button
-                type="button"
-                onClick={fetchDummyStats}
-                disabled={statsLoading}
-                className="inline-flex items-center gap-1 text-slate-500 hover:text-slate-800 font-medium cursor-pointer transition-colors"
-                title="Perbarui status database"
-              >
-                <RefreshCw className={`w-3.5 h-3.5 ${statsLoading ? 'animate-spin' : ''}`} />
-                <span>Refresh Status</span>
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={fetchDummyStats}
+                  disabled={statsLoading}
+                  className="inline-flex items-center gap-1 text-slate-500 hover:text-slate-800 font-medium cursor-pointer transition-colors"
+                  title="Perbarui status database"
+                >
+                  <RefreshCw className={`w-3.5 h-3.5 ${statsLoading ? 'animate-spin' : ''}`} />
+                  <span>Refresh Status</span>
+                </button>
+                <span className="text-slate-300">|</span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setOldPin('');
+                    setNewPin('');
+                    setConfirmNewPin('');
+                    setChangePinError('');
+                    setShowChangePinModal(true);
+                  }}
+                  className="inline-flex items-center gap-1 text-blue-600 hover:text-blue-800 font-medium cursor-pointer transition-colors"
+                  title="Ubah PIN Keamanan Admin"
+                >
+                  <KeyRound className="w-3.5 h-3.5" />
+                  <span>Ubah PIN</span>
+                </button>
+                <span className="text-slate-300">|</span>
+                <button
+                  type="button"
+                  onClick={handleLockTab}
+                  className="inline-flex items-center gap-1 text-rose-600 hover:text-rose-800 font-medium cursor-pointer transition-colors"
+                  title="Kunci kembali tab ini"
+                >
+                  <Lock className="w-3.5 h-3.5" />
+                  <span>Kunci Tab</span>
+                </button>
+              </div>
             </div>
 
             {/* Compact 3-Card Grid */}
@@ -2154,6 +2336,182 @@ export default function WebsiteSettings({ refreshTrigger }) {
         )}
 
       </form>
+
+      {/* MODAL 1: Otorisasi PIN Gatekeeper */}
+      {showPinModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-fadeIn">
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-2xl max-w-sm w-full p-6 space-y-4">
+            <div className="flex items-start justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-amber-100 text-amber-800 flex items-center justify-center shadow-2xs">
+                  <Lock className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-slate-900 text-sm">Otorisasi PIN Admin</h3>
+                  <p className="text-[11px] text-slate-500">Akses Menu Reset & Dummy</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowPinModal(false)}
+                className="text-slate-400 hover:text-slate-600 p-1 rounded-lg hover:bg-slate-100 cursor-pointer transition-colors"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <p className="text-xs text-slate-600 leading-relaxed">
+              Menu ini berisi operasi reset data destruktif dan generator database. Masukkan PIN untuk membuka kunci.
+            </p>
+
+            <form onSubmit={handleVerifyPin} className="space-y-4">
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1.5">
+                  PIN Keamanan:
+                </label>
+                <div className="relative">
+                  <input
+                    type={showPinPassword ? "text" : "password"}
+                    autoFocus
+                    value={pinInput}
+                    onChange={(e) => {
+                      setPinInput(e.target.value);
+                      if (pinError) setPinError('');
+                    }}
+                    placeholder="Ketik PIN..."
+                    className={`w-full px-3.5 py-2.5 text-center text-lg tracking-widest font-mono bg-slate-50 border rounded-xl focus:outline-none transition-all ${
+                      pinError 
+                        ? 'border-rose-400 bg-rose-50/50 focus:ring-2 focus:ring-rose-200 text-rose-800' 
+                        : 'border-slate-200 focus:border-emerald-700 focus:bg-white focus:ring-2 focus:ring-emerald-100 text-slate-900'
+                    }`}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPinPassword(!showPinPassword)}
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-1 rounded-lg cursor-pointer transition-colors"
+                    title={showPinPassword ? "Sembunyikan PIN" : "Lihat PIN"}
+                  >
+                    {showPinPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
+                </div>
+                {pinError && (
+                  <p className="text-[11px] text-rose-600 font-semibold mt-1.5 flex items-center gap-1">
+                    <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                    <span>{pinError}</span>
+                  </p>
+                )}
+                <div className="mt-2 text-center">
+                  <span className="text-[10px] bg-slate-100 text-slate-500 px-2.5 py-0.5 rounded-full font-medium">
+                    PIN default: <strong>123</strong>
+                  </span>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2 pt-1">
+                <button
+                  type="button"
+                  onClick={() => setShowPinModal(false)}
+                  className="flex-1 py-2 px-3 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold transition-all cursor-pointer"
+                >
+                  Batal
+                </button>
+                <button
+                  type="submit"
+                  disabled={verifyingPin || !pinInput.trim()}
+                  className="flex-1 py-2 px-3 bg-emerald-800 hover:bg-emerald-900 text-white rounded-xl text-xs font-bold transition-all shadow-xs disabled:opacity-50 cursor-pointer flex items-center justify-center gap-1.5"
+                >
+                  {verifyingPin ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Unlock className="w-3.5 h-3.5" />}
+                  <span>{verifyingPin ? 'Memeriksa...' : 'Buka Kunci'}</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL 2: Ubah PIN Admin */}
+      {showChangePinModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-fadeIn">
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-2xl max-w-sm w-full p-6 space-y-4">
+            <div className="flex items-start justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-blue-100 text-blue-800 flex items-center justify-center shadow-2xs">
+                  <KeyRound className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-slate-900 text-sm">Ubah PIN Admin</h3>
+                  <p className="text-[11px] text-slate-500">Perbarui PIN akses menu reset</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowChangePinModal(false)}
+                className="text-slate-400 hover:text-slate-600 p-1 rounded-lg hover:bg-slate-100 cursor-pointer transition-colors"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <form onSubmit={handleChangePin} className="space-y-3">
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">PIN Lama:</label>
+                <input
+                  type="password"
+                  value={oldPin}
+                  onChange={(e) => setOldPin(e.target.value)}
+                  placeholder="Ketik PIN saat ini..."
+                  className="w-full px-3 py-2 text-xs font-mono bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-blue-600 focus:bg-white"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">PIN Baru:</label>
+                <input
+                  type="password"
+                  value={newPin}
+                  onChange={(e) => setNewPin(e.target.value)}
+                  placeholder="Minimal 3 karakter..."
+                  className="w-full px-3 py-2 text-xs font-mono bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-blue-600 focus:bg-white"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">Konfirmasi PIN Baru:</label>
+                <input
+                  type="password"
+                  value={confirmNewPin}
+                  onChange={(e) => setConfirmNewPin(e.target.value)}
+                  placeholder="Ulangi PIN baru..."
+                  className="w-full px-3 py-2 text-xs font-mono bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-blue-600 focus:bg-white"
+                />
+              </div>
+
+              {changePinError && (
+                <p className="text-[11px] text-rose-600 font-semibold flex items-center gap-1">
+                  <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                  <span>{changePinError}</span>
+                </p>
+              )}
+
+              <div className="flex items-center gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setShowChangePinModal(false)}
+                  className="flex-1 py-2 px-3 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold transition-all cursor-pointer"
+                >
+                  Batal
+                </button>
+                <button
+                  type="submit"
+                  disabled={changingPin}
+                  className="flex-1 py-2 px-3 bg-blue-700 hover:bg-blue-800 text-white rounded-xl text-xs font-bold transition-all shadow-xs disabled:opacity-50 cursor-pointer flex items-center justify-center gap-1.5"
+                >
+                  {changingPin ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
+                  <span>{changingPin ? 'Menyimpan...' : 'Simpan PIN'}</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
     </div>
   );

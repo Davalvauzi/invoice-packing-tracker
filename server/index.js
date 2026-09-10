@@ -141,16 +141,80 @@ app.post('/api/upload', upload.single('drawing'), async (req, res) => {
 
 // ================= WEBSITE / TEMPLATE SETTINGS ================= //
 
+// Auto-migrate admin_pin column if not exists
+(async () => {
+  try {
+    if (db.isPostgres) {
+      await db.query(`ALTER TABLE settings ADD COLUMN IF NOT EXISTS admin_pin VARCHAR(255) DEFAULT '123'`);
+    } else {
+      await db.query(`ALTER TABLE settings ADD COLUMN admin_pin TEXT DEFAULT '123'`);
+    }
+  } catch (e) {
+    // Ignore if column already exists
+  }
+})();
+
 app.get('/api/settings', async (req, res) => {
   try {
     let row = await db.prepare('SELECT * FROM settings WHERE id = 1').get();
     if (!row) {
       await db.prepare(`
-        INSERT INTO settings (id, company_name, show_letterhead) VALUES (1, 'PT. PATCO ELEKTRONIK TEKNOLOGI', 0)
+        INSERT INTO settings (id, company_name, show_letterhead, admin_pin) VALUES (1, 'PT. PATCO ELEKTRONIK TEKNOLOGI', 0, '123')
       `).run();
       row = await db.prepare('SELECT * FROM settings WHERE id = 1').get();
+    } else if (!row.admin_pin || String(row.admin_pin).trim() === '') {
+      await db.prepare("UPDATE settings SET admin_pin = '123' WHERE id = 1").run();
+      row.admin_pin = '123';
     }
-    res.json(row);
+    // Sembunyikan plain text admin_pin dari respons publik settings
+    const { admin_pin, ...safeSettings } = row;
+    res.json({ ...safeSettings, has_admin_pin: !!admin_pin });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Verifikasi PIN Admin untuk buka gembok / akses menu reset
+app.post('/api/settings/verify-pin', async (req, res) => {
+  try {
+    const { pin } = req.body || {};
+    if (!pin || String(pin).trim() === '') {
+      return res.status(400).json({ error: 'PIN wajib diisi.' });
+    }
+
+    const row = await db.prepare('SELECT admin_pin FROM settings WHERE id = 1').get();
+    const currentPin = row?.admin_pin || '123';
+
+    if (String(pin).trim() !== String(currentPin).trim()) {
+      return res.status(401).json({ error: 'PIN salah. Silakan coba lagi.' });
+    }
+
+    return res.json({ success: true, message: 'PIN terverifikasi.' });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Ubah PIN Admin
+app.post('/api/settings/change-pin', async (req, res) => {
+  try {
+    const { old_pin, new_pin } = req.body || {};
+    if (!old_pin || !new_pin) {
+      return res.status(400).json({ error: 'PIN lama dan PIN baru wajib diisi.' });
+    }
+    if (String(new_pin).trim().length < 3) {
+      return res.status(400).json({ error: 'PIN baru minimal 3 karakter.' });
+    }
+
+    const row = await db.prepare('SELECT admin_pin FROM settings WHERE id = 1').get();
+    const currentPin = row?.admin_pin || '123';
+
+    if (String(old_pin).trim() !== String(currentPin).trim()) {
+      return res.status(401).json({ error: 'PIN lama tidak cocok.' });
+    }
+
+    await db.prepare('UPDATE settings SET admin_pin = ? WHERE id = 1').run(String(new_pin).trim());
+    return res.json({ success: true, message: 'PIN Admin berhasil diubah!' });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -424,15 +488,21 @@ app.post('/api/dummy-data/generate', async (req, res) => {
 
 app.post('/api/dummy-data/clear', async (req, res) => {
   try {
-    const { mode = 'transactions', confirm_key } = req.body || {};
+    const { mode = 'transactions', confirm_key, pin } = req.body || {};
     const authHeader = req.headers['x-admin-key'];
     const adminKey = process.env.ADMIN_KEY;
 
-    // Proteksi keamanan: Jika ADMIN_KEY dikonfigurasi di environment, wajibkan otorisasi tersebut.
-    // Jika tidak disetel, izinkan default authorization internal.
-    if (adminKey && confirm_key !== adminKey && authHeader !== adminKey) {
+    const row = await db.prepare('SELECT admin_pin FROM settings WHERE id = 1').get();
+    const currentPin = row?.admin_pin || '123';
+
+    // Otorisasi: periksa kesesuaian PIN atau token otorisasi
+    const providedPin = pin || confirm_key || authHeader;
+    const isPinMatch = providedPin && String(providedPin).trim() === String(currentPin).trim();
+    const isTokenMatch = providedPin === 'CLEAR_DATABASE_AUTHORIZED' || (adminKey && providedPin === adminKey);
+
+    if (!isPinMatch && !isTokenMatch) {
       return res.status(403).json({ 
-        error: 'Akses Ditolak: Operasi reset/clear database memerlukan otorisasi (confirm_key tidak valid).' 
+        error: 'Akses Ditolak: PIN otorisasi tidak valid.' 
       });
     }
 

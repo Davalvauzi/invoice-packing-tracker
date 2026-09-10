@@ -150,7 +150,11 @@ export default function PrintInvoice({ id, onBack }) {
   }
 
   const rawShipTo = invoice.ship_to || customer?.ship_to || customer?.address || '';
-  let shipToLines = rawShipTo.split('\n').map(l => l.trim()).filter(Boolean);
+  let shipToLines = rawShipTo
+    .split('\n')
+    .map(l => l.trim())
+    .filter(Boolean)
+    .filter(l => !/^(phone|tel|fax|attn|up|pic):/i.test(l));
   if (shipToLines.length === 0 && invoice.customer_name) {
     shipToLines = [invoice.customer_name];
   }

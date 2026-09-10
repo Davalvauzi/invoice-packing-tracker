@@ -203,8 +203,22 @@ export default function PrintDeliveryOrder({ id, onBack }) {
     billToLines = [deliveryOrder.customer_name];
   }
 
+  // Ensure contact info is present in BILL TO (bukan di Ship To)
+  const billToText = billToLines.join('\n').toLowerCase();
+  if (customer?.phone && !billToText.includes(customer.phone.toLowerCase()) && !/^(tel|phone):/im.test(billToText)) {
+    billToLines.push(`Tel: ${customer.phone}`);
+  }
+  if (customer?.contact_person && !billToText.includes(customer.contact_person.toLowerCase()) && !/^(attn|pic|up):/im.test(billToText)) {
+    billToLines.push(`Attn: ${customer.contact_person}`);
+  }
+
+  // Ship To: bersihkan dari informasi kontak (phone/tel/fax/attn)
   const rawShipTo = customer?.ship_to || customer?.address || '';
-  let shipToLines = rawShipTo.split('\n').map(l => l.trim()).filter(Boolean);
+  let shipToLines = rawShipTo
+    .split('\n')
+    .map(l => l.trim())
+    .filter(Boolean)
+    .filter(l => !/^(phone|tel|fax|attn|up|pic):/i.test(l));
   if (shipToLines.length === 0 && deliveryOrder.customer_name) {
     shipToLines = [deliveryOrder.customer_name];
   }
@@ -428,15 +442,6 @@ export default function PrintDeliveryOrder({ id, onBack }) {
                     ))
                   ) : (
                     <div>{customer?.address || '-'}</div>
-                  )}
-                  {customer?.phone && (
-                    <div className="mt-0.5">
-                      <span>Phone: {customer.phone}</span>
-                      {customer?.fax && <span className="ml-3">Fax: {customer.fax}</span>}
-                    </div>
-                  )}
-                  {customer?.contact_person && (
-                    <div>Attn: {customer.contact_person}</div>
                   )}
                 </div>
               </div>

@@ -1208,6 +1208,16 @@ app.post('/api/invoices', async (req, res) => {
       }
     }
 
+    let finalCustName = (customer_name || '').trim();
+    let finalCustId = (customer_id || '').trim();
+    if (!finalCustName && finalCustId) {
+      const cRow = await db.prepare('SELECT customer_name, customer_id FROM customers WHERE id = ? OR customer_id = ? LIMIT 1').get(finalCustId, finalCustId);
+      if (cRow) {
+        finalCustName = cRow.customer_name;
+        finalCustId = cRow.customer_id || finalCustId;
+      }
+    }
+
     let finalPartName = part_name || '';
     let finalPoNo = customer_po_no || '';
     let numPallets = Number(no_of_pallet) || 0;
@@ -1270,8 +1280,8 @@ app.post('/api/invoices', async (req, res) => {
     const info = await stmt.run(
       invoice_number || '',
       invoice_date || new Date().toISOString().slice(0, 10),
-      customer_name || '',
-      customer_id || '',
+      finalCustName,
+      finalCustId,
       bill_to || '',
       ship_to || '',
       payment_term || '',
@@ -1308,8 +1318,8 @@ app.post('/api/invoices', async (req, res) => {
       'INVOICE',
       invoice_number || `INV-${refId}`,
       invoice_date || new Date().toISOString().slice(0, 10),
-      customer_name || '',
-      customer_id || '',
+      finalCustName,
+      finalCustId,
       finalPoNo,
       finalPartName,
       numBoxes,

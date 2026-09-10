@@ -765,21 +765,20 @@ export default function DataLogger({
                 <th className="px-4 py-3.5 cursor-pointer hover:text-slate-800" onClick={() => toggleSort('customer_name')}>
                   <div className="flex items-center gap-1">Customer <ArrowUpDown className="w-3 h-3" /></div>
                 </th>
-                <th className="px-3 py-3.5">Terms / Delivery</th>
                 <th className="px-4 py-3.5 text-right">Aksi</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
               {loading ? (
                 <tr>
-                  <td colSpan={viewMode === 'tree' ? 8 : 7} className="px-6 py-12 text-center text-slate-400">
+                  <td colSpan={viewMode === 'tree' ? 7 : 6} className="px-6 py-12 text-center text-slate-400">
                     <RefreshCw className="w-6 h-6 animate-spin mx-auto mb-2 text-emerald-700" />
                     Memuat data logger...
                   </td>
                 </tr>
               ) : logs.length === 0 ? (
                 <tr>
-                  <td colSpan={viewMode === 'tree' ? 8 : 7} className="px-6 py-12 text-center text-slate-400">
+                  <td colSpan={viewMode === 'tree' ? 7 : 6} className="px-6 py-12 text-center text-slate-400">
                     Tidak ada transaksi yang cocok dengan filter yang dipilih.
                   </td>
                 </tr>
@@ -852,9 +851,6 @@ export default function DataLogger({
                                 {inv.customer_id}
                               </span>
                             )}
-                          </td>
-                          <td className="px-3 py-3 text-slate-600 text-[11px] whitespace-nowrap">
-                            {inv.terms_of_delivery || inv.payment_term || '-'}
                           </td>
                           <td className="px-4 py-3 text-right whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
                             <div className="flex items-center justify-end gap-1.5">
@@ -947,9 +943,6 @@ export default function DataLogger({
                             <td className="px-4 py-2.5 font-semibold text-slate-700 max-w-[220px] truncate">
                               {child.customer_name}
                             </td>
-                            <td className="px-3 py-2.5 text-slate-500 text-[11px] whitespace-nowrap">
-                              {child.terms_of_delivery || child.payment_term || '-'}
-                            </td>
                             <td className="px-4 py-2.5 text-right whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
                               <div className="flex items-center justify-end gap-1.5">
                                 <button
@@ -993,7 +986,7 @@ export default function DataLogger({
                   {treeData.orphans.length > 0 && (
                     <>
                       <tr className="bg-slate-100/80 border-t-2 border-slate-300">
-                        <td colSpan={viewMode === 'tree' ? 8 : 7} className="px-4 py-2 font-bold text-slate-600 text-[11px] uppercase tracking-wider">
+                        <td colSpan={viewMode === 'tree' ? 7 : 6} className="px-4 py-2 font-bold text-slate-600 text-[11px] uppercase tracking-wider">
                           📁 Dokumen Lainnya / Tanpa Induk Invoice Terhubung ({treeData.orphans.length})
                         </td>
                       </tr>
@@ -1026,9 +1019,6 @@ export default function DataLogger({
                           </td>
                           <td className="px-4 py-3 font-semibold text-slate-800 max-w-[220px] truncate">
                             {orphan.customer_name}
-                          </td>
-                          <td className="px-3 py-3 text-slate-600 text-[11px] whitespace-nowrap">
-                            {orphan.terms_of_delivery || orphan.payment_term || '-'}
                           </td>
                           <td className="px-4 py-3 text-right whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
                             <div className="flex items-center justify-end gap-1.5">
@@ -1108,9 +1098,6 @@ export default function DataLogger({
                           {log.customer_id}
                         </span>
                       )}
-                    </td>
-                    <td className="px-3 py-3 text-slate-600 text-[11px] whitespace-nowrap">
-                      {log.terms_of_delivery || log.payment_term || '-'}
                     </td>
                     <td className="px-4 py-3 text-right whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
                       <div className="flex items-center justify-end gap-1.5">

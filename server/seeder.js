@@ -380,26 +380,26 @@ async function generateTransactionsOnly(db, options = {}) {
     const chosenCurrency = pickRandom(currencies.length > 0 ? currencies : ['USD', 'IDR', 'JPY']);
 
     // Determine unit price based on currency
-    let unitPrice = part.price || 5.0;
+    let unitPrice = Number(part.price) || Number(part.price_usd) || 5.0;
     if (chosenCurrency === 'IDR') {
       unitPrice = Math.round((unitPrice * 15800) / 100) * 100; // e.g. Rp 71,100
     } else if (chosenCurrency === 'JPY') {
       unitPrice = Math.round(unitPrice * 152); // e.g. ¥684
     } else {
-      unitPrice = +unitPrice.toFixed(4);
+      unitPrice = Number(unitPrice.toFixed(4));
     }
 
     // Boxes & Pallets calculation
-    const qtyPerBox = part.qty_per_box || 50;
+    const qtyPerBox = Number(part.qty_per_box) || 50;
     const noOfBox = randInt(10, 80);
     const noOfPallet = Math.max(1, Math.ceil(noOfBox / 20));
     const totalQty = noOfBox * qtyPerBox;
-    const totalAmount = +(totalQty * unitPrice).toFixed(2);
+    const totalAmount = Number((totalQty * unitPrice).toFixed(2));
 
     // VAT: 60% with PPN 11%, 40% export/zero-rated
     const vatRate = Math.random() > 0.4 ? 11 : 0;
-    const vatAmount = +(totalAmount * (vatRate / 100)).toFixed(2);
-    const grandTotal = +(totalAmount + vatAmount).toFixed(2);
+    const vatAmount = Number((totalAmount * (vatRate / 100)).toFixed(2));
+    const grandTotal = Number((totalAmount + vatAmount).toFixed(2));
 
     const poNumber = `PO-${(customer.customer_name || 'CUST').replace(/[^a-zA-Z]/g, '').slice(0, 5).toUpperCase()}-${randInt(1000, 9999)}`;
     const paymentTerm = pickRandom(PAYMENT_TERMS);

@@ -6,7 +6,7 @@ export default function PrintPackingList({ id, onBack }) {
   const [packingList, setPackingList] = useState(null);
   const [customer, setCustomer] = useState(null);
   const [settings, setSettings] = useState(null);
-  const [showLetterhead, setShowLetterhead] = useState(true);
+  const [showLetterhead, setShowLetterhead] = useState(false);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -47,8 +47,10 @@ export default function PrintPackingList({ id, onBack }) {
 
       setPackingList(plData);
       setSettings(setData);
-      if (setData) {
-        setShowLetterhead(setData.show_letterhead !== undefined ? (setData.show_letterhead === 1 || setData.show_letterhead === true) : true);
+      if (setData && setData.show_letterhead !== undefined && setData.show_letterhead !== null) {
+        setShowLetterhead(setData.show_letterhead === 1 || setData.show_letterhead === true);
+      } else {
+        setShowLetterhead(false);
       }
 
       if (plData.customer_name) {

@@ -6,7 +6,7 @@ export default function PrintInvoice({ id, onBack }) {
   const [invoice, setInvoice] = useState(null);
   const [customer, setCustomer] = useState(null);
   const [settings, setSettings] = useState(null);
-  const [showLetterhead, setShowLetterhead] = useState(true);
+  const [showLetterhead, setShowLetterhead] = useState(false);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -47,8 +47,10 @@ export default function PrintInvoice({ id, onBack }) {
 
       setInvoice(invData);
       setSettings(setData);
-      if (setData) {
-        setShowLetterhead(setData.show_letterhead !== undefined ? (setData.show_letterhead === 1 || setData.show_letterhead === true) : true);
+      if (setData && setData.show_letterhead !== undefined && setData.show_letterhead !== null) {
+        setShowLetterhead(setData.show_letterhead === 1 || setData.show_letterhead === true);
+      } else {
+        setShowLetterhead(false);
       }
 
       if (invData.customer_name) {
@@ -128,8 +130,8 @@ export default function PrintInvoice({ id, onBack }) {
     ? items.reduce((sum, it) => sum + (Number(it.total_amount) || 0), 0)
     : (Number(invoice.total_amount) || (unitPrice > 0 && totalQty > 0 ? totalQty * unitPrice : 0));
 
-  const vatAmount = Number(invoice.vat_amount) || 0;
-  const grandTotal = Number(invoice.grand_total) || totalAmount;
+  const vatAmount = 0; // Nilai VAT fix 0.00 (tidak bertambah)
+  const grandTotal = totalAmount;
 
   // Parse lines for Bill To and Ship To
   const rawBillTo = invoice.bill_to || customer?.bill_to || customer?.address || '';
@@ -561,14 +563,14 @@ export default function PrintInvoice({ id, onBack }) {
                 </td>
               </tr>
 
-              {/* Row 2: VAT 11% USD (Tetap ada di laporan PDF, bernilai 0.00) */}
+              {/* Row 2: VAT 11% USD (Tetap ada di tampilan, bernilai fix 0.00 tidak bertambah) */}
               <tr>
                 <td colSpan={5} className="py-0.5"></td>
                 <td colSpan={3} className="py-0.5 text-left font-normal pl-2 whitespace-nowrap">
                   VAT 11% USD
                 </td>
                 <td className="py-0.5 text-right font-mono font-normal pr-1">
-                  {vatAmount > 0 ? formatMoney(vatAmount, 2) : '0.00'}
+                  0.00
                 </td>
               </tr>
 
@@ -579,7 +581,7 @@ export default function PrintInvoice({ id, onBack }) {
                   TOTAL AMOUNT USD
                 </td>
                 <td className="py-0.5 pb-1 text-right font-mono font-bold pr-1">
-                  {grandTotal > 0 ? formatMoney(grandTotal, 2) : (totalAmount > 0 ? formatMoney(totalAmount, 2) : '0.00')}
+                  {totalAmount > 0 ? formatMoney(totalAmount, 2) : '0.00'}
                 </td>
               </tr>
             </tfoot>

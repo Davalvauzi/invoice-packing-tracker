@@ -52,6 +52,8 @@ export default function DeliveryOrderModal({ isOpen, onClose, onSuccess, initial
   // Dynamic Product Items
   const [items, setItems] = useState([createEmptyDOItem()]);
 
+  const [isEditMode, setIsEditMode] = useState(false);
+  const [editingDoId, setEditingDoId] = useState(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submittedDoc, setSubmittedDoc] = useState(null);
 
@@ -211,6 +213,30 @@ export default function DeliveryOrderModal({ isOpen, onClose, onSuccess, initial
         customer_po_no: found.customer_po_no || prev.customer_po_no
       }));
 
+      // Cek apakah Delivery Order untuk nomor ini sudah pernah dibuat sebelumnya
+      fetch(`/api/delivery-orders/${encodeURIComponent(targetInvNum)}`)
+        .then(res => res.ok ? res.json() : null)
+        .then(existingDo => {
+          if (existingDo && existingDo.id) {
+            setIsEditMode(true);
+            setEditingDoId(existingDo.id);
+            if (existingDo.do_date) {
+              setFormData(prev => ({
+                ...prev,
+                do_date: existingDo.do_date.slice(0, 10),
+                notes: existingDo.notes || prev.notes
+              }));
+            }
+          } else {
+            setIsEditMode(false);
+            setEditingDoId(null);
+          }
+        })
+        .catch(() => {
+          setIsEditMode(false);
+          setEditingDoId(null);
+        });
+
       showSuccess(`Data ${parsedItems?.length ? `${parsedItems.length} produk` : ''} berhasil ditautkan dari Invoice ${targetInvNum}! Nomor DO diselaraskan.`);
     } else {
       setFormData(prev => ({ 
@@ -218,6 +244,8 @@ export default function DeliveryOrderModal({ isOpen, onClose, onSuccess, initial
         do_number: invNum, 
         invoice_number: invNum 
       }));
+      setIsEditMode(false);
+      setEditingDoId(null);
     }
   };
 
@@ -322,8 +350,11 @@ export default function DeliveryOrderModal({ isOpen, onClose, onSuccess, initial
 
     setIsSubmitting(true);
     try {
-      const postRes = await fetch('/api/delivery-orders', {
-        method: 'POST',
+      const endpoint = isEditMode && editingDoId ? `/api/delivery-orders/${editingDoId}` : '/api/delivery-orders';
+      const method = isEditMode && editingDoId ? 'PUT' : 'POST';
+
+      const postRes = await fetch(endpoint, {
+        method,
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           ...formData,
@@ -333,12 +364,15 @@ export default function DeliveryOrderModal({ isOpen, onClose, onSuccess, initial
       });
 
       if (!postRes.ok) {
-        throw new Error('Gagal menyimpan Delivery Order');
+        throw new Error(isEditMode ? 'Gagal memperbarui Delivery Order' : 'Gagal menyimpan Delivery Order');
       }
 
       const savedData = await postRes.json();
       setSubmittedDoc(savedData);
-      showSuccess('Delivery Order berhasil dibuat dan disimpan!');
+      showSuccess(isEditMode 
+        ? `Delivery Order ${finalDoNumber} berhasil diperbarui!` 
+        : 'Delivery Order berhasil dibuat dan disimpan!'
+      );
 
       confetti({
         particleCount: 80,
@@ -358,6 +392,8 @@ export default function DeliveryOrderModal({ isOpen, onClose, onSuccess, initial
   };
 
   const resetForm = () => {
+    setIsEditMode(false);
+    setEditingDoId(null);
     setSubmittedDoc(null);
     setFormData({
       do_number: '',
@@ -391,14 +427,32 @@ export default function DeliveryOrderModal({ isOpen, onClose, onSuccess, initial
       >
         
         {/* Header Bar */}
-        <div className="bg-gradient-to-r from-teal-900 via-[#0b4d53] to-slate-900 px-6 py-4 text-white flex items-center justify-between shrink-0 shadow-sm">
+        <div className={`px-6 py-4 text-white flex items-center justify-between shrink-0 shadow-sm transition-colors duration-200 ${
+          isEditMode 
+            ? 'bg-gradient-to-r from-amber-700 to-amber-900' 
+            : 'bg-gradient-to-r from-teal-900 via-[#0b4d53] to-slate-900'
+        }`}>
           <div className="flex items-center gap-3">
             <div className="w-8 h-8 rounded-lg bg-white/10 flex items-center justify-center">
               <Truck className="w-5 h-5 text-teal-300" />
             </div>
             <div>
-              <h2 className="text-base sm:text-lg font-black tracking-wide uppercase">DELIVERY ORDER FORM</h2>
-              <p className="text-[11px] text-teal-200">Surat Jalan Pengiriman Barang Fisik (Multi-Product Supported)</p>
+              {isEditMode ? (
+                <div>
+                  <div className="flex items-center gap-2 mb-0.5">
+                    <span className="inline-flex items-center gap-1 text-[10px] font-black uppercase px-2 py-0.5 rounded bg-amber-500/80 text-white border border-amber-400/40">
+                      MODE EDIT DELIVERY ORDER
+                    </span>
+                    <span className="font-mono text-xs text-amber-200 font-bold">{formData.do_number}</span>
+                  </div>
+                  <h2 className="text-base sm:text-lg font-black tracking-wide uppercase">KOREKSI DATA DELIVERY ORDER</h2>
+                </div>
+              ) : (
+                <div>
+                  <h2 className="text-base sm:text-lg font-black tracking-wide uppercase">DELIVERY ORDER FORM</h2>
+                  <p className="text-[11px] text-teal-200">Surat Jalan Pengiriman Barang Fisik (Multi-Product Supported)</p>
+                </div>
+              )}
             </div>
           </div>
           <button

@@ -146,7 +146,7 @@ app.get('/api/settings', async (req, res) => {
     let row = await db.prepare('SELECT * FROM settings WHERE id = 1').get();
     if (!row) {
       await db.prepare(`
-        INSERT INTO settings (id, company_name) VALUES (1, 'PT. PATCO ELEKTRONIK TEKNOLOGI')
+        INSERT INTO settings (id, company_name, show_letterhead) VALUES (1, 'PT. PATCO ELEKTRONIK TEKNOLOGI', 0)
       `).run();
       row = await db.prepare('SELECT * FROM settings WHERE id = 1').get();
     }
@@ -286,7 +286,7 @@ app.put('/api/settings', async (req, res) => {
       authorized_sign_title || '',
       authorized_sign_url || '',
       doc_control_code || '',
-      show_letterhead !== undefined ? (show_letterhead ? 1 : 0) : 1,
+      show_letterhead !== undefined ? (show_letterhead ? 1 : 0) : 0,
       pl_prepared_by_name !== undefined ? pl_prepared_by_name : 'Staff Warehouse',
       pl_prepared_by_title !== undefined ? pl_prepared_by_title : 'Prepared By',
       pl_authorized_name !== undefined ? pl_authorized_name : 'Warehouse Supervisor',
@@ -424,7 +424,16 @@ app.post('/api/dummy-data/generate', async (req, res) => {
 
 app.post('/api/dummy-data/clear', async (req, res) => {
   try {
-    const { mode = 'transactions' } = req.body;
+    const { mode = 'transactions', confirm_key } = req.body || {};
+    const authHeader = req.headers['x-admin-key'];
+    const expectedKey = process.env.ADMIN_KEY || 'CLEAR_DATABASE_AUTHORIZED';
+
+    // Proteksi keamanan: Cegah penghapusan database tanpa otorisasi eksplisit
+    if (confirm_key !== expectedKey && authHeader !== expectedKey) {
+      return res.status(403).json({ 
+        error: 'Akses Ditolak: Operasi reset/clear database memerlukan otorisasi (confirm_key tidak valid).' 
+      });
+    }
 
     if (mode === 'transactions' || mode === 'dummy_only') {
       // 1. Hapus Hanya Transaksi (Invoices, PL, DO, Logs) - Master Data 100% AMAN
@@ -687,7 +696,8 @@ app.put('/api/parts/:id', async (req, res) => {
       Number(price) || 0,
       req.params.id
     );
-    res.json({ success: true });
+    const updated = await db.prepare('SELECT * FROM parts WHERE id = ?').get(req.params.id);
+    res.json(updated || { success: true });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -878,6 +888,16 @@ app.get('/api/parts/:id/price-at-date', async (req, res) => {
 
 app.get('/api/invoices', async (req, res) => {
   try {
+    const { search } = req.query;
+    if (search && search.trim()) {
+      const term = `%${search.trim()}%`;
+      const rows = await db.prepare(`
+        SELECT * FROM invoices 
+        WHERE invoice_number LIKE ? OR customer_name LIKE ? OR customer_po_no LIKE ? OR part_name LIKE ? OR notes LIKE ?
+        ORDER BY id DESC
+      `).all(term, term, term, term, term);
+      return res.json(rows);
+    }
     const rows = await db.prepare('SELECT * FROM invoices ORDER BY id DESC').all();
     res.json(rows);
   } catch (err) {
@@ -952,7 +972,18 @@ async function updateInvoiceHelper(targetId, data) {
     items
   } = data;
 
-  const oldInv = await db.prepare('SELECT * FROM invoices WHERE id = ?').get(targetId);
+  let oldInv = await db.prepare('SELECT * FROM invoices WHERE id = ?').get(targetId);
+  if (!oldInv && invoice_number) {
+    oldInv = await db.prepare('SELECT * FROM invoices WHERE invoice_number = ? LIMIT 1').get(invoice_number);
+    if (oldInv) targetId = oldInv.id;
+  }
+  if (!oldInv) {
+    const dl = await db.prepare("SELECT ref_id FROM data_logger WHERE doc_type = 'INVOICE' AND id = ?").get(targetId);
+    if (dl && dl.ref_id) {
+      oldInv = await db.prepare('SELECT * FROM invoices WHERE id = ?').get(dl.ref_id);
+      if (oldInv) targetId = oldInv.id;
+    }
+  }
   if (!oldInv) {
     throw new Error('Invoice not found');
   }
@@ -982,11 +1013,20 @@ async function updateInvoiceHelper(targetId, data) {
     numPallets = parsedItems.reduce((acc, it) => acc + (Number(it.no_of_pallet) || 0), 0);
     numBoxes = parsedItems.reduce((acc, it) => acc + (Number(it.no_of_box) || 0), 0);
     computedTotalQty = parsedItems.reduce((acc, it) => {
-      const itemBoxes = Number(it.no_of_box) || 0;
+      const itemBoxes = Number(it.no_of_box || it.box_qty) || 0;
       const itemPerBox = Number(it.qty_per_box) || 0;
-      return acc + (Number(it.total_qty) || (itemBoxes * itemPerBox));
+      return acc + (Number(it.total_qty || it.qty) || (itemBoxes * itemPerBox));
     }, 0);
-    computedTotalAmount = parsedItems.reduce((acc, it) => acc + (Number(it.total_amount) || 0), 0);
+    computedTotalAmount = parsedItems.reduce((acc, it) => {
+      const itemAmt = Number(it.total_amount !== undefined ? it.total_amount : (it.amount !== undefined ? it.amount : NaN));
+      if (!isNaN(itemAmt)) return acc + itemAmt;
+      const q = Number(it.total_qty || it.qty) || ((Number(it.no_of_box || it.box_qty) || 0) * (Number(it.qty_per_box) || 0));
+      const p = Number(it.unit_price || it.price) || 0;
+      return acc + (q * p);
+    }, 0);
+    if (!computedTotalAmount && total_amount) {
+      computedTotalAmount = Number(total_amount) || 0;
+    }
     
     finalPartName = parsedItems.length === 1
       ? (parsedItems[0].part_name || '')
@@ -1003,8 +1043,8 @@ async function updateInvoiceHelper(targetId, data) {
     computedTotalAmount = computedTotalAmount || (computedTotalQty * numUnitPrice);
   }
 
-  const computedVatAmount = Number(vat_amount) || (numVatRate > 0 ? (computedTotalAmount * (numVatRate / 100)) : 0);
-  const computedGrandTotal = Number(grand_total) || (computedTotalAmount + computedVatAmount);
+  const computedVatAmount = 0; // Fix VAT to 0.00
+  const computedGrandTotal = computedTotalAmount;
   const itemsJson = parsedItems ? JSON.stringify(parsedItems) : null;
 
   await db.prepare(`
@@ -1183,11 +1223,20 @@ app.post('/api/invoices', async (req, res) => {
       numPallets = parsedItems.reduce((acc, it) => acc + (Number(it.no_of_pallet) || 0), 0);
       numBoxes = parsedItems.reduce((acc, it) => acc + (Number(it.no_of_box) || 0), 0);
       computedTotalQty = parsedItems.reduce((acc, it) => {
-        const itemBoxes = Number(it.no_of_box) || 0;
+        const itemBoxes = Number(it.no_of_box || it.box_qty) || 0;
         const itemPerBox = Number(it.qty_per_box) || 0;
-        return acc + (Number(it.total_qty) || (itemBoxes * itemPerBox));
+        return acc + (Number(it.total_qty || it.qty) || (itemBoxes * itemPerBox));
       }, 0);
-      computedTotalAmount = parsedItems.reduce((acc, it) => acc + (Number(it.total_amount) || 0), 0);
+      computedTotalAmount = parsedItems.reduce((acc, it) => {
+        const itemAmt = Number(it.total_amount !== undefined ? it.total_amount : (it.amount !== undefined ? it.amount : NaN));
+        if (!isNaN(itemAmt)) return acc + itemAmt;
+        const q = Number(it.total_qty || it.qty) || ((Number(it.no_of_box || it.box_qty) || 0) * (Number(it.qty_per_box) || 0));
+        const p = Number(it.unit_price || it.price) || 0;
+        return acc + (q * p);
+      }, 0);
+      if (!computedTotalAmount && total_amount) {
+        computedTotalAmount = Number(total_amount) || 0;
+      }
       
       finalPartName = parsedItems.length === 1
         ? (parsedItems[0].part_name || '')
@@ -1205,8 +1254,8 @@ app.post('/api/invoices', async (req, res) => {
       computedTotalAmount = computedTotalAmount || (computedTotalQty * numUnitPrice);
     }
 
-    const computedVatAmount = Number(vat_amount) || (numVatRate > 0 ? (computedTotalAmount * (numVatRate / 100)) : 0);
-    const computedGrandTotal = Number(grand_total) || (computedTotalAmount + computedVatAmount);
+    const computedVatAmount = 0; // Fix VAT to 0.00
+    const computedGrandTotal = computedTotalAmount;
     const itemsJson = parsedItems ? JSON.stringify(parsedItems) : null;
 
     const stmt = await db.prepare(`
@@ -1299,6 +1348,16 @@ app.put('/api/invoices/:id', async (req, res) => {
 
 app.get('/api/packing-lists', async (req, res) => {
   try {
+    const { search } = req.query;
+    if (search && search.trim()) {
+      const term = `%${search.trim()}%`;
+      const rows = await db.prepare(`
+        SELECT * FROM packing_lists 
+        WHERE invoice_number LIKE ? OR customer_name LIKE ? OR customer_po_no LIKE ? OR part_name LIKE ? OR notes LIKE ?
+        ORDER BY id DESC
+      `).all(term, term, term, term, term);
+      return res.json(rows);
+    }
     const rows = await db.prepare('SELECT * FROM packing_lists ORDER BY id DESC').all();
     res.json(rows);
   } catch (err) {
@@ -1595,6 +1654,59 @@ app.post('/api/packing-lists', async (req, res) => {
 
     const itemsJson = parsedItems ? JSON.stringify(parsedItems) : null;
 
+    // Cegah duplikasi: jika Packing List untuk invoice ini sudah ada, lakukan update in-place
+    const existingPl = invoice_number 
+      ? await db.prepare('SELECT id FROM packing_lists WHERE invoice_number = ? LIMIT 1').get(invoice_number)
+      : null;
+
+    if (existingPl) {
+      await db.prepare(`
+        UPDATE packing_lists
+        SET invoice_date = ?, customer_name = ?, customer_po_no = ?, part_name = ?,
+            terms_of_delivery = ?, box_qty = ?, pallet_qty = ?, length = ?, width = ?, height = ?,
+            unit_note = ?, image_url = ?, notes = ?, items = ?
+        WHERE id = ?
+      `).run(
+        invoice_date || new Date().toISOString().slice(0, 10),
+        customer_name || '',
+        finalPoNo,
+        finalPartName,
+        terms_of_delivery || '',
+        numBoxes,
+        numPallets,
+        Number(length) || 0,
+        Number(width) || 0,
+        Number(height) || 0,
+        unit_note || 'mm',
+        image_url || '',
+        notes || '',
+        itemsJson,
+        existingPl.id
+      );
+
+      await db.prepare(`
+        UPDATE data_logger
+        SET doc_date = ?, customer_name = ?, po_no = ?, part_name = ?,
+            box_qty = ?, pallet_qty = ?, terms_of_delivery = ?, notes = ?, items = ?
+        WHERE doc_type = 'PACKING_LIST' AND (ref_id = ? OR doc_number = ?)
+      `).run(
+        invoice_date || new Date().toISOString().slice(0, 10),
+        customer_name || '',
+        finalPoNo,
+        finalPartName,
+        numBoxes,
+        numPallets,
+        terms_of_delivery || '',
+        notes || '',
+        itemsJson,
+        existingPl.id,
+        invoice_number
+      );
+
+      const updated = await db.prepare('SELECT * FROM packing_lists WHERE id = ?').get(existingPl.id);
+      return res.status(200).json(updated);
+    }
+
     const stmt = await db.prepare(`
       INSERT INTO packing_lists (
         invoice_number, invoice_date, customer_name, customer_po_no, part_name,
@@ -1774,6 +1886,16 @@ app.put('/api/packing-lists/:id', async (req, res) => {
 
 app.get('/api/delivery-orders', async (req, res) => {
   try {
+    const { search } = req.query;
+    if (search && search.trim()) {
+      const term = `%${search.trim()}%`;
+      const rows = await db.prepare(`
+        SELECT * FROM delivery_orders 
+        WHERE do_number LIKE ? OR invoice_number LIKE ? OR customer_name LIKE ? OR customer_po_no LIKE ? OR part_name LIKE ? OR notes LIKE ?
+        ORDER BY id DESC
+      `).all(term, term, term, term, term, term);
+      return res.json(rows);
+    }
     const rows = await db.prepare('SELECT * FROM delivery_orders ORDER BY id DESC').all();
     res.json(rows);
   } catch (err) {
@@ -2051,6 +2173,57 @@ app.post('/api/delivery-orders', async (req, res) => {
     const itemsJson = parsedItems ? JSON.stringify(parsedItems) : null;
     const finalDoNumber = (do_number?.trim() || invoice_number?.trim() || '').trim();
 
+    // Cegah duplikasi: jika Delivery Order untuk nomor ini sudah ada, lakukan update in-place
+    const existingDo = finalDoNumber 
+      ? await db.prepare('SELECT id FROM delivery_orders WHERE do_number = ? OR (invoice_number = ? AND invoice_number != \'\') LIMIT 1').get(finalDoNumber, finalDoNumber)
+      : null;
+
+    if (existingDo) {
+      await db.prepare(`
+        UPDATE delivery_orders
+        SET do_number = ?, do_date = ?, invoice_number = ?, customer_name = ?, customer_id = ?,
+            customer_po_no = ?, part_name = ?, pallet_qty = ?, box_qty = ?, notes = ?, items = ?
+        WHERE id = ?
+      `).run(
+        finalDoNumber || (invoice_number?.trim() || ''),
+        do_date || new Date().toISOString().slice(0, 10),
+        invoice_number || '',
+        customer_name || '',
+        customer_id || '',
+        finalPoNo,
+        finalPartName,
+        numPallets,
+        numBoxes,
+        notes || '',
+        itemsJson,
+        existingDo.id
+      );
+
+      await db.prepare(`
+        UPDATE data_logger
+        SET doc_number = ?, doc_date = ?, customer_name = ?, customer_id = ?, po_no = ?,
+            part_name = ?, box_qty = ?, pallet_qty = ?, terms_of_delivery = ?, notes = ?, items = ?
+        WHERE doc_type = 'DELIVERY_ORDER' AND (ref_id = ? OR doc_number = ?)
+      `).run(
+        finalDoNumber || (invoice_number?.trim() || `DO-${existingDo.id}`),
+        do_date || new Date().toISOString().slice(0, 10),
+        customer_name || '',
+        customer_id || '',
+        finalPoNo,
+        finalPartName,
+        numBoxes,
+        numPallets,
+        invoice_number ? `Ref Inv: ${invoice_number}` : '',
+        notes || '',
+        itemsJson,
+        existingDo.id,
+        finalDoNumber
+      );
+
+      const updated = await db.prepare('SELECT * FROM delivery_orders WHERE id = ?').get(existingDo.id);
+      return res.status(200).json(updated);
+    }
+
     const stmt = await db.prepare(`
       INSERT INTO delivery_orders (
         do_number, do_date, invoice_number, customer_name, customer_id,
@@ -2209,6 +2382,62 @@ app.put('/api/delivery-orders/:id', async (req, res) => {
 });
 
 // ================= DATA LOGGER ROUTES ================= //
+
+app.post('/api/data-logger', async (req, res) => {
+  try {
+    const {
+      doc_type = 'INVOICE',
+      doc_number,
+      doc_date = new Date().toISOString().slice(0, 10),
+      customer_name = '',
+      customer_id = '',
+      po_no = '',
+      part_name = '',
+      box_qty = 0,
+      pallet_qty = 0,
+      terms_of_delivery = '',
+      payment_term = '',
+      dimensions = null,
+      image_url = '',
+      notes = '',
+      items = null,
+      ref_id = null
+    } = req.body || {};
+
+    const itemsJson = typeof items === 'object' && items !== null ? JSON.stringify(items) : (items || null);
+
+    const info = await db.prepare(`
+      INSERT INTO data_logger (
+        doc_type, doc_number, doc_date, customer_name, customer_id, po_no,
+        part_name, box_qty, pallet_qty, terms_of_delivery, payment_term,
+        dimensions, image_url, notes, items, ref_id
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(
+      doc_type,
+      doc_number || `LOG-${Date.now()}`,
+      doc_date,
+      customer_name,
+      customer_id,
+      po_no,
+      part_name,
+      Number(box_qty) || 0,
+      Number(pallet_qty) || 0,
+      terms_of_delivery,
+      payment_term,
+      dimensions,
+      image_url,
+      notes,
+      itemsJson,
+      ref_id
+    );
+
+    const created = await db.prepare('SELECT * FROM data_logger WHERE id = ?').get(info.lastInsertRowid);
+    res.status(201).json(created);
+  } catch (err) {
+    console.error('Data logger create error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
 
 app.get('/api/data-logger', async (req, res) => {
   try {
@@ -2430,10 +2659,14 @@ app.delete('/api/data-logger/:id', async (req, res) => {
 const clientDistPath = path.join(__dirname, '..', 'client', 'dist');
 if (fs.existsSync(clientDistPath)) {
   app.use(express.static(clientDistPath, {
-    maxAge: '1d',
     setHeaders: (res, filePath) => {
       if (filePath.includes(path.sep + 'assets' + path.sep) || filePath.includes('/assets/')) {
         res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+      } else {
+        // Jangan cache index.html atau root static files agar browser selalu mendapatkan versi terbaru
+        res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+        res.setHeader('Pragma', 'no-cache');
+        res.setHeader('Expires', '0');
       }
     }
   }));
@@ -2441,9 +2674,24 @@ if (fs.existsSync(clientDistPath)) {
     if (req.path.startsWith('/api') || req.path.startsWith('/uploads')) {
       return next();
     }
+    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+    res.setHeader('Pragma', 'no-cache');
+    res.setHeader('Expires', '0');
     res.sendFile(path.join(clientDistPath, 'index.html'));
   });
 }
+
+// Global error handling middleware for safety
+app.use((err, req, res, next) => {
+  console.error('Server error:', err);
+  if (err && err.message && err.message.includes('Format file tidak didukung')) {
+    return res.status(400).json({ error: err.message });
+  }
+  if (err instanceof multer.MulterError) {
+    return res.status(400).json({ error: `File upload error: ${err.message}` });
+  }
+  res.status(err.status || 500).json({ error: err.message || 'Internal Server Error' });
+});
 
 // Listen on 0.0.0.0 for LAN access
 app.listen(PORT, '0.0.0.0', () => {

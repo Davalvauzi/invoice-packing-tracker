@@ -232,6 +232,10 @@ async function createPostgresSchema(client) {
     CREATE INDEX IF NOT EXISTS idx_inv_number ON invoices(invoice_number);
     CREATE INDEX IF NOT EXISTS idx_pl_inv_number ON packing_lists(invoice_number);
     CREATE INDEX IF NOT EXISTS idx_do_number ON delivery_orders(do_number);
+    CREATE INDEX IF NOT EXISTS idx_do_inv_number ON delivery_orders(invoice_number);
+    CREATE INDEX IF NOT EXISTS idx_parts_part_no ON parts(part_no);
+    CREATE INDEX IF NOT EXISTS idx_parts_customer ON parts(customer_id);
+    CREATE INDEX IF NOT EXISTS idx_price_history_part ON part_price_history(part_id);
 
     -- Ensure incremental schema updates
     ALTER TABLE parts ADD COLUMN IF NOT EXISTS box_per_pallet INTEGER DEFAULT 0;

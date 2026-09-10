@@ -62,6 +62,8 @@ export default function PackingListModal({ isOpen, onClose, openPrintTab, onSucc
   // Dynamic Product Items
   const [items, setItems] = useState([createEmptyPLItem()]);
 
+  const [isEditMode, setIsEditMode] = useState(false);
+  const [editingPlId, setEditingPlId] = useState(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submittedDoc, setSubmittedDoc] = useState(null);
 
@@ -357,6 +359,30 @@ export default function PackingListModal({ isOpen, onClose, openPrintTab, onSucc
       box_qty: invBox ? String(invBox) : ''
     }));
 
+    // Cek apakah Packing List untuk nomor ini sudah pernah dibuat sebelumnya
+    fetch(`/api/packing-lists/${encodeURIComponent(invNum)}`)
+      .then(res => res.ok ? res.json() : null)
+      .then(existingPl => {
+        if (existingPl && existingPl.id) {
+          setIsEditMode(true);
+          setEditingPlId(existingPl.id);
+          if (existingPl.packing_date || existingPl.invoice_date) {
+            setFormData(prev => ({
+              ...prev,
+              invoice_date: (existingPl.packing_date || existingPl.invoice_date).slice(0, 10),
+              notes: existingPl.notes || prev.notes
+            }));
+          }
+        } else {
+          setIsEditMode(false);
+          setEditingPlId(null);
+        }
+      })
+      .catch(() => {
+        setIsEditMode(false);
+        setEditingPlId(null);
+      });
+
     showSuccess(`Data ${parsedItems?.length ? `${parsedItems.length} produk` : ''} berhasil ditarik dari Invoice ${invNum}! (Pallet: ${invPallet || 0})`);
   };
 
@@ -380,8 +406,11 @@ export default function PackingListModal({ isOpen, onClose, openPrintTab, onSucc
 
     setIsSubmitting(true);
     try {
-      const postRes = await fetch('/api/packing-lists', {
-        method: 'POST',
+      const endpoint = isEditMode && editingPlId ? `/api/packing-lists/${editingPlId}` : '/api/packing-lists';
+      const method = isEditMode && editingPlId ? 'PUT' : 'POST';
+
+      const postRes = await fetch(endpoint, {
+        method,
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           ...formData,
@@ -390,12 +419,15 @@ export default function PackingListModal({ isOpen, onClose, openPrintTab, onSucc
       });
 
       if (!postRes.ok) {
-        throw new Error('Gagal menyimpan packing list');
+        throw new Error(isEditMode ? 'Gagal memperbarui packing list' : 'Gagal menyimpan packing list');
       }
 
       const savedData = await postRes.json();
       setSubmittedDoc(savedData);
-      showSuccess('Packing List berhasil dibuat dan disimpan!');
+      showSuccess(isEditMode 
+        ? `Packing List ${formData.invoice_number} berhasil diperbarui!` 
+        : 'Packing List berhasil dibuat dan disimpan!'
+      );
 
       confetti({
         particleCount: 80,
@@ -417,6 +449,8 @@ export default function PackingListModal({ isOpen, onClose, openPrintTab, onSucc
   };
 
   const resetForm = () => {
+    setIsEditMode(false);
+    setEditingPlId(null);
     setSubmittedDoc(null);
     setFormData({
       invoice_number: '',
@@ -466,14 +500,32 @@ export default function PackingListModal({ isOpen, onClose, openPrintTab, onSucc
       >
         
         {/* Header Bar */}
-        <div className="bg-gradient-to-r from-teal-800 to-emerald-900 px-6 py-4 text-white flex items-center justify-between shrink-0">
+        <div className={`px-6 py-4 text-white flex items-center justify-between shrink-0 transition-colors duration-200 ${
+          isEditMode 
+            ? 'bg-gradient-to-r from-amber-700 to-amber-900' 
+            : 'bg-gradient-to-r from-teal-800 to-emerald-900'
+        }`}>
           <div className="flex items-center gap-3">
             <div className="w-8 h-8 rounded-lg bg-white/10 flex items-center justify-center">
               <Package className="w-5 h-5 text-teal-300" />
             </div>
             <div>
-              <h2 className="text-base sm:text-lg font-black tracking-wide uppercase">PACKING LIST FORM</h2>
-              <p className="text-[11px] text-teal-200">Form Spesifikasi Pengemasan & Logistik (Multi-Product Supported)</p>
+              {isEditMode ? (
+                <div>
+                  <div className="flex items-center gap-2 mb-0.5">
+                    <span className="inline-flex items-center gap-1 text-[10px] font-black uppercase px-2 py-0.5 rounded bg-amber-500/80 text-white border border-amber-400/40">
+                      MODE EDIT PACKING LIST
+                    </span>
+                    <span className="font-mono text-xs text-amber-200 font-bold">{formData.invoice_number}</span>
+                  </div>
+                  <h2 className="text-base sm:text-lg font-black tracking-wide uppercase">KOREKSI DATA PACKING LIST</h2>
+                </div>
+              ) : (
+                <div>
+                  <h2 className="text-base sm:text-lg font-black tracking-wide uppercase">PACKING LIST FORM</h2>
+                  <p className="text-[11px] text-teal-200">Form Spesifikasi Pengemasan & Logistik (Multi-Product Supported)</p>
+                </div>
+              )}
             </div>
           </div>
           <button

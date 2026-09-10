@@ -1,16 +1,18 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, lazy, Suspense } from 'react';
 import Navbar from './components/Navbar';
 import Dashboard from './pages/Dashboard';
-import DataLogger from './pages/DataLogger';
-import MasterData from './pages/MasterData';
-import WebsiteSettings from './pages/WebsiteSettings';
-import PrintInvoice from './pages/PrintInvoice';
-import PrintPackingList from './pages/PrintPackingList';
-import PrintDeliveryOrder from './pages/PrintDeliveryOrder';
 import InvoiceModal from './components/InvoiceModal';
 import PackingListModal from './components/PackingListModal';
 import DeliveryOrderModal from './components/DeliveryOrderModal';
 import { NotificationProvider } from './context/NotificationContext';
+
+// Lazy load modul halaman sekunder & cetak agar bundle utama ringan & cepat dimuat
+const DataLogger = lazy(() => import('./pages/DataLogger'));
+const MasterData = lazy(() => import('./pages/MasterData'));
+const WebsiteSettings = lazy(() => import('./pages/WebsiteSettings'));
+const PrintInvoice = lazy(() => import('./pages/PrintInvoice'));
+const PrintPackingList = lazy(() => import('./pages/PrintPackingList'));
+const PrintDeliveryOrder = lazy(() => import('./pages/PrintDeliveryOrder'));
 
 function AppContent() {
   const [activeView, setActiveView] = useState(() => {
@@ -74,39 +76,44 @@ function AppContent() {
 
   // If in direct print/preview mode (opened in new tab)
   if (printDoc) {
-    if (printDoc.view === 'print-invoice') {
-      return (
-        <PrintInvoice 
-          id={printDoc.id} 
-          onBack={() => {
-            window.history.replaceState({}, '', window.location.pathname);
-            setPrintDoc(null);
-          }} 
-        />
-      );
-    }
-    if (printDoc.view === 'print-packing-list') {
-      return (
-        <PrintPackingList 
-          id={printDoc.id} 
-          onBack={() => {
-            window.history.replaceState({}, '', window.location.pathname);
-            setPrintDoc(null);
-          }} 
-        />
-      );
-    }
-    if (printDoc.view === 'print-delivery-order') {
-      return (
-        <PrintDeliveryOrder 
-          id={printDoc.id} 
-          onBack={() => {
-            window.history.replaceState({}, '', window.location.pathname);
-            setPrintDoc(null);
-          }} 
-        />
-      );
-    }
+    return (
+      <Suspense fallback={
+        <div className="min-h-screen flex items-center justify-center bg-slate-100 font-sans">
+          <div className="text-center space-y-2">
+            <div className="w-8 h-8 border-4 border-slate-700 border-t-transparent rounded-full animate-spin mx-auto"></div>
+            <p className="text-slate-600 text-xs font-medium">Menyiapkan dokumen cetak...</p>
+          </div>
+        </div>
+      }>
+        {printDoc.view === 'print-invoice' && (
+          <PrintInvoice 
+            id={printDoc.id} 
+            onBack={() => {
+              window.history.replaceState({}, '', window.location.pathname);
+              setPrintDoc(null);
+            }} 
+          />
+        )}
+        {printDoc.view === 'print-packing-list' && (
+          <PrintPackingList 
+            id={printDoc.id} 
+            onBack={() => {
+              window.history.replaceState({}, '', window.location.pathname);
+              setPrintDoc(null);
+            }} 
+          />
+        )}
+        {printDoc.view === 'print-delivery-order' && (
+          <PrintDeliveryOrder 
+            id={printDoc.id} 
+            onBack={() => {
+              window.history.replaceState({}, '', window.location.pathname);
+              setPrintDoc(null);
+            }} 
+          />
+        )}
+      </Suspense>
+    );
   }
 
   return (
@@ -126,46 +133,53 @@ function AppContent() {
 
       {/* Main Content Area */}
       <main className="flex-1 pb-16">
-        {activeView === 'dashboard' && (
-          <Dashboard 
-            setActiveView={setActiveView} 
-            openPrintTab={openPrintTab}
-            onOpenInvoiceModal={() => {
-              setEditingInvoice(null);
-              setIsInvoiceModalOpen(true);
-            }}
-            onEditInvoice={handleEditInvoice}
-            onOpenPackingListModal={handleOpenPackingListModal}
-            onOpenDeliveryOrderModal={handleOpenDeliveryOrderModal}
-            refreshTrigger={refreshTrigger}
-          />
-        )}
+        <Suspense fallback={
+          <div className="min-h-[50vh] flex flex-col items-center justify-center p-8">
+            <div className="w-8 h-8 border-3 border-emerald-600 border-t-transparent rounded-full animate-spin"></div>
+            <p className="text-xs text-slate-500 font-medium mt-3">Memuat modul aplikasi...</p>
+          </div>
+        }>
+          {activeView === 'dashboard' && (
+            <Dashboard 
+              setActiveView={setActiveView} 
+              openPrintTab={openPrintTab}
+              onOpenInvoiceModal={() => {
+                setEditingInvoice(null);
+                setIsInvoiceModalOpen(true);
+              }}
+              onEditInvoice={handleEditInvoice}
+              onOpenPackingListModal={handleOpenPackingListModal}
+              onOpenDeliveryOrderModal={handleOpenDeliveryOrderModal}
+              refreshTrigger={refreshTrigger}
+            />
+          )}
 
-        {activeView === 'data-logger' && (
-          <DataLogger 
-            openPrintTab={openPrintTab} 
-            onOpenInvoiceModal={() => {
-              setEditingInvoice(null);
-              setIsInvoiceModalOpen(true);
-            }}
-            onEditInvoice={handleEditInvoice}
-            onOpenPackingListModal={handleOpenPackingListModal}
-            onOpenDeliveryOrderModal={handleOpenDeliveryOrderModal}
-            refreshTrigger={refreshTrigger}
-          />
-        )}
+          {activeView === 'data-logger' && (
+            <DataLogger 
+              openPrintTab={openPrintTab} 
+              onOpenInvoiceModal={() => {
+                setEditingInvoice(null);
+                setIsInvoiceModalOpen(true);
+              }}
+              onEditInvoice={handleEditInvoice}
+              onOpenPackingListModal={handleOpenPackingListModal}
+              onOpenDeliveryOrderModal={handleOpenDeliveryOrderModal}
+              refreshTrigger={refreshTrigger}
+            />
+          )}
 
-        {activeView === 'master-data' && (
-          <MasterData 
-            setActiveView={setActiveView} 
-          />
-        )}
+          {activeView === 'master-data' && (
+            <MasterData 
+              setActiveView={setActiveView} 
+            />
+          )}
 
-        {activeView === 'website-settings' && (
-          <WebsiteSettings 
-            setActiveView={setActiveView} 
-          />
-        )}
+          {activeView === 'website-settings' && (
+            <WebsiteSettings 
+              setActiveView={setActiveView} 
+            />
+          )}
+        </Suspense>
       </main>
 
       {/* Global Invoice Form Modal */}

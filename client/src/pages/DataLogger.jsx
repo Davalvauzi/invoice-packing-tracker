@@ -27,6 +27,7 @@ import {
   CornerDownRight
 } from 'lucide-react';
 import { useNotification } from '../context/NotificationContext';
+import { formatIndoDate } from '../utils/dateFormatter';
 
 export default function DataLogger({ 
   openPrintTab, 
@@ -842,7 +843,7 @@ export default function DataLogger({
                             {inv.doc_number}
                           </td>
                           <td className="px-3 py-3 text-slate-500 whitespace-nowrap">
-                            {inv.doc_date}
+                            {formatIndoDate(inv.doc_date)}
                           </td>
                           <td className="px-4 py-3 font-semibold text-slate-800 max-w-[220px] truncate">
                             {inv.customer_name}
@@ -941,7 +942,7 @@ export default function DataLogger({
                               {child.doc_number}
                             </td>
                             <td className="px-3 py-2.5 text-slate-500 whitespace-nowrap">
-                              {child.doc_date}
+                              {formatIndoDate(child.doc_date)}
                             </td>
                             <td className="px-4 py-2.5 font-semibold text-slate-700 max-w-[220px] truncate">
                               {child.customer_name}
@@ -1021,7 +1022,7 @@ export default function DataLogger({
                             {orphan.doc_number}
                           </td>
                           <td className="px-3 py-3 text-slate-500 whitespace-nowrap">
-                            {orphan.doc_date}
+                            {formatIndoDate(orphan.doc_date)}
                           </td>
                           <td className="px-4 py-3 font-semibold text-slate-800 max-w-[220px] truncate">
                             {orphan.customer_name}
@@ -1098,7 +1099,7 @@ export default function DataLogger({
                       {log.doc_number}
                     </td>
                     <td className="px-3 py-3 text-slate-500 whitespace-nowrap">
-                      {log.doc_date}
+                      {formatIndoDate(log.doc_date)}
                     </td>
                     <td className="px-4 py-3 font-semibold text-slate-800 max-w-[220px] truncate">
                       {log.customer_name}
@@ -1280,7 +1281,7 @@ export default function DataLogger({
                 </div>
                 <div>
                   <span className="text-[10px] text-slate-400 font-semibold block uppercase">Tanggal Dokumen</span>
-                  <p className="font-bold text-slate-900 text-sm">{selectedLog.doc_date}</p>
+                  <p className="font-bold text-slate-900 text-sm">{formatIndoDate(selectedLog.doc_date)}</p>
                   <p className="text-slate-500 font-mono mt-0.5">Input: {selectedLog.created_at}</p>
                 </div>
               </div>

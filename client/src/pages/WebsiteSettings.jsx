@@ -59,7 +59,7 @@ export default function WebsiteSettings({ refreshTrigger }) {
     authorized_sign_title: '',
     authorized_sign_url: '',
     doc_control_code: 'FRM-ACC-01 Rev.02',
-    show_letterhead: 1,
+    show_letterhead: 0,
     pl_prepared_by_name: 'Staff Warehouse',
     pl_prepared_by_title: 'Prepared By',
     pl_authorized_name: 'Warehouse Supervisor',
@@ -488,11 +488,11 @@ export default function WebsiteSettings({ refreshTrigger }) {
                   <div className="flex items-center gap-2">
                     <span className="text-xs font-black text-slate-900 uppercase tracking-wider">Cetak Kop Dokumen (Letterhead)</span>
                     <span className={`text-[10px] font-extrabold px-2.5 py-0.5 rounded-full ${
-                      Boolean(settings.show_letterhead ?? 1)
+                      Boolean(settings.show_letterhead ?? 0)
                         ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
                         : 'bg-amber-100 text-amber-800 border border-amber-300'
                     }`}>
-                      {Boolean(settings.show_letterhead ?? 1) ? '● KOP AKTIF (Kertas Putih / PDF)' : '● KOP NONAKTIF (Kertas Kop Bawaan)'}
+                      {Boolean(settings.show_letterhead ?? 0) ? '● KOP AKTIF (Kertas Putih / PDF)' : '● KOP NONAKTIF (Pre-printed Paper)'}
                     </span>
                   </div>
                   <p className="text-[11px] text-slate-600 mt-1 max-w-2xl leading-relaxed">
@@ -504,16 +504,16 @@ export default function WebsiteSettings({ refreshTrigger }) {
                 <button
                   type="button"
                   role="switch"
-                  aria-checked={Boolean(settings.show_letterhead ?? 1)}
-                  onClick={() => setSettings(prev => ({ ...prev, show_letterhead: (Boolean(prev.show_letterhead ?? 1) ? 0 : 1) }))}
+                  aria-checked={Boolean(settings.show_letterhead ?? 0)}
+                  onClick={() => setSettings(prev => ({ ...prev, show_letterhead: (Boolean(prev.show_letterhead ?? 0) ? 0 : 1) }))}
                   className={`relative inline-flex h-8 w-14 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-emerald-700 focus:ring-offset-2 shadow-inner ${
-                    Boolean(settings.show_letterhead ?? 1) ? 'bg-emerald-700' : 'bg-slate-400'
+                    Boolean(settings.show_letterhead ?? 0) ? 'bg-emerald-700' : 'bg-slate-400'
                   }`}
                   title="Klik untuk mengubah status Kop Dokumen"
                 >
                   <span
                     className={`pointer-events-none inline-block h-7 w-7 transform rounded-full bg-white shadow-md ring-0 transition duration-200 ease-in-out ${
-                      Boolean(settings.show_letterhead ?? 1) ? 'translate-x-6' : 'translate-x-0'
+                      Boolean(settings.show_letterhead ?? 0) ? 'translate-x-6' : 'translate-x-0'
                     }`}
                   />
                 </button>
@@ -525,17 +525,17 @@ export default function WebsiteSettings({ refreshTrigger }) {
                   type="button"
                   onClick={() => setSettings(prev => ({ ...prev, show_letterhead: 1 }))}
                   className={`flex items-start gap-3 p-3 rounded-xl border text-left transition-all cursor-pointer ${
-                    Boolean(settings.show_letterhead ?? 1)
+                    Boolean(settings.show_letterhead ?? 0)
                       ? 'bg-emerald-50/80 border-emerald-500 ring-2 ring-emerald-500/20 shadow-xs'
                       : 'bg-white border-slate-200 hover:bg-slate-50 text-slate-600'
                   }`}
                 >
                   <div className={`w-5 h-5 rounded-full flex items-center justify-center shrink-0 mt-0.5 border ${
-                    Boolean(settings.show_letterhead ?? 1)
+                    Boolean(settings.show_letterhead ?? 0)
                       ? 'border-emerald-600 bg-emerald-600 text-white'
                       : 'border-slate-300 bg-white'
                   }`}>
-                    {Boolean(settings.show_letterhead ?? 1) && <Check className="w-3.5 h-3.5" />}
+                    {Boolean(settings.show_letterhead ?? 0) && <Check className="w-3.5 h-3.5" />}
                   </div>
                   <div>
                     <div className="text-xs font-bold text-slate-900">1. Kop Aktif (Kertas Putih / PDF)</div>
@@ -547,20 +547,20 @@ export default function WebsiteSettings({ refreshTrigger }) {
                   type="button"
                   onClick={() => setSettings(prev => ({ ...prev, show_letterhead: 0 }))}
                   className={`flex items-start gap-3 p-3 rounded-xl border text-left transition-all cursor-pointer ${
-                    !Boolean(settings.show_letterhead ?? 1)
+                    !Boolean(settings.show_letterhead ?? 0)
                       ? 'bg-amber-50/80 border-amber-500 ring-2 ring-amber-500/20 shadow-xs'
                       : 'bg-white border-slate-200 hover:bg-slate-50 text-slate-600'
                   }`}
                 >
                   <div className={`w-5 h-5 rounded-full flex items-center justify-center shrink-0 mt-0.5 border ${
-                    !Boolean(settings.show_letterhead ?? 1)
+                    !Boolean(settings.show_letterhead ?? 0)
                       ? 'border-amber-600 bg-amber-600 text-white'
                       : 'border-slate-300 bg-white'
                   }`}>
-                    {!Boolean(settings.show_letterhead ?? 1) && <Check className="w-3.5 h-3.5" />}
+                    {!Boolean(settings.show_letterhead ?? 0) && <Check className="w-3.5 h-3.5" />}
                   </div>
                   <div>
-                    <div className="text-xs font-bold text-slate-900">2. Nonaktifkan Kop (Kertas Bawaan)</div>
+                    <div className="text-xs font-bold text-slate-900">2. Nonaktifkan Kop (Pre-printed Paper)</div>
                     <div className="text-[11px] text-slate-500 mt-0.5">Sembunyikan kop digital, beri jarak kosong agar pas di bawah kop kertas fisik.</div>
                   </div>
                 </button>

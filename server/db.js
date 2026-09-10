@@ -95,9 +95,17 @@ if (DB_TYPE === 'postgres') {
 
   console.log(`📡 Database Connected: PostgreSQL (database: ${process.env.PG_DATABASE || 'invoice_track'})`);
 
-  // Auto-ensure incremental schema columns
+  // Auto-ensure incremental schema columns & performance indexes
   pool.query('ALTER TABLE parts ADD COLUMN IF NOT EXISTS box_per_pallet INTEGER DEFAULT 0')
     .catch(() => { /* table might not exist yet */ });
+  pool.query('CREATE INDEX IF NOT EXISTS idx_do_inv_number ON delivery_orders(invoice_number)')
+    .catch(() => {});
+  pool.query('CREATE INDEX IF NOT EXISTS idx_parts_part_no ON parts(part_no)')
+    .catch(() => {});
+  pool.query('CREATE INDEX IF NOT EXISTS idx_parts_customer ON parts(customer_id)')
+    .catch(() => {});
+  pool.query('CREATE INDEX IF NOT EXISTS idx_price_history_part ON part_price_history(part_id)')
+    .catch(() => {});
 
 } else {
   // SQLite fallback

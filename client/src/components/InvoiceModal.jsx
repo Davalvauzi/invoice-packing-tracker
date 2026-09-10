@@ -182,8 +182,10 @@ export default function InvoiceModal({ isOpen, onClose, openPrintTab, onSuccess,
   const loadInvoiceData = async (inv) => {
     if (!inv) return;
     try {
-      let fullInv = inv;
-      const targetId = inv.id || inv.ref_id || inv;
+      // Prioritas resolusi targetId invoice: ref_id dari data_logger, invoice_number, atau ID
+      const targetId = (inv.doc_type === 'INVOICE' && inv.ref_id)
+        ? inv.ref_id
+        : (inv.invoice_number || inv.ref_id || inv.id || inv);
       if (typeof targetId === 'number' || typeof targetId === 'string') {
         const res = await fetch(`/api/invoices/${targetId}`);
         if (res.ok) {

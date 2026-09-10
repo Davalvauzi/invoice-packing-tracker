@@ -32,7 +32,8 @@ import {
   KeyRound,
   Eye,
   EyeOff,
-  Clock
+  Clock,
+  HelpCircle
 } from 'lucide-react';
 import { useNotification } from '../context/NotificationContext';
 
@@ -114,6 +115,7 @@ export default function WebsiteSettings({ refreshTrigger }) {
   const [pinError, setPinError] = useState('');
   const [verifyingPin, setVerifyingPin] = useState(false);
   const [showPinPassword, setShowPinPassword] = useState(false);
+  const [showDefaultPinHint, setShowDefaultPinHint] = useState(false);
 
   // Ubah PIN States
   const [showChangePinModal, setShowChangePinModal] = useState(false);
@@ -1509,8 +1511,30 @@ export default function WebsiteSettings({ refreshTrigger }) {
               <KeyRound className="w-4 h-4" />
               <span>Buka Kunci dengan PIN</span>
             </button>
-            <div className="text-[11px] text-slate-400">
-              PIN default: <strong>123</strong>
+            <div className="flex items-center justify-center pt-1">
+              {showDefaultPinHint ? (
+                <div className="inline-flex items-center gap-2 bg-amber-50 text-amber-900 border border-amber-200 px-3 py-1 rounded-full text-[11px] font-medium animate-fadeIn">
+                  <span>PIN default: <strong className="font-bold text-amber-950 font-mono">123</strong></span>
+                  <button
+                    type="button"
+                    onClick={() => setShowDefaultPinHint(false)}
+                    className="text-amber-700 hover:text-amber-900 text-[10px] font-bold ml-1 hover:underline cursor-pointer"
+                    title="Sembunyikan petunjuk"
+                  >
+                    ✕ Tutup
+                  </button>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setShowDefaultPinHint(true)}
+                  className="text-[11px] text-slate-400 hover:text-emerald-800 hover:underline inline-flex items-center gap-1.5 cursor-pointer transition-colors py-0.5"
+                  title="Tampilkan petunjuk PIN default"
+                >
+                  <HelpCircle className="w-3.5 h-3.5" />
+                  <span>Lihat Petunjuk PIN Default</span>
+                </button>
+              )}
             </div>
           </div>
         )}
@@ -2462,10 +2486,30 @@ export default function WebsiteSettings({ refreshTrigger }) {
                     <span>{pinError}</span>
                   </p>
                 )}
-                <div className="mt-2 text-center">
-                  <span className="text-[10px] bg-slate-100 text-slate-500 px-2.5 py-0.5 rounded-full font-medium">
-                    PIN default: <strong>123</strong>
-                  </span>
+                <div className="mt-2.5 flex items-center justify-center">
+                  {showDefaultPinHint ? (
+                    <div className="inline-flex items-center gap-2 bg-amber-50 text-amber-900 border border-amber-200 px-3 py-1 rounded-full text-[11px] font-medium animate-fadeIn">
+                      <span>PIN default: <strong className="font-bold text-amber-950 font-mono">123</strong></span>
+                      <button
+                        type="button"
+                        onClick={() => setShowDefaultPinHint(false)}
+                        className="text-amber-700 hover:text-amber-900 text-[10px] font-bold ml-1 hover:underline cursor-pointer"
+                        title="Sembunyikan petunjuk"
+                      >
+                        ✕ Tutup
+                      </button>
+                    </div>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => setShowDefaultPinHint(true)}
+                      className="text-[11px] text-slate-400 hover:text-emerald-800 hover:underline inline-flex items-center gap-1.5 cursor-pointer transition-colors py-0.5"
+                      title="Tampilkan petunjuk PIN default"
+                    >
+                      <HelpCircle className="w-3.5 h-3.5" />
+                      <span>Lihat Petunjuk PIN Default</span>
+                    </button>
+                  )}
                 </div>
               </div>
 

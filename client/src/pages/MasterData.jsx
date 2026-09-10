@@ -13,7 +13,6 @@ import {
   Copy,
   DollarSign,
   Package,
-  Sparkles,
   Clock,
   History,
   Calendar,
@@ -68,7 +67,6 @@ export default function MasterData({ setActiveView }) {
 
   const [isAdding, setIsAdding] = useState(false);
   const [editingId, setEditingId] = useState(null);
-  const [isGeneratingDummy, setIsGeneratingDummy] = useState(false);
 
   const [historyModalOpen, setHistoryModalOpen] = useState(false);
 
@@ -205,31 +203,6 @@ export default function MasterData({ setActiveView }) {
     }
   };
 
-  const handleQuickDummy = async () => {
-    const confirmed = await confirmDialog({
-      title: 'Generate Data Dummy',
-      message: 'Masukkan data dummy (Customer, Produk/Harga, Invoice, dan Packing List)?',
-      confirmText: 'Ya, Generate',
-      type: 'info'
-    });
-    if (!confirmed) return;
-
-    setIsGeneratingDummy(true);
-    try {
-      const res = await fetch('/api/dummy-data/generate', { method: 'POST' });
-      const data = await res.json();
-      if (res.ok) {
-        showSuccess('Berhasil! Data dummy telah dimasukkan.');
-        fetchAllMasterData();
-      } else {
-        showError('Gagal: ' + (data.error || 'Terjadi kesalahan'));
-      }
-    } catch (err) {
-      showError('Error: ' + err.message);
-    } finally {
-      setIsGeneratingDummy(false);
-    }
-  };
 
   useEffect(() => {
     fetchAllMasterData();
@@ -529,16 +502,6 @@ export default function MasterData({ setActiveView }) {
           {activeTab === 'delivery' && 'Daftar Ketentuan Pengiriman (Terms of Delivery)'}
         </h3>
         <div className="flex items-center gap-2">
-          <button
-            type="button"
-            onClick={handleQuickDummy}
-            disabled={isGeneratingDummy}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-300 rounded-xl text-xs font-bold transition-colors cursor-pointer disabled:opacity-50"
-            title="Generate Data Dummy Customer, Produk & Transaksi"
-          >
-            <Sparkles className="w-3.5 h-3.5" />
-            <span>{isGeneratingDummy ? 'Mengisi...' : 'Isi Data Dummy'}</span>
-          </button>
           <button
             onClick={() => {
               if (isAdding) {

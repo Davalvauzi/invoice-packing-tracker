@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Printer, ArrowLeft } from 'lucide-react';
 import { formatIndoDate } from '../utils/dateFormatter';
+import { sanitizeDocumentTitle } from '../utils/formatters';
 
 export default function PrintPackingList({ id, onBack }) {
   const [packingList, setPackingList] = useState(null);
@@ -17,9 +18,7 @@ export default function PrintPackingList({ id, onBack }) {
   useEffect(() => {
     if (packingList) {
       const prevTitle = document.title;
-      const code = packingList.invoice_number || packingList.id || '';
-      const cleanCode = String(code).replace(/[/\\?%*:|"<>]/g, '-').replace(/\s+/g, '').replace(/-+/g, '-').replace(/^-|-$/g, '');
-      document.title = cleanCode ? `packing-list-${cleanCode}` : 'packing-list';
+      document.title = sanitizeDocumentTitle(packingList.invoice_number || packingList.id, 'packing-list');
       return () => {
         document.title = prevTitle;
       };
@@ -28,9 +27,7 @@ export default function PrintPackingList({ id, onBack }) {
 
   const handlePrint = () => {
     if (packingList) {
-      const code = packingList.invoice_number || packingList.id || '';
-      const cleanCode = String(code).replace(/[/\\?%*:|"<>]/g, '-').replace(/\s+/g, '').replace(/-+/g, '-').replace(/^-|-$/g, '');
-      document.title = cleanCode ? `packing-list-${cleanCode}` : 'packing-list';
+      document.title = sanitizeDocumentTitle(packingList.invoice_number || packingList.id, 'packing-list');
     }
     window.print();
   };

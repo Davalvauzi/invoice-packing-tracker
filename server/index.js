@@ -498,7 +498,7 @@ app.post('/api/dummy-data/clear', async (req, res) => {
     // Otorisasi: periksa kesesuaian PIN atau token otorisasi
     const providedPin = pin || confirm_key || authHeader;
     const isPinMatch = providedPin && String(providedPin).trim() === String(currentPin).trim();
-    const isTokenMatch = providedPin === 'CLEAR_DATABASE_AUTHORIZED' || (adminKey && providedPin === adminKey);
+    const isTokenMatch = Boolean(adminKey && String(providedPin).trim() === String(adminKey).trim());
 
     if (!isPinMatch && !isTokenMatch) {
       return res.status(403).json({ 

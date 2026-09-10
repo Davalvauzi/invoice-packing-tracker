@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Printer, ArrowLeft } from 'lucide-react';
 import { formatIndoDate } from '../utils/dateFormatter';
+import { sanitizeDocumentTitle } from '../utils/formatters';
 
 export default function PrintInvoice({ id, onBack }) {
   const [invoice, setInvoice] = useState(null);
@@ -16,9 +17,7 @@ export default function PrintInvoice({ id, onBack }) {
   useEffect(() => {
     if (invoice) {
       const prevTitle = document.title;
-      const code = invoice.invoice_number || invoice.id || '';
-      const cleanCode = String(code).replace(/[/\\?%*:|"<>]/g, '-').replace(/\s+/g, '').replace(/-+/g, '-').replace(/^-|-$/g, '');
-      document.title = cleanCode ? `invoice-${cleanCode}` : 'invoice';
+      document.title = sanitizeDocumentTitle(invoice.invoice_number || invoice.id, 'invoice');
       return () => {
         document.title = prevTitle;
       };
@@ -27,9 +26,7 @@ export default function PrintInvoice({ id, onBack }) {
 
   const handlePrint = () => {
     if (invoice) {
-      const code = invoice.invoice_number || invoice.id || '';
-      const cleanCode = String(code).replace(/[/\\?%*:|"<>]/g, '-').replace(/\s+/g, '').replace(/-+/g, '-').replace(/^-|-$/g, '');
-      document.title = cleanCode ? `invoice-${cleanCode}` : 'invoice';
+      document.title = sanitizeDocumentTitle(invoice.invoice_number || invoice.id, 'invoice');
     }
     window.print();
   };

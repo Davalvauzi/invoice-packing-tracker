@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Printer, ArrowLeft } from 'lucide-react';
 import { formatIndoDate } from '../utils/dateFormatter';
+import { sanitizeDocumentTitle } from '../utils/formatters';
 
 export default function PrintDeliveryOrder({ id, onBack }) {
   const [deliveryOrder, setDeliveryOrder] = useState(null);
@@ -16,9 +17,7 @@ export default function PrintDeliveryOrder({ id, onBack }) {
   useEffect(() => {
     if (deliveryOrder) {
       const prevTitle = document.title;
-      const code = deliveryOrder.do_number || deliveryOrder.invoice_number || deliveryOrder.id || '';
-      const cleanCode = String(code).replace(/[/\\?%*:|"<>]/g, '-').replace(/\s+/g, '').replace(/-+/g, '-').replace(/^-|-$/g, '');
-      document.title = cleanCode ? `delivery-order-${cleanCode}` : 'delivery-order';
+      document.title = sanitizeDocumentTitle(deliveryOrder.do_number || deliveryOrder.invoice_number || deliveryOrder.id, 'delivery-order');
       return () => {
         document.title = prevTitle;
       };
@@ -27,9 +26,7 @@ export default function PrintDeliveryOrder({ id, onBack }) {
 
   const handlePrint = () => {
     if (deliveryOrder) {
-      const code = deliveryOrder.do_number || deliveryOrder.invoice_number || deliveryOrder.id || '';
-      const cleanCode = String(code).replace(/[/\\?%*:|"<>]/g, '-').replace(/\s+/g, '').replace(/-+/g, '-').replace(/^-|-$/g, '');
-      document.title = cleanCode ? `delivery-order-${cleanCode}` : 'delivery-order';
+      document.title = sanitizeDocumentTitle(deliveryOrder.do_number || deliveryOrder.invoice_number || deliveryOrder.id, 'delivery-order');
     }
     window.print();
   };

@@ -125,6 +125,13 @@ export default function WebsiteSettings({ refreshTrigger }) {
   const [changingPin, setChangingPin] = useState(false);
   const [changePinError, setChangePinError] = useState('');
 
+  // Reset Data PIN Confirmation Modal States
+  const [resetPinModalOpen, setResetPinModalOpen] = useState(false);
+  const [resetTargetMode, setResetTargetMode] = useState('transactions');
+  const [resetPinInput, setResetPinInput] = useState('');
+  const [resetPinError, setResetPinError] = useState('');
+  const [showResetPinPassword, setShowResetPinPassword] = useState(false);
+
   // Countdown timer: otomatis kunci tab setelah 5 menit
   useEffect(() => {
     if (!isPinUnlocked) return;
@@ -353,16 +360,19 @@ export default function WebsiteSettings({ refreshTrigger }) {
 
   // Handle ESC key to close modals
   useEffect(() => {
-    if (!isCustomModalOpen && !isCustomMasterModalOpen) return;
+    if (!isCustomModalOpen && !isCustomMasterModalOpen && !showPinModal && !showChangePinModal && !resetPinModalOpen) return;
     const handleKeyDown = (e) => {
       if (e.key === 'Escape') {
         setIsCustomModalOpen(false);
         setIsCustomMasterModalOpen(false);
+        setShowPinModal(false);
+        setShowChangePinModal(false);
+        setResetPinModalOpen(false);
       }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isCustomModalOpen, isCustomMasterModalOpen]);
+  }, [isCustomModalOpen, isCustomMasterModalOpen, showPinModal, showChangePinModal, resetPinModalOpen]);
 
   const openCustomMasterModal = async () => {
     setIsCustomMasterModalOpen(true);
@@ -511,62 +521,47 @@ export default function WebsiteSettings({ refreshTrigger }) {
     }
   };
 
-  const handleClearDummy = async (modeInput = 'transactions') => {
+  const handleClearDummy = (modeInput = 'transactions') => {
     const mode = typeof modeInput === 'string' ? modeInput : 'transactions';
-    let title = 'Konfirmasi Pembersihan';
-    let msg = '';
-    let confirmType = 'warning';
-    let confirmBtnText = 'Ya, Bersihkan';
+    setResetTargetMode(mode);
+    setResetPinInput('');
+    setResetPinError('');
+    setShowResetPinPassword(false);
+    setResetPinModalOpen(true);
+  };
 
-    if (mode === 'transactions') {
-      title = 'Hapus Seluruh Data Transaksi Saja';
-      msg = 'Apakah Anda yakin ingin MENGHAPUS SEMUA TRANSAKSI (Invoice, Packing List, Delivery Order, dan Data Logger)?\n\nSeluruh Master Data Customer, Katalog Part, Riwayat Harga, dan Termin dijamin TETAP AMAN tersimpan.';
-      confirmType = 'warning';
-      confirmBtnText = 'Hapus Semua Transaksi';
-    } else if (mode === 'master_only') {
-      title = 'PERINGATAN: Hapus Master Data Saja';
-      msg = 'PERINGATAN: Anda akan MENGOSONGKAN SELURUH MASTER DATA (Customer, Ship To/Bill To, Katalog Part, Riwayat Harga, dan Termin).\n\nRiwayat transaksi yang sudah ada tidak dihapus, namun tidak lagi memiliki referensi master data aktif. Lanjutkan?';
-      confirmType = 'danger';
-      confirmBtnText = 'Ya, Hapus Master Data';
-    } else if (mode === 'all') {
-      title = 'PERINGATAN KERAS: Reset Total Database';
-      msg = 'PERINGATAN KERAS: Seluruh database (Semua Transaksi Faktur, PL, DO, Logs, serta Master Customer & Part) akan dikosongkan total ke titik nol!\n\nTindakan ini bersifat permanen dan tidak dapat dibatalkan.\n\nApakah Anda benar-benar yakin?';
-      confirmType = 'danger';
-      confirmBtnText = 'Ya, Reset Total Database';
+  const handleConfirmResetWithPin = async (e) => {
+    if (e) e.preventDefault();
+    if (!resetPinInput.trim()) {
+      setResetPinError('Masukkan PIN Admin untuk konfirmasi.');
+      return;
     }
 
-    const ok = await confirmDialog({
-      title,
-      message: msg,
-      confirmText: confirmBtnText,
-      type: confirmType
-    });
-    if (!ok) return;
-
     setClearingDummy(true);
+    setResetPinError('');
     try {
-      const storedPin = sessionStorage.getItem('docutrack_admin_pin_value') || '123';
       const res = await fetch('/api/dummy-data/clear', {
         method: 'POST',
         headers: { 
           'Content-Type': 'application/json',
-          'x-admin-key': storedPin
+          'x-admin-key': resetPinInput.trim()
         },
         body: JSON.stringify({ 
-          mode, 
-          pin: storedPin,
-          confirm_key: storedPin 
+          mode: resetTargetMode, 
+          pin: resetPinInput.trim()
         })
       });
       const data = await res.json();
       if (res.ok) {
         showSuccess(data.message, 'Pembersihan Selesai');
+        setResetPinModalOpen(false);
+        setResetPinInput('');
         fetchDummyStats();
       } else {
-        showError(data.error || 'Terjadi kesalahan saat pembersihan');
+        setResetPinError(data.error || 'PIN salah. Penghapusan dibatalkan.');
       }
     } catch (err) {
-      showError(err.message);
+      setResetPinError(err.message || 'Terjadi kesalahan jaringan.');
     } finally {
       setClearingDummy(false);
     }
@@ -2612,6 +2607,139 @@ export default function WebsiteSettings({ refreshTrigger }) {
                 >
                   {changingPin ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
                   <span>{changingPin ? 'Menyimpan...' : 'Simpan PIN'}</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL 3: Konfirmasi PIN untuk Hapus / Reset Data */}
+      {resetPinModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-fadeIn">
+          <div className="bg-white rounded-2xl border border-rose-200 shadow-2xl max-w-sm w-full p-6 space-y-4">
+            <div className="flex items-start justify-between">
+              <div className="flex items-center gap-3">
+                <div className={`w-10 h-10 rounded-xl flex items-center justify-center shadow-2xs ${
+                  resetTargetMode === 'all' 
+                    ? 'bg-rose-100 text-rose-700' 
+                    : resetTargetMode === 'transactions'
+                    ? 'bg-amber-100 text-amber-800'
+                    : 'bg-slate-100 text-slate-700'
+                }`}>
+                  <AlertTriangle className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-slate-900 text-sm">
+                    {resetTargetMode === 'all' && 'Konfirmasi PIN: Reset Total'}
+                    {resetTargetMode === 'transactions' && 'Konfirmasi PIN: Hapus Transaksi'}
+                    {resetTargetMode === 'master_only' && 'Konfirmasi PIN: Hapus Master Data'}
+                  </h3>
+                  <p className="text-[11px] text-slate-500 font-medium">
+                    Otorisasi keamanan data sebelum eksekusi
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setResetPinModalOpen(false)}
+                className="text-slate-400 hover:text-slate-600 p-1 rounded-lg hover:bg-slate-100 cursor-pointer transition-colors"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Peringatan Bahaya */}
+            <div className={`p-3 rounded-xl border text-xs leading-relaxed ${
+              resetTargetMode === 'all'
+                ? 'bg-rose-50 border-rose-200 text-rose-900'
+                : resetTargetMode === 'transactions'
+                ? 'bg-amber-50 border-amber-200 text-amber-900'
+                : 'bg-slate-50 border-slate-200 text-slate-800'
+            }`}>
+              {resetTargetMode === 'all' && (
+                <div>
+                  <strong className="font-bold text-rose-950 block mb-1">⚠️ PERINGATAN KERAS:</strong>
+                  Seluruh database (Faktur, Packing List, DO, Logs, dan Master Customer & Part) akan <strong>dikosongkan total ke titik nol</strong>! Tindakan ini permanen.
+                </div>
+              )}
+              {resetTargetMode === 'transactions' && (
+                <div>
+                  <strong className="font-bold text-amber-950 block mb-1">⚠️ Hapus Semua Transaksi:</strong>
+                  Seluruh Invoice, Packing List, Delivery Order, dan Logs akan dihapus. <strong>Master Data Customer & Part tetap aman</strong> tersimpan.
+                </div>
+              )}
+              {resetTargetMode === 'master_only' && (
+                <div>
+                  <strong className="font-bold text-slate-900 block mb-1">⚠️ Hapus Master Data:</strong>
+                  Seluruh Master Data (Customer, Katalog Part, Riwayat Harga, dan Termin) akan dihapus.
+                </div>
+              )}
+            </div>
+
+            <form onSubmit={handleConfirmResetWithPin} className="space-y-4">
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1.5">
+                  Masukkan PIN Admin:
+                </label>
+                <div className="relative">
+                  <input
+                    type={showResetPinPassword ? "text" : "password"}
+                    autoFocus
+                    value={resetPinInput}
+                    onChange={(e) => {
+                      setResetPinInput(e.target.value);
+                      if (resetPinError) setResetPinError('');
+                    }}
+                    placeholder="Ketik PIN untuk konfirmasi..."
+                    className={`w-full px-3.5 py-2.5 text-center text-lg tracking-widest font-mono bg-slate-50 border rounded-xl focus:outline-none transition-all ${
+                      resetPinError 
+                        ? 'border-rose-400 bg-rose-50/50 focus:ring-2 focus:ring-rose-200 text-rose-800' 
+                        : 'border-slate-200 focus:border-rose-600 focus:bg-white focus:ring-2 focus:ring-rose-100 text-slate-900'
+                    }`}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowResetPinPassword(!showResetPinPassword)}
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-1 rounded-lg cursor-pointer transition-colors"
+                    title={showResetPinPassword ? "Sembunyikan PIN" : "Lihat PIN"}
+                  >
+                    {showResetPinPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
+                </div>
+                {resetPinError && (
+                  <p className="text-[11px] text-rose-600 font-semibold mt-1.5 flex items-center gap-1">
+                    <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                    <span>{resetPinError}</span>
+                  </p>
+                )}
+              </div>
+
+              <div className="flex items-center gap-2 pt-1">
+                <button
+                  type="button"
+                  onClick={() => setResetPinModalOpen(false)}
+                  className="flex-1 py-2 px-3 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold transition-all cursor-pointer"
+                >
+                  Batal
+                </button>
+                <button
+                  type="submit"
+                  disabled={clearingDummy || !resetPinInput.trim()}
+                  className={`flex-1 py-2 px-3 text-white rounded-xl text-xs font-bold transition-all shadow-xs disabled:opacity-50 cursor-pointer flex items-center justify-center gap-1.5 ${
+                    resetTargetMode === 'all'
+                      ? 'bg-rose-700 hover:bg-rose-800'
+                      : resetTargetMode === 'transactions'
+                      ? 'bg-amber-600 hover:bg-amber-700'
+                      : 'bg-rose-700 hover:bg-rose-800'
+                  }`}
+                >
+                  {clearingDummy ? (
+                    <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                  ) : (
+                    <Trash2 className="w-3.5 h-3.5" />
+                  )}
+                  <span>{clearingDummy ? 'Menghapus...' : 'Konfirmasi Hapus'}</span>
                 </button>
               </div>
             </form>

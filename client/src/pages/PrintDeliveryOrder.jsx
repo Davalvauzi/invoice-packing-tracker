@@ -484,35 +484,44 @@ export default function PrintDeliveryOrder({ id, onBack }) {
           </div>
 
           {/* ================= 4. TABEL PRODUK DELIVERY ORDER (BORDERLESS VERTIKAL SESUAI DOKUMEN FISIK) ================= */}
-          <table className="w-full border-collapse text-[7.2pt] leading-tight">
+          <table className="w-full border-collapse text-[7.2pt] leading-tight" style={{ tableLayout: 'fixed' }}>
+            <colgroup>
+              <col style={{ width: '5%' }} />    {/* NO */}
+              <col style={{ width: '38%' }} />   {/* Part Name and Part Number */}
+              <col style={{ width: '14%' }} />   {/* Our PO No. Cust PO No. (Center at 50%) */}
+              <col style={{ width: '7%' }} />    {/* Plt No. */}
+              <col style={{ width: '9%' }} />    {/* No of Ctn/Tray */}
+              <col style={{ width: '9%' }} />    {/* Qty per Ctn/Tray */}
+              <col style={{ width: '9%' }} />    {/* Total Qty */}
+              <col style={{ width: '9%' }} />    {/* REMARK */}
+            </colgroup>
             <thead>
               <tr className="border-t border-b border-black text-center font-bold">
-                <th className="py-1.5 px-1 w-[35px]">NO</th>
-                <th className="py-1.5 px-1 text-left">
-                  <div>Part Name and</div>
-                  <div>Part Number</div>
+                <th className="py-1.5 px-1">NO</th>
+                <th className="py-1.5 px-1 text-center whitespace-nowrap">
+                  Part Name and Part Number
                 </th>
-                <th className="py-1.5 px-1 w-[90px]">
+                <th className="py-1.5 px-1 text-center">
                   <div>Our PO No.</div>
                   <div>Cust PO No.</div>
                 </th>
-                <th className="py-1.5 px-1 w-[50px]">
+                <th className="py-1.5 px-1">
                   <div>Plt</div>
                   <div>No.</div>
                 </th>
-                <th className="py-1.5 px-1 w-[55px]">
+                <th className="py-1.5 px-1">
                   <div>No of</div>
                   <div>Ctn/Tray</div>
                 </th>
-                <th className="py-1.5 px-1 w-[55px]">
+                <th className="py-1.5 px-1">
                   <div>Qty per</div>
                   <div>Ctn/Tray</div>
                 </th>
-                <th className="py-1.5 px-1 w-[60px]">
+                <th className="py-1.5 px-1">
                   <div>Total</div>
                   <div>Qty</div>
                 </th>
-                <th className="py-1.5 px-1 w-[65px]">
+                <th className="py-1.5 px-1">
                   REMARK
                 </th>
               </tr>
@@ -523,7 +532,7 @@ export default function PrintDeliveryOrder({ id, onBack }) {
                   <td className="py-1.5 px-1 text-center font-mono">
                     {idx + 1}
                   </td>
-                  <td className="py-1.5 px-1 text-left">
+                  <td className="py-1.5 px-1 text-center">
                     <div className="font-bold">{it.part_name}</div>
                     {it.part_no && <div className="text-[6.8pt] font-mono">{it.part_no}</div>}
                   </td>

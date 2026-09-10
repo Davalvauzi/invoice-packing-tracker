@@ -6,6 +6,7 @@ export default function PrintPackingList({ id, onBack }) {
   const [packingList, setPackingList] = useState(null);
   const [customer, setCustomer] = useState(null);
   const [settings, setSettings] = useState(null);
+  const [linkedInvoice, setLinkedInvoice] = useState(null);
   const [showLetterhead, setShowLetterhead] = useState(false);
   const [loading, setLoading] = useState(true);
 
@@ -58,6 +59,18 @@ export default function PrintPackingList({ id, onBack }) {
         if (cRes.ok) {
           const found = await cRes.json();
           if (found) setCustomer(found);
+        }
+      }
+
+      if (plData.invoice_number) {
+        try {
+          const invRes = await fetch(`/api/invoices/${encodeURIComponent(plData.invoice_number)}`);
+          if (invRes.ok) {
+            const invData = await invRes.json();
+            if (invData) setLinkedInvoice(invData);
+          }
+        } catch (e) {
+          console.warn('Could not fetch linked invoice for packing list:', e);
         }
       }
     } catch (err) {
@@ -242,8 +255,8 @@ export default function PrintPackingList({ id, onBack }) {
   const totalGrossWeight = items.reduce((sum, it) => sum + (Number(it.gross_weight) || 0), 0);
   const totalCbm = items.reduce((sum, it) => sum + (Number(it.cbm) || 0), 0);
 
-  // Parse Ship To (Exclude contact info)
-  const rawShipTo = packingList.ship_to || customer?.ship_to || customer?.address || '';
+  // Parse Ship To (Exclude contact info) - Prioritas: Invoice ship_to -> PL ship_to -> Customer ship_to/address
+  const rawShipTo = linkedInvoice?.ship_to || packingList.ship_to || customer?.ship_to || customer?.address || '';
   let shipToLines = rawShipTo
     .split('\n')
     .map(l => l.trim())
@@ -483,7 +496,7 @@ export default function PrintPackingList({ id, onBack }) {
             <thead>
               <tr className="border-t border-b border-black text-center font-bold">
                 <th rowSpan={2} className="py-1 px-1 w-[45px]">Pallet No</th>
-                <th rowSpan={2} className="py-1 px-1 w-[70px]">PO No</th>
+                <th rowSpan={2} className="py-1 px-1 min-w-[70px] whitespace-nowrap">PO No</th>
                 <th rowSpan={2} className="py-1 px-1 text-center whitespace-nowrap">
                   Part Name & Part Code
                 </th>
@@ -528,8 +541,8 @@ export default function PrintPackingList({ id, onBack }) {
                   <td className="py-1 px-1 text-center font-bold">
                     {it.pallet_no}
                   </td>
-                  <td className="py-1 px-1 text-center font-mono">
-                    {it.customer_po_no || '-'}
+                  <td className="py-1 px-1 text-center font-mono whitespace-nowrap text-[6.8pt]">
+                    {it.customer_po_no ? it.customer_po_no.replace(/\r?\n/g, ', ') : '-'}
                   </td>
                   <td className="py-1 px-1 text-center">
                     <div className="font-bold">{it.part_name}</div>

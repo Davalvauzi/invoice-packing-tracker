@@ -203,13 +203,21 @@ export default function PrintDeliveryOrder({ id, onBack }) {
     billToLines = [deliveryOrder.customer_name];
   }
 
-  // Ensure contact info is present in BILL TO (bukan di Ship To)
+  // Ensure contact info is present in BILL TO (Attn di atas, Tel di bawah)
   const billToText = billToLines.join('\n').toLowerCase();
+  if (customer?.contact_person && !billToText.includes(customer.contact_person.toLowerCase()) && !/^(attn|pic|up):/im.test(billToText)) {
+    billToLines.push(`Attn: ${customer.contact_person}`);
+  }
   if (customer?.phone && !billToText.includes(customer.phone.toLowerCase()) && !/^(tel|phone):/im.test(billToText)) {
     billToLines.push(`Tel: ${customer.phone}`);
   }
-  if (customer?.contact_person && !billToText.includes(customer.contact_person.toLowerCase()) && !/^(attn|pic|up):/im.test(billToText)) {
-    billToLines.push(`Attn: ${customer.contact_person}`);
+
+  // Pastikan posisi Attn selalu berada di atas Tel
+  const doAttnIdx = billToLines.findIndex(l => /^(attn|pic|up):/i.test(l));
+  const doTelIdx = billToLines.findIndex(l => /^(tel|phone):/i.test(l));
+  if (doAttnIdx !== -1 && doTelIdx !== -1 && doTelIdx < doAttnIdx) {
+    const [attnLine] = billToLines.splice(doAttnIdx, 1);
+    billToLines.splice(doTelIdx, 0, attnLine);
   }
 
   // Ship To: bersihkan dari informasi kontak (phone/tel/fax/attn)

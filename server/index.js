@@ -1442,7 +1442,7 @@ app.get('/api/packing-lists/:id', async (req, res) => {
         if (!row.customer_po_no && linkedInvoice.customer_po_no) {
           row.customer_po_no = linkedInvoice.customer_po_no;
         }
-        if (!row.ship_to && linkedInvoice.ship_to) {
+        if (linkedInvoice.ship_to) {
           row.ship_to = linkedInvoice.ship_to;
         }
         if (!row.terms_of_delivery && linkedInvoice.terms_of_delivery) {

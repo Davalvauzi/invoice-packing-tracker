@@ -136,17 +136,32 @@ export default function PrintInvoice({ id, onBack }) {
   // Parse lines for Bill To and Ship To
   const rawBillTo = invoice.bill_to || customer?.bill_to || customer?.address || '';
   let billToLines = rawBillTo.split('\n').map(l => l.trim()).filter(Boolean);
-  if (billToLines.length === 0 && invoice.customer_name) {
-    billToLines = [invoice.customer_name];
+
+  // Pastikan nama perusahaan pelanggan berada di baris pertama
+  const customerName = invoice.customer_name || customer?.name || '';
+  if (customerName) {
+    const cleanName = customerName.toLowerCase().replace(/[^a-z0-9]/g, '');
+    const alreadyPresent = billToLines.some(l => l.toLowerCase().replace(/[^a-z0-9]/g, '') === cleanName);
+    if (!alreadyPresent) {
+      billToLines.unshift(customerName);
+    }
   }
 
-  // Ensure contact info is present in Bill To
+  // Ensure contact info is present in Bill To (Attn di atas, Tel di bawah)
   const billToText = billToLines.join('\n').toLowerCase();
+  if (customer?.contact_person && !billToText.includes(customer.contact_person.toLowerCase()) && !/^(attn|pic|up):/im.test(billToText)) {
+    billToLines.push(`Attn: ${customer.contact_person}`);
+  }
   if (customer?.phone && !billToText.includes(customer.phone.toLowerCase()) && !/^(tel|phone):/im.test(billToText)) {
     billToLines.push(`Tel: ${customer.phone}`);
   }
-  if (customer?.contact_person && !billToText.includes(customer.contact_person.toLowerCase()) && !/^(attn|pic|up):/im.test(billToText)) {
-    billToLines.push(`Attn: ${customer.contact_person}`);
+
+  // Pastikan posisi Attn selalu berada di atas Tel
+  const attnIdx = billToLines.findIndex(l => /^(attn|pic|up):/i.test(l));
+  const telIdx = billToLines.findIndex(l => /^(tel|phone):/i.test(l));
+  if (attnIdx !== -1 && telIdx !== -1 && telIdx < attnIdx) {
+    const [attnLine] = billToLines.splice(attnIdx, 1);
+    billToLines.splice(telIdx, 0, attnLine);
   }
 
   const rawShipTo = invoice.ship_to || customer?.ship_to || customer?.address || '';
@@ -155,8 +170,13 @@ export default function PrintInvoice({ id, onBack }) {
     .map(l => l.trim())
     .filter(Boolean)
     .filter(l => !/^(phone|tel|fax|attn|up|pic):/i.test(l));
-  if (shipToLines.length === 0 && invoice.customer_name) {
-    shipToLines = [invoice.customer_name];
+
+  if (customerName) {
+    const cleanName = customerName.toLowerCase().replace(/[^a-z0-9]/g, '');
+    const alreadyPresent = shipToLines.some(l => l.toLowerCase().replace(/[^a-z0-9]/g, '') === cleanName);
+    if (!alreadyPresent) {
+      shipToLines.unshift(customerName);
+    }
   }
 
   const htsCode = invoice.hts_code || settings?.hts_code_invoice || '8503.00.90';
@@ -643,9 +663,7 @@ export default function PrintInvoice({ id, onBack }) {
             <div className="h-16 flex items-end justify-start w-44">
               {settings?.prepared_by_sign_url ? (
                 <img src={settings.prepared_by_sign_url} alt="Sign" className="h-14 object-contain" />
-              ) : (
-                <span className="text-[7.5pt] italic text-slate-700 select-none pb-1">Mb</span>
-              )}
+              ) : null}
             </div>
             {/* Signature Underline */}
             <div className="border-b border-black w-44 mb-1"></div>

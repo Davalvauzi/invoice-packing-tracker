@@ -196,7 +196,6 @@ export default function WebsiteSettings({ refreshTrigger }) {
         const fiveMinutes = 5 * 60 * 1000;
         const expireAt = Date.now() + fiveMinutes;
         sessionStorage.setItem('docutrack_admin_pin_unlocked', 'true');
-        sessionStorage.setItem('docutrack_admin_pin_value', pinInput.trim());
         sessionStorage.setItem('docutrack_admin_pin_expire', expireAt.toString());
         setPinRemainingSeconds(5 * 60);
         setIsPinUnlocked(true);
@@ -216,7 +215,6 @@ export default function WebsiteSettings({ refreshTrigger }) {
 
   const handleLockTab = (isTimeout = false) => {
     sessionStorage.removeItem('docutrack_admin_pin_unlocked');
-    sessionStorage.removeItem('docutrack_admin_pin_value');
     sessionStorage.removeItem('docutrack_admin_pin_expire');
     setPinRemainingSeconds(0);
     setIsPinUnlocked(false);
@@ -255,7 +253,6 @@ export default function WebsiteSettings({ refreshTrigger }) {
       const data = await res.json();
       if (res.ok) {
         showSuccess('PIN Keamanan Admin berhasil diperbarui!', 'Sukses');
-        sessionStorage.setItem('docutrack_admin_pin_value', newPin.trim());
         setShowChangePinModal(false);
         setOldPin('');
         setNewPin('');

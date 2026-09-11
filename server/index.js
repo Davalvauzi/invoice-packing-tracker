@@ -174,9 +174,31 @@ app.get('/api/settings', async (req, res) => {
   }
 });
 
+// In-memory rate limiting & lockout untuk proteksi brute-force PIN
+const pinAttempts = new Map();
+
+function getClientIp(req) {
+  return (req.headers['x-forwarded-for'] || req.socket.remoteAddress || '127.0.0.1').toString().split(',')[0].trim();
+}
+
 // Verifikasi PIN Admin untuk buka gembok / akses menu reset
 app.post('/api/settings/verify-pin', async (req, res) => {
   try {
+    const ip = getClientIp(req);
+    const now = Date.now();
+    const record = pinAttempts.get(ip) || { count: 0, lockedUntil: 0, lastAttempt: now };
+
+    if (record.lockedUntil > now) {
+      const waitSeconds = Math.ceil((record.lockedUntil - now) / 1000);
+      return res.status(429).json({ 
+        error: `Akses terkunci sementara karena 5x percobaan salah. Tunggu ${waitSeconds} detik lagi.` 
+      });
+    }
+
+    if (now - record.lastAttempt > 2 * 60 * 1000) {
+      record.count = 0;
+    }
+
     const { pin } = req.body || {};
     if (!pin || String(pin).trim() === '') {
       return res.status(400).json({ error: 'PIN wajib diisi.' });
@@ -186,9 +208,27 @@ app.post('/api/settings/verify-pin', async (req, res) => {
     const currentPin = row?.admin_pin || '123';
 
     if (String(pin).trim() !== String(currentPin).trim()) {
-      return res.status(401).json({ error: 'PIN salah. Silakan coba lagi.' });
+      record.count += 1;
+      record.lastAttempt = now;
+
+      if (record.count >= 5) {
+        record.lockedUntil = now + 60 * 1000;
+        record.count = 0;
+        pinAttempts.set(ip, record);
+        return res.status(429).json({ 
+          error: 'Percobaan PIN salah mencapai 5 kali. Akses terkunci selama 60 detik demi keamanan.' 
+        });
+      }
+
+      pinAttempts.set(ip, record);
+      const remainingAttempts = 5 - record.count;
+      return res.status(401).json({ 
+        error: `PIN salah. Sisa kesempatan: ${remainingAttempts} kali.` 
+      });
     }
 
+    // Berhasil: hapus riwayat percobaan
+    pinAttempts.delete(ip);
     return res.json({ success: true, message: 'PIN terverifikasi.' });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -488,6 +528,17 @@ app.post('/api/dummy-data/generate', async (req, res) => {
 
 app.post('/api/dummy-data/clear', async (req, res) => {
   try {
+    const ip = getClientIp(req);
+    const now = Date.now();
+    const record = pinAttempts.get(ip) || { count: 0, lockedUntil: 0, lastAttempt: now };
+
+    if (record.lockedUntil > now) {
+      const waitSeconds = Math.ceil((record.lockedUntil - now) / 1000);
+      return res.status(429).json({ 
+        error: `Akses terkunci sementara karena 5x percobaan salah. Tunggu ${waitSeconds} detik lagi.` 
+      });
+    }
+
     const { mode = 'transactions', confirm_key, pin } = req.body || {};
     const authHeader = req.headers['x-admin-key'];
     const adminKey = process.env.ADMIN_KEY;
@@ -501,10 +552,23 @@ app.post('/api/dummy-data/clear', async (req, res) => {
     const isTokenMatch = Boolean(adminKey && String(providedPin).trim() === String(adminKey).trim());
 
     if (!isPinMatch && !isTokenMatch) {
+      record.count += 1;
+      record.lastAttempt = now;
+      if (record.count >= 5) {
+        record.lockedUntil = now + 60 * 1000;
+        record.count = 0;
+        pinAttempts.set(ip, record);
+        return res.status(429).json({ 
+          error: 'Percobaan otorisasi salah mencapai 5 kali. Akses terkunci selama 60 detik.' 
+        });
+      }
+      pinAttempts.set(ip, record);
       return res.status(403).json({ 
-        error: 'Akses Ditolak: PIN otorisasi tidak valid.' 
+        error: `Akses Ditolak: PIN otorisasi tidak valid. Sisa kesempatan: ${5 - record.count} kali.` 
       });
     }
+
+    pinAttempts.delete(ip);
 
     if (mode === 'transactions' || mode === 'dummy_only') {
       // 1. Hapus Hanya Transaksi (Invoices, PL, DO, Logs) - Master Data 100% AMAN

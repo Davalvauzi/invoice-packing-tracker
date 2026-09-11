@@ -541,13 +541,13 @@ export default function PrintDeliveryOrder({ id, onBack }) {
                   <td className="py-1.5 px-1 text-center font-bold">
                     {it.plt_no}
                   </td>
-                  <td className="py-1.5 px-1 text-right font-mono">
+                  <td className="py-1.5 px-1 text-center font-mono">
                     {it.no_of_ctn > 0 ? formatNum(it.no_of_ctn) : '-'}
                   </td>
-                  <td className="py-1.5 px-1 text-right font-mono">
+                  <td className="py-1.5 px-1 text-center font-mono">
                     {it.qty_per_ctn > 0 ? formatNum(it.qty_per_ctn) : '-'}
                   </td>
-                  <td className="py-1.5 px-1 text-right font-mono font-bold">
+                  <td className="py-1.5 px-1 text-center font-mono font-bold">
                     {it.total_qty > 0 ? formatNum(it.total_qty) : '-'}
                   </td>
                   <td className="py-1.5 px-1 text-center text-[6.8pt]">
@@ -568,13 +568,13 @@ export default function PrintDeliveryOrder({ id, onBack }) {
                 <td colSpan={4} className="py-1.5 px-2 text-right">
                   Total
                 </td>
-                <td className="py-1.5 px-1 text-right font-mono">
+                <td className="py-1.5 px-1 text-center font-mono">
                   {totalCtn > 0 ? formatNum(totalCtn) : '-'}
                 </td>
                 <td className="py-1.5 px-1 text-center">
                   &nbsp;
                 </td>
-                <td className="py-1.5 px-1 text-right font-mono">
+                <td className="py-1.5 px-1 text-center font-mono">
                   {grandTotalQty > 0 ? formatNum(grandTotalQty) : '-'}
                 </td>
                 <td className="py-1.5 px-1 text-center">

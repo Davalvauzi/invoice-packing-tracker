@@ -2375,7 +2375,9 @@ app.post('/api/delivery-orders', async (req, res) => {
       box_qty,
       notes,
       items,
-      hts_code
+      hts_code,
+      bill_to,
+      ship_to
     } = req.body;
 
     let parsedItems = null;
@@ -2441,11 +2443,15 @@ app.post('/api/delivery-orders', async (req, res) => {
     const itemsJson = parsedItems ? JSON.stringify(parsedItems) : null;
     const finalDoNumber = (do_number?.trim() || invoice_number?.trim() || '').trim();
 
-    // If hts_code is empty, try to inherit from linked invoice
+    // If hts_code, bill_to, or ship_to is empty, try to inherit from linked invoice
     let finalHtsCode = hts_code || '';
-    if (!finalHtsCode && invoice_number) {
-      const linkedInv = await db.prepare('SELECT hts_code FROM invoices WHERE invoice_number = ? LIMIT 1').get(invoice_number);
-      if (linkedInv?.hts_code) finalHtsCode = linkedInv.hts_code;
+    let finalBillTo = bill_to || '';
+    let finalShipTo = ship_to || '';
+    if ((!finalHtsCode || !finalBillTo || !finalShipTo) && invoice_number) {
+      const linkedInv = await db.prepare('SELECT hts_code, bill_to, ship_to FROM invoices WHERE invoice_number = ? LIMIT 1').get(invoice_number);
+      if (linkedInv?.hts_code && !finalHtsCode) finalHtsCode = linkedInv.hts_code;
+      if (linkedInv?.bill_to && !finalBillTo) finalBillTo = linkedInv.bill_to;
+      if (linkedInv?.ship_to && !finalShipTo) finalShipTo = linkedInv.ship_to;
     }
 
     // Cegah duplikasi: jika Delivery Order untuk nomor ini sudah ada, lakukan update in-place
@@ -2457,7 +2463,8 @@ app.post('/api/delivery-orders', async (req, res) => {
       await db.prepare(`
         UPDATE delivery_orders
         SET do_number = ?, do_date = ?, invoice_number = ?, customer_name = ?, customer_id = ?,
-            customer_po_no = ?, part_name = ?, pallet_qty = ?, box_qty = ?, notes = ?, items = ?, hts_code = ?
+            customer_po_no = ?, part_name = ?, pallet_qty = ?, box_qty = ?, notes = ?, items = ?, hts_code = ?,
+            bill_to = ?, ship_to = ?
         WHERE id = ?
       `).run(
         finalDoNumber || (invoice_number?.trim() || ''),
@@ -2472,6 +2479,8 @@ app.post('/api/delivery-orders', async (req, res) => {
         notes || '',
         itemsJson,
         finalHtsCode,
+        finalBillTo,
+        finalShipTo,
         existingDo.id
       );
 
@@ -2503,8 +2512,9 @@ app.post('/api/delivery-orders', async (req, res) => {
     const stmt = await db.prepare(`
       INSERT INTO delivery_orders (
         do_number, do_date, invoice_number, customer_name, customer_id,
-        customer_po_no, part_name, pallet_qty, box_qty, notes, items, hts_code
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        customer_po_no, part_name, pallet_qty, box_qty, notes, items, hts_code,
+        bill_to, ship_to
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
 
     const info = await stmt.run(
@@ -2519,7 +2529,9 @@ app.post('/api/delivery-orders', async (req, res) => {
       numBoxes,
       notes || '',
       itemsJson,
-      finalHtsCode
+      finalHtsCode,
+      finalBillTo,
+      finalShipTo
     );
 
     const refId = info.lastInsertRowid;
@@ -2571,7 +2583,9 @@ app.put('/api/delivery-orders/:id', async (req, res) => {
       pallet_qty,
       box_qty,
       notes,
-      items
+      items,
+      bill_to,
+      ship_to
     } = req.body;
 
     let parsedItems = null;
@@ -2608,16 +2622,21 @@ app.put('/api/delivery-orders/:id', async (req, res) => {
     const finalDoNumber = (do_number?.trim() || invoice_number?.trim() || '').trim();
 
     let finalHtsCode = req.body.hts_code || '';
-    if (!finalHtsCode && invoice_number) {
-      const linkedInv = await db.prepare('SELECT hts_code FROM invoices WHERE invoice_number = ? LIMIT 1').get(invoice_number);
-      if (linkedInv?.hts_code) finalHtsCode = linkedInv.hts_code;
+    let finalBillTo = bill_to || '';
+    let finalShipTo = ship_to || '';
+    if ((!finalHtsCode || !finalBillTo || !finalShipTo) && invoice_number) {
+      const linkedInv = await db.prepare('SELECT hts_code, bill_to, ship_to FROM invoices WHERE invoice_number = ? LIMIT 1').get(invoice_number);
+      if (linkedInv?.hts_code && !finalHtsCode) finalHtsCode = linkedInv.hts_code;
+      if (linkedInv?.bill_to && !finalBillTo) finalBillTo = linkedInv.bill_to;
+      if (linkedInv?.ship_to && !finalShipTo) finalShipTo = linkedInv.ship_to;
     }
 
     await db.prepare(`
       UPDATE delivery_orders
       SET do_number = ?, do_date = ?, invoice_number = ?, customer_name = ?,
           customer_id = ?, customer_po_no = ?, part_name = ?, pallet_qty = ?,
-          box_qty = ?, notes = ?, items = ?, hts_code = ?
+          box_qty = ?, notes = ?, items = ?, hts_code = ?,
+          bill_to = ?, ship_to = ?
       WHERE id = ?
     `).run(
       finalDoNumber || (invoice_number?.trim() || ''),
@@ -2632,6 +2651,8 @@ app.put('/api/delivery-orders/:id', async (req, res) => {
       notes || '',
       itemsJson,
       finalHtsCode,
+      finalBillTo,
+      finalShipTo,
       req.params.id
     );
 

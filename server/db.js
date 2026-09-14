@@ -100,6 +100,10 @@ if (DB_TYPE === 'postgres') {
     .catch(() => { /* table might not exist yet */ });
   pool.query('ALTER TABLE delivery_orders ADD COLUMN IF NOT EXISTS hts_code VARCHAR(50)')
     .catch(() => {});
+  pool.query('ALTER TABLE delivery_orders ADD COLUMN IF NOT EXISTS bill_to TEXT')
+    .catch(() => {});
+  pool.query('ALTER TABLE delivery_orders ADD COLUMN IF NOT EXISTS ship_to TEXT')
+    .catch(() => {});
   pool.query(`
     CREATE TABLE IF NOT EXISTS customer_contacts (
       id SERIAL PRIMARY KEY,
@@ -146,8 +150,16 @@ if (DB_TYPE === 'postgres') {
     }
 
     const doCols = sqliteDb.prepare("PRAGMA table_info(delivery_orders)").all();
-    if (doCols && doCols.length > 0 && !doCols.some(c => c.name === 'hts_code')) {
-      sqliteDb.exec("ALTER TABLE delivery_orders ADD COLUMN hts_code TEXT");
+    if (doCols && doCols.length > 0) {
+      if (!doCols.some(c => c.name === 'hts_code')) {
+        sqliteDb.exec("ALTER TABLE delivery_orders ADD COLUMN hts_code TEXT");
+      }
+      if (!doCols.some(c => c.name === 'bill_to')) {
+        sqliteDb.exec("ALTER TABLE delivery_orders ADD COLUMN bill_to TEXT");
+      }
+      if (!doCols.some(c => c.name === 'ship_to')) {
+        sqliteDb.exec("ALTER TABLE delivery_orders ADD COLUMN ship_to TEXT");
+      }
     }
 
     sqliteDb.exec(`

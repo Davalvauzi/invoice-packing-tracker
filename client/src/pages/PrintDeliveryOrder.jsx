@@ -5,6 +5,7 @@ import { sanitizeDocumentTitle } from '../utils/formatters';
 
 export default function PrintDeliveryOrder({ id, onBack }) {
   const [deliveryOrder, setDeliveryOrder] = useState(null);
+  const [linkedInvoice, setLinkedInvoice] = useState(null);
   const [customer, setCustomer] = useState(null);
   const [settings, setSettings] = useState(null);
   const [showLetterhead, setShowLetterhead] = useState(false);
@@ -55,6 +56,21 @@ export default function PrintDeliveryOrder({ id, onBack }) {
         if (cRes.ok) {
           const found = await cRes.json();
           if (found) setCustomer(found);
+        }
+      }
+
+      const invToFetch = doData.invoice_number || doData.do_number;
+      if (invToFetch) {
+        try {
+          const invRes = await fetch(`/api/invoices/${encodeURIComponent(invToFetch)}`);
+          if (invRes.ok) {
+            const invData = await invRes.json();
+            if (invData && (invData.invoice_number || invData.id)) {
+              setLinkedInvoice(invData);
+            }
+          }
+        } catch (e) {
+          console.warn('Could not fetch linked invoice for DO:', e);
         }
       }
     } catch (err) {
@@ -194,18 +210,29 @@ export default function PrintDeliveryOrder({ id, onBack }) {
   const grandTotalQty = items.reduce((sum, it) => sum + (Number(it.total_qty) || 0), 0);
 
   // Parse Bill To & Ship To
-  const rawBillTo = customer?.bill_to || customer?.address || '';
+  const rawBillTo = deliveryOrder.bill_to || linkedInvoice?.bill_to || customer?.bill_to || customer?.address || '';
   let billToLines = rawBillTo.split('\n').map(l => l.trim()).filter(Boolean);
-  if (billToLines.length === 0 && deliveryOrder.customer_name) {
-    billToLines = [deliveryOrder.customer_name];
+
+  // Pastikan nama perusahaan pelanggan berada di baris pertama
+  const customerName = deliveryOrder.customer_name || linkedInvoice?.customer_name || customer?.customer_name || customer?.name || '';
+  if (customerName) {
+    const cleanName = customerName.toLowerCase().replace(/[^a-z0-9]/g, '');
+    const alreadyPresent = billToLines.some(l => l.toLowerCase().replace(/[^a-z0-9]/g, '') === cleanName);
+    if (!alreadyPresent) {
+      billToLines.unshift(customerName);
+    }
   }
 
   // Ensure contact info is present in BILL TO (Attn di atas, Tel di bawah)
+  // Hanya fallback ke kontak default customer jika di rawBillTo belum ada informasi Attn / PIC / Tel
   const billToText = billToLines.join('\n').toLowerCase();
-  if (customer?.contact_person && !billToText.includes(customer.contact_person.toLowerCase()) && !/^(attn|pic|up):/im.test(billToText)) {
+  const hasAttn = /^(attn|pic|up):/im.test(billToText);
+  const hasTel = /^(tel|phone):/im.test(billToText);
+
+  if (!hasAttn && customer?.contact_person) {
     billToLines.push(`Attn: ${customer.contact_person}`);
   }
-  if (customer?.phone && !billToText.includes(customer.phone.toLowerCase()) && !/^(tel|phone):/im.test(billToText)) {
+  if (!hasTel && customer?.phone) {
     billToLines.push(`Tel: ${customer.phone}`);
   }
 
@@ -218,14 +245,18 @@ export default function PrintDeliveryOrder({ id, onBack }) {
   }
 
   // Ship To: bersihkan dari informasi kontak (phone/tel/fax/attn)
-  const rawShipTo = customer?.ship_to || customer?.address || '';
+  const rawShipTo = deliveryOrder.ship_to || linkedInvoice?.ship_to || customer?.ship_to || customer?.address || '';
   let shipToLines = rawShipTo
     .split('\n')
     .map(l => l.trim())
     .filter(Boolean)
     .filter(l => !/^(phone|tel|fax|attn|up|pic):/i.test(l));
-  if (shipToLines.length === 0 && deliveryOrder.customer_name) {
-    shipToLines = [deliveryOrder.customer_name];
+  if (customerName) {
+    const cleanName = customerName.toLowerCase().replace(/[^a-z0-9]/g, '');
+    const alreadyPresent = shipToLines.some(l => l.toLowerCase().replace(/[^a-z0-9]/g, '') === cleanName);
+    if (!alreadyPresent) {
+      shipToLines.unshift(customerName);
+    }
   }
 
   const formatNum = (val) => {
@@ -423,15 +454,14 @@ export default function PrintDeliveryOrder({ id, onBack }) {
               <div>
                 <div className="font-bold">BILL TO :</div>
                 <div className="pl-0 mt-0.5">
-                  <div className="font-bold">{deliveryOrder.customer_name}</div>
                   {billToLines.length > 0 ? (
                     billToLines.map((line, idx) => (
-                      <div key={idx} className="leading-tight">
-                        {line !== deliveryOrder.customer_name ? line : ''}
+                      <div key={idx} className={idx === 0 ? "font-bold leading-tight" : "leading-tight"}>
+                        {line}
                       </div>
                     ))
                   ) : (
-                    <div>{customer?.address || '-'}</div>
+                    <div>{deliveryOrder.customer_name || '-'}</div>
                   )}
                 </div>
               </div>
@@ -441,7 +471,7 @@ export default function PrintDeliveryOrder({ id, onBack }) {
                 <div className="pl-0 mt-0.5">
                   {shipToLines.length > 0 ? (
                     shipToLines.map((line, idx) => (
-                      <div key={idx} className="leading-tight">
+                      <div key={idx} className={idx === 0 ? "font-bold leading-tight" : "leading-tight"}>
                         {line}
                       </div>
                     ))

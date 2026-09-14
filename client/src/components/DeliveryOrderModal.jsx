@@ -46,7 +46,10 @@ export default function DeliveryOrderModal({ isOpen, onClose, onSuccess, initial
     part_name: '',
     pallet_qty: '',
     box_qty: '',
-    notes: ''
+    notes: '',
+    hts_code: '',
+    bill_to: '',
+    ship_to: ''
   });
 
   // Dynamic Product Items
@@ -145,7 +148,8 @@ export default function DeliveryOrderModal({ isOpen, onClose, onSuccess, initial
 
   const handleInvoiceSelect = (invNum) => {
     if (!invNum || typeof invNum !== 'string') return;
-    const found = recentInvoices.find(i => i.invoice_number === invNum || i.doc_number === invNum);
+    const found = recentInvoices.find(i => i.invoice_number === invNum || i.doc_number === invNum) ||
+      (initialInvoice && (initialInvoice.invoice_number === invNum || initialInvoice.doc_number === invNum) ? initialInvoice : null);
     const targetInvNum = found?.invoice_number || found?.doc_number || invNum;
 
     if (found) {
@@ -215,7 +219,9 @@ export default function DeliveryOrderModal({ isOpen, onClose, onSuccess, initial
         hts_code: found.hts_code || prev.hts_code || '',
         customer_name: found.customer_name || prev.customer_name,
         customer_id: found.customer_id || prev.customer_id,
-        customer_po_no: found.customer_po_no || prev.customer_po_no
+        customer_po_no: found.customer_po_no || prev.customer_po_no,
+        bill_to: found.bill_to || prev.bill_to || '',
+        ship_to: found.ship_to || prev.ship_to || ''
       }));
 
       // Cek apakah Delivery Order untuk nomor ini sudah pernah dibuat sebelumnya
@@ -410,7 +416,10 @@ export default function DeliveryOrderModal({ isOpen, onClose, onSuccess, initial
       part_name: '',
       pallet_qty: '',
       box_qty: '',
-      notes: ''
+      notes: '',
+      hts_code: '',
+      bill_to: '',
+      ship_to: ''
     });
     setItems([createEmptyDOItem()]);
   };

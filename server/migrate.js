@@ -140,6 +140,9 @@ async function createPostgresSchema(client) {
       box_qty INTEGER DEFAULT 0,
       notes TEXT,
       items TEXT,
+      hts_code VARCHAR(50),
+      bill_to TEXT,
+      ship_to TEXT,
       is_dummy SMALLINT DEFAULT 0,
       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     );

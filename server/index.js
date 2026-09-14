@@ -630,9 +630,22 @@ app.get('/api/customers', async (req, res) => {
     const { name } = req.query;
     if (name) {
       const row = await db.prepare('SELECT * FROM customers WHERE customer_name = ? LIMIT 1').get(name);
+      if (row) {
+        row.contacts = await db.prepare('SELECT * FROM customer_contacts WHERE customer_id = ? ORDER BY is_default DESC, id ASC').all(row.id);
+      }
       return res.json(row || null);
     }
     const rows = await db.prepare('SELECT * FROM customers ORDER BY customer_name ASC').all();
+    // Attach contacts to each customer
+    const contacts = await db.prepare('SELECT * FROM customer_contacts ORDER BY is_default DESC, id ASC').all();
+    const contactMap = {};
+    for (const c of contacts) {
+      if (!contactMap[c.customer_id]) contactMap[c.customer_id] = [];
+      contactMap[c.customer_id].push(c);
+    }
+    for (const row of rows) {
+      row.contacts = contactMap[row.id] || [];
+    }
     res.json(rows);
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -641,7 +654,7 @@ app.get('/api/customers', async (req, res) => {
 
 app.post('/api/customers', async (req, res) => {
   try {
-    const { customer_id, customer_name, address, bill_to, ship_to, contact_person, phone } = req.body;
+    const { customer_id, customer_name, address, bill_to, ship_to, contact_person, phone, contacts } = req.body;
     if (!customer_name) {
       return res.status(400).json({ error: 'Customer name is required' });
     }
@@ -658,7 +671,34 @@ app.post('/api/customers', async (req, res) => {
       contact_person || '', 
       phone || ''
     );
-    const newCustomer = await db.prepare('SELECT * FROM customers WHERE id = ?').get(info.lastInsertRowid);
+    const newCustId = info.lastInsertRowid;
+
+    // Insert contacts if provided
+    if (Array.isArray(contacts) && contacts.length > 0) {
+      for (const ct of contacts) {
+        if (ct.contact_name?.trim()) {
+          await db.prepare(`
+            INSERT INTO customer_contacts (customer_id, contact_name, phone, email, position, is_default)
+            VALUES (?, ?, ?, ?, ?, ?)
+          `).run(
+            newCustId,
+            ct.contact_name.trim(),
+            ct.phone || '',
+            ct.email || '',
+            ct.position || '',
+            ct.is_default ? 1 : 0
+          );
+        }
+      }
+    } else if (contact_person || phone) {
+      await db.prepare(`
+        INSERT INTO customer_contacts (customer_id, contact_name, phone, is_default)
+        VALUES (?, ?, ?, 1)
+      `).run(newCustId, contact_person || '', phone || '');
+    }
+
+    const newCustomer = await db.prepare('SELECT * FROM customers WHERE id = ?').get(newCustId);
+    newCustomer.contacts = await db.prepare('SELECT * FROM customer_contacts WHERE customer_id = ?').all(newCustId);
     res.status(201).json(newCustomer);
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -667,7 +707,7 @@ app.post('/api/customers', async (req, res) => {
 
 app.put('/api/customers/:id', async (req, res) => {
   try {
-    const { customer_id, customer_name, address, bill_to, ship_to, contact_person, phone } = req.body;
+    const { customer_id, customer_name, address, bill_to, ship_to, contact_person, phone, contacts } = req.body;
     await db.prepare(`
       UPDATE customers
       SET customer_id = ?, customer_name = ?, address = ?, bill_to = ?, ship_to = ?, contact_person = ?, phone = ?
@@ -682,6 +722,27 @@ app.put('/api/customers/:id', async (req, res) => {
       phone, 
       req.params.id
     );
+
+    // Sync contacts if provided
+    if (Array.isArray(contacts)) {
+      await db.prepare('DELETE FROM customer_contacts WHERE customer_id = ?').run(req.params.id);
+      for (const ct of contacts) {
+        if (ct.contact_name?.trim()) {
+          await db.prepare(`
+            INSERT INTO customer_contacts (customer_id, contact_name, phone, email, position, is_default)
+            VALUES (?, ?, ?, ?, ?, ?)
+          `).run(
+            req.params.id,
+            ct.contact_name.trim(),
+            ct.phone || '',
+            ct.email || '',
+            ct.position || '',
+            ct.is_default ? 1 : 0
+          );
+        }
+      }
+    }
+
     res.json({ success: true });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -690,7 +751,65 @@ app.put('/api/customers/:id', async (req, res) => {
 
 app.delete('/api/customers/:id', async (req, res) => {
   try {
+    await db.prepare('DELETE FROM customer_contacts WHERE customer_id = ?').run(req.params.id);
     await db.prepare('DELETE FROM customers WHERE id = ?').run(req.params.id);
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Customer Contacts Sub-routes
+app.get('/api/customers/:id/contacts', async (req, res) => {
+  try {
+    const rows = await db.prepare('SELECT * FROM customer_contacts WHERE customer_id = ? ORDER BY is_default DESC, id ASC').all(req.params.id);
+    res.json(rows);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/customers/:id/contacts', async (req, res) => {
+  try {
+    const { contact_name, phone, email, position, is_default } = req.body;
+    if (!contact_name) {
+      return res.status(400).json({ error: 'Contact name is required' });
+    }
+    if (is_default) {
+      await db.prepare('UPDATE customer_contacts SET is_default = 0 WHERE customer_id = ?').run(req.params.id);
+    }
+    const stmt = await db.prepare(`
+      INSERT INTO customer_contacts (customer_id, contact_name, phone, email, position, is_default)
+      VALUES (?, ?, ?, ?, ?, ?)
+    `);
+    const info = await stmt.run(req.params.id, contact_name, phone || '', email || '', position || '', is_default ? 1 : 0);
+    const created = await db.prepare('SELECT * FROM customer_contacts WHERE id = ?').get(info.lastInsertRowid);
+    res.status(201).json(created);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.put('/api/contacts/:id', async (req, res) => {
+  try {
+    const { contact_name, phone, email, position, is_default, customer_id } = req.body;
+    if (is_default && customer_id) {
+      await db.prepare('UPDATE customer_contacts SET is_default = 0 WHERE customer_id = ?').run(customer_id);
+    }
+    await db.prepare(`
+      UPDATE customer_contacts
+      SET contact_name = ?, phone = ?, email = ?, position = ?, is_default = ?
+      WHERE id = ?
+    `).run(contact_name, phone || '', email || '', position || '', is_default ? 1 : 0, req.params.id);
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.delete('/api/contacts/:id', async (req, res) => {
+  try {
+    await db.prepare('DELETE FROM customer_contacts WHERE id = ?').run(req.params.id);
     res.json({ success: true });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -2142,6 +2261,9 @@ app.get('/api/delivery-orders/:id', async (req, res) => {
         if (!row.total_qty && linkedInvoice.total_qty) {
           row.total_qty = linkedInvoice.total_qty;
         }
+        if (!row.hts_code && linkedInvoice.hts_code) {
+          row.hts_code = linkedInvoice.hts_code;
+        }
       }
 
       // Ekstrak nama part dan part_no jika format: "Part Name (PART-NO)"
@@ -2252,7 +2374,8 @@ app.post('/api/delivery-orders', async (req, res) => {
       pallet_qty,
       box_qty,
       notes,
-      items
+      items,
+      hts_code
     } = req.body;
 
     let parsedItems = null;
@@ -2318,6 +2441,13 @@ app.post('/api/delivery-orders', async (req, res) => {
     const itemsJson = parsedItems ? JSON.stringify(parsedItems) : null;
     const finalDoNumber = (do_number?.trim() || invoice_number?.trim() || '').trim();
 
+    // If hts_code is empty, try to inherit from linked invoice
+    let finalHtsCode = hts_code || '';
+    if (!finalHtsCode && invoice_number) {
+      const linkedInv = await db.prepare('SELECT hts_code FROM invoices WHERE invoice_number = ? LIMIT 1').get(invoice_number);
+      if (linkedInv?.hts_code) finalHtsCode = linkedInv.hts_code;
+    }
+
     // Cegah duplikasi: jika Delivery Order untuk nomor ini sudah ada, lakukan update in-place
     const existingDo = finalDoNumber 
       ? await db.prepare('SELECT id FROM delivery_orders WHERE do_number = ? OR (invoice_number = ? AND invoice_number != \'\') LIMIT 1').get(finalDoNumber, finalDoNumber)
@@ -2327,7 +2457,7 @@ app.post('/api/delivery-orders', async (req, res) => {
       await db.prepare(`
         UPDATE delivery_orders
         SET do_number = ?, do_date = ?, invoice_number = ?, customer_name = ?, customer_id = ?,
-            customer_po_no = ?, part_name = ?, pallet_qty = ?, box_qty = ?, notes = ?, items = ?
+            customer_po_no = ?, part_name = ?, pallet_qty = ?, box_qty = ?, notes = ?, items = ?, hts_code = ?
         WHERE id = ?
       `).run(
         finalDoNumber || (invoice_number?.trim() || ''),
@@ -2341,6 +2471,7 @@ app.post('/api/delivery-orders', async (req, res) => {
         numBoxes,
         notes || '',
         itemsJson,
+        finalHtsCode,
         existingDo.id
       );
 
@@ -2372,8 +2503,8 @@ app.post('/api/delivery-orders', async (req, res) => {
     const stmt = await db.prepare(`
       INSERT INTO delivery_orders (
         do_number, do_date, invoice_number, customer_name, customer_id,
-        customer_po_no, part_name, pallet_qty, box_qty, notes, items
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        customer_po_no, part_name, pallet_qty, box_qty, notes, items, hts_code
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
 
     const info = await stmt.run(
@@ -2387,7 +2518,8 @@ app.post('/api/delivery-orders', async (req, res) => {
       numPallets,
       numBoxes,
       notes || '',
-      itemsJson
+      itemsJson,
+      finalHtsCode
     );
 
     const refId = info.lastInsertRowid;
@@ -2475,11 +2607,17 @@ app.put('/api/delivery-orders/:id', async (req, res) => {
     const itemsJson = parsedItems ? JSON.stringify(parsedItems) : null;
     const finalDoNumber = (do_number?.trim() || invoice_number?.trim() || '').trim();
 
+    let finalHtsCode = req.body.hts_code || '';
+    if (!finalHtsCode && invoice_number) {
+      const linkedInv = await db.prepare('SELECT hts_code FROM invoices WHERE invoice_number = ? LIMIT 1').get(invoice_number);
+      if (linkedInv?.hts_code) finalHtsCode = linkedInv.hts_code;
+    }
+
     await db.prepare(`
       UPDATE delivery_orders
       SET do_number = ?, do_date = ?, invoice_number = ?, customer_name = ?,
           customer_id = ?, customer_po_no = ?, part_name = ?, pallet_qty = ?,
-          box_qty = ?, notes = ?, items = ?
+          box_qty = ?, notes = ?, items = ?, hts_code = ?
       WHERE id = ?
     `).run(
       finalDoNumber || (invoice_number?.trim() || ''),
@@ -2493,6 +2631,7 @@ app.put('/api/delivery-orders/:id', async (req, res) => {
       numBoxes,
       notes || '',
       itemsJson,
+      finalHtsCode,
       req.params.id
     );
 

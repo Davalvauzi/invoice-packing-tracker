@@ -98,6 +98,32 @@ if (DB_TYPE === 'postgres') {
   // Auto-ensure incremental schema columns & performance indexes
   pool.query('ALTER TABLE parts ADD COLUMN IF NOT EXISTS box_per_pallet INTEGER DEFAULT 0')
     .catch(() => { /* table might not exist yet */ });
+  pool.query('ALTER TABLE delivery_orders ADD COLUMN IF NOT EXISTS hts_code VARCHAR(50)')
+    .catch(() => {});
+  pool.query(`
+    CREATE TABLE IF NOT EXISTS customer_contacts (
+      id SERIAL PRIMARY KEY,
+      customer_id INTEGER REFERENCES customers(id) ON DELETE CASCADE,
+      contact_name VARCHAR(255) NOT NULL,
+      phone VARCHAR(100),
+      email VARCHAR(255),
+      position VARCHAR(100),
+      is_default SMALLINT DEFAULT 0,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )
+  `).then(() => {
+    // Migrate existing contact_person & phone from customers into customer_contacts if customer_contacts is empty
+    return pool.query(`
+      INSERT INTO customer_contacts (customer_id, contact_name, phone, is_default)
+      SELECT id, contact_person, phone, 1
+      FROM customers
+      WHERE contact_person IS NOT NULL AND contact_person != ''
+        AND id NOT IN (SELECT DISTINCT customer_id FROM customer_contacts WHERE customer_id IS NOT NULL)
+    `);
+  }).catch(() => {});
+
+  pool.query('CREATE INDEX IF NOT EXISTS idx_customer_contacts_cust ON customer_contacts(customer_id)')
+    .catch(() => {});
   pool.query('CREATE INDEX IF NOT EXISTS idx_do_inv_number ON delivery_orders(invoice_number)')
     .catch(() => {});
   pool.query('CREATE INDEX IF NOT EXISTS idx_parts_part_no ON parts(part_no)')
@@ -118,6 +144,33 @@ if (DB_TYPE === 'postgres') {
       sqliteDb.exec("ALTER TABLE parts ADD COLUMN box_per_pallet INTEGER DEFAULT 0");
       console.log('✅ Added box_per_pallet column to parts table (SQLite)');
     }
+
+    const doCols = sqliteDb.prepare("PRAGMA table_info(delivery_orders)").all();
+    if (doCols && doCols.length > 0 && !doCols.some(c => c.name === 'hts_code')) {
+      sqliteDb.exec("ALTER TABLE delivery_orders ADD COLUMN hts_code TEXT");
+    }
+
+    sqliteDb.exec(`
+      CREATE TABLE IF NOT EXISTS customer_contacts (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        customer_id INTEGER,
+        contact_name TEXT NOT NULL,
+        phone TEXT,
+        email TEXT,
+        position TEXT,
+        is_default INTEGER DEFAULT 0,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
+    // Migrate existing
+    sqliteDb.exec(`
+      INSERT INTO customer_contacts (customer_id, contact_name, phone, is_default)
+      SELECT id, contact_person, phone, 1
+      FROM customers
+      WHERE contact_person IS NOT NULL AND contact_person != ''
+        AND id NOT IN (SELECT DISTINCT customer_id FROM customer_contacts WHERE customer_id IS NOT NULL)
+    `);
   } catch (e) {
     // ignore if table doesn't exist yet
   }

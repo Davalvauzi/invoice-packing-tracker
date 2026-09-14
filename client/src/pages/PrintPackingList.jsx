@@ -526,9 +526,9 @@ export default function PrintPackingList({ id, onBack }) {
                 </th>
               </tr>
               <tr className="border-b border-black text-center font-bold text-[6.5pt]">
+                <th className="py-0.5 px-0.5 w-[22px]">L</th>
                 <th className="py-0.5 px-0.5 w-[22px]">W</th>
                 <th className="py-0.5 px-0.5 w-[22px]">H</th>
-                <th className="py-0.5 px-0.5 w-[22px]">L</th>
                 <th className="py-0.5 px-1 w-[35px]">CBM</th>
               </tr>
             </thead>
@@ -564,13 +564,13 @@ export default function PrintPackingList({ id, onBack }) {
                     {it.gross_weight > 0 ? formatNum(it.gross_weight, 2) : '-'}
                   </td>
                   <td className="py-1 px-0.5 text-center font-mono text-[6.8pt]">
+                    {it.length > 0 ? it.length : '-'}
+                  </td>
+                  <td className="py-1 px-0.5 text-center font-mono text-[6.8pt]">
                     {it.width > 0 ? it.width : '-'}
                   </td>
                   <td className="py-1 px-0.5 text-center font-mono text-[6.8pt]">
                     {it.height > 0 ? it.height : '-'}
-                  </td>
-                  <td className="py-1 px-0.5 text-center font-mono text-[6.8pt]">
-                    {it.length > 0 ? it.length : '-'}
                   </td>
                   <td className="py-1 px-1 text-center font-mono text-[6.8pt]">
                     {it.cbm > 0 ? Number(it.cbm).toFixed(3) : '-'}

@@ -204,10 +204,15 @@ export default function DeliveryOrderModal({ isOpen, onClose, onSuccess, initial
         }]);
       }
 
+      const invDate = found.invoice_date || found.doc_date || '';
+      const formattedDate = invDate ? invDate.slice(0, 10) : prev.do_date;
+
       setFormData(prev => ({
         ...prev,
         do_number: targetInvNum, // No DO otomatis mengikuti No Invoice
         invoice_number: targetInvNum,
+        do_date: formattedDate || prev.do_date, // Tanggal DO ngikut dari Invoice
+        hts_code: found.hts_code || prev.hts_code || '',
         customer_name: found.customer_name || prev.customer_name,
         customer_id: found.customer_id || prev.customer_id,
         customer_po_no: found.customer_po_no || prev.customer_po_no

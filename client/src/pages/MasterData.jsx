@@ -18,7 +18,11 @@ import {
   Calendar,
   TrendingUp,
   AlertCircle,
-  CheckCircle2
+  CheckCircle2,
+  UserPlus,
+  Phone,
+  Mail,
+  Briefcase
 } from 'lucide-react';
 import { useNotification } from '../context/NotificationContext';
 
@@ -235,7 +239,10 @@ export default function MasterData({ setActiveView }) {
       ship_to: '',
       address: '',
       contact_person: '',
-      phone: ''
+      phone: '',
+      contacts: [
+        { id: Date.now(), contact_name: '', phone: '', email: '', position: '', is_default: 1 }
+      ]
     });
     setPartForm({
       id: null,
@@ -256,6 +263,12 @@ export default function MasterData({ setActiveView }) {
   // Customer handlers
   const handleEditCustomer = (c) => {
     setEditingId(c.id);
+    const existingContacts = Array.isArray(c.contacts) && c.contacts.length > 0
+      ? c.contacts.map(ct => ({ ...ct }))
+      : (c.contact_person || c.phone 
+          ? [{ id: Date.now(), contact_name: c.contact_person || '', phone: c.phone || '', position: '', is_default: 1 }]
+          : [{ id: Date.now(), contact_name: '', phone: '', email: '', position: '', is_default: 1 }]);
+
     setCustomerForm({
       id: c.id,
       customer_id: c.customer_id || '',
@@ -264,19 +277,65 @@ export default function MasterData({ setActiveView }) {
       ship_to: c.ship_to || c.address || '',
       address: c.address || '',
       contact_person: c.contact_person || '',
-      phone: c.phone || ''
+      phone: c.phone || '',
+      contacts: existingContacts
     });
     setIsAdding(true);
+  };
+
+  const handleAddContactRow = () => {
+    setCustomerForm(prev => ({
+      ...prev,
+      contacts: [
+        ...(prev.contacts || []),
+        { id: Date.now(), contact_name: '', phone: '', email: '', position: '', is_default: 0 }
+      ]
+    }));
+  };
+
+  const handleRemoveContactRow = (idx) => {
+    setCustomerForm(prev => {
+      const updated = (prev.contacts || []).filter((_, i) => i !== idx);
+      if (updated.length > 0 && !updated.some(c => c.is_default)) {
+        updated[0].is_default = 1;
+      }
+      return { ...prev, contacts: updated };
+    });
+  };
+
+  const handleContactFieldChange = (idx, field, val) => {
+    setCustomerForm(prev => {
+      const updated = [...(prev.contacts || [])];
+      updated[idx] = { ...updated[idx], [field]: val };
+      return { ...prev, contacts: updated };
+    });
+  };
+
+  const handleSetDefaultContact = (idx) => {
+    setCustomerForm(prev => {
+      const updated = (prev.contacts || []).map((c, i) => ({
+        ...c,
+        is_default: i === idx ? 1 : 0
+      }));
+      return { ...prev, contacts: updated };
+    });
   };
 
   const handleSaveCustomer = async (e) => {
     e.preventDefault();
     if (!customerForm.customer_name.trim()) return showWarning('Nama customer wajib diisi');
-    
+
+    // Pick default contact or first contact
+    const validContacts = (customerForm.contacts || []).filter(c => c.contact_name?.trim());
+    const defaultContact = validContacts.find(c => c.is_default) || validContacts[0] || null;
+
     // Auto sync address with bill_to if address empty
     const payload = {
       ...customerForm,
-      address: customerForm.address || customerForm.bill_to
+      address: customerForm.address || customerForm.bill_to,
+      contact_person: defaultContact ? defaultContact.contact_name : (customerForm.contact_person || ''),
+      phone: defaultContact ? (defaultContact.phone || '') : (customerForm.phone || ''),
+      contacts: validContacts
     };
 
     try {
@@ -601,26 +660,112 @@ export default function MasterData({ setActiveView }) {
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-[11px] font-bold text-slate-700 mb-1">Kontak Person (PIC)</label>
-                  <input
-                    type="text"
-                    placeholder="Bpk. Hendra / Purchasing Dept"
-                    value={customerForm.contact_person}
-                    onChange={(e) => setCustomerForm({ ...customerForm, contact_person: e.target.value })}
-                    className="w-full px-3 py-2 text-xs rounded-lg border border-slate-300 bg-white"
-                  />
+              {/* Multiple Contacts Section */}
+              <div className="bg-slate-50 p-3.5 rounded-xl border border-slate-200 space-y-3">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <label className="block text-[11px] font-bold text-slate-800 uppercase tracking-wider">
+                      Daftar Kontak Perusahaan / PIC (Multiple Contacts)
+                    </label>
+                    <p className="text-[10px] text-slate-500">
+                      1 Customer bisa memiliki beberapa kontak. Kontak utama (default) akan otomatis dipilih saat membuat Invoice baru.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleAddContactRow}
+                    className="inline-flex items-center gap-1 px-2.5 py-1 bg-emerald-700 hover:bg-emerald-800 text-white rounded-lg text-[11px] font-bold cursor-pointer transition-colors"
+                  >
+                    <UserPlus className="w-3.5 h-3.5" /> + Tambah Kontak
+                  </button>
                 </div>
-                <div>
-                  <label className="block text-[11px] font-bold text-slate-700 mb-1">Nomor Telepon / HP</label>
-                  <input
-                    type="text"
-                    placeholder="0812-xxxx-xxxx / (021) 8980..."
-                    value={customerForm.phone}
-                    onChange={(e) => setCustomerForm({ ...customerForm, phone: e.target.value })}
-                    className="w-full px-3 py-2 text-xs rounded-lg border border-slate-300 bg-white"
-                  />
+
+                <div className="space-y-2.5">
+                  {(customerForm.contacts || []).map((ct, idx) => (
+                    <div 
+                      key={ct.id || idx}
+                      className={`p-2.5 rounded-lg border text-xs transition-colors ${
+                        ct.is_default 
+                          ? 'bg-emerald-50/70 border-emerald-300' 
+                          : 'bg-white border-slate-200 hover:border-slate-300'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between gap-2 mb-2">
+                        <div className="flex items-center gap-2">
+                          <span className="font-bold text-[10px] uppercase px-1.5 py-0.5 rounded bg-slate-200 text-slate-700">
+                            Kontak #{idx + 1}
+                          </span>
+                          {ct.is_default ? (
+                            <span className="text-[10px] font-bold text-emerald-800 bg-emerald-100 px-2 py-0.5 rounded-full flex items-center gap-1 border border-emerald-300">
+                              <Check className="w-3 h-3" /> Kontak Utama (Default)
+                            </span>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={() => handleSetDefaultContact(idx)}
+                              className="text-[10px] text-slate-500 hover:text-emerald-700 hover:underline cursor-pointer font-medium"
+                            >
+                              Jadikan Utama
+                            </button>
+                          )}
+                        </div>
+
+                        {(customerForm.contacts || []).length > 1 && (
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveContactRow(idx)}
+                            className="text-slate-400 hover:text-red-600 p-1 rounded hover:bg-red-50 cursor-pointer"
+                            title="Hapus kontak ini"
+                          >
+                            <Trash2 className="w-3.5 h-3.5 text-red-500" />
+                          </button>
+                        )}
+                      </div>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-4 gap-2">
+                        <div>
+                          <label className="block text-[10px] font-semibold text-slate-600 mb-0.5">Nama Kontak / PIC *</label>
+                          <input
+                            type="text"
+                            placeholder="Bpk. Hendra"
+                            value={ct.contact_name}
+                            onChange={(e) => handleContactFieldChange(idx, 'contact_name', e.target.value)}
+                            className="w-full px-2.5 py-1.5 text-xs rounded border border-slate-300 bg-white font-medium"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-[10px] font-semibold text-slate-600 mb-0.5">Jabatan / Bagian</label>
+                          <input
+                            type="text"
+                            placeholder="Purchasing / Finance"
+                            value={ct.position || ''}
+                            onChange={(e) => handleContactFieldChange(idx, 'position', e.target.value)}
+                            className="w-full px-2.5 py-1.5 text-xs rounded border border-slate-300 bg-white"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-[10px] font-semibold text-slate-600 mb-0.5">No. Telp / HP</label>
+                          <input
+                            type="text"
+                            placeholder="0812-xxxx / 021-..."
+                            value={ct.phone || ''}
+                            onChange={(e) => handleContactFieldChange(idx, 'phone', e.target.value)}
+                            className="w-full px-2.5 py-1.5 text-xs rounded border border-slate-300 bg-white font-mono"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-[10px] font-semibold text-slate-600 mb-0.5">Email</label>
+                          <input
+                            type="email"
+                            placeholder="hendra@pt.com"
+                            value={ct.email || ''}
+                            onChange={(e) => handleContactFieldChange(idx, 'email', e.target.value)}
+                            className="w-full px-2.5 py-1.5 text-xs rounded border border-slate-300 bg-white"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  ))}
                 </div>
               </div>
 
@@ -891,8 +1036,35 @@ export default function MasterData({ setActiveView }) {
                       {c.ship_to || c.address || '-'}
                     </td>
                     <td className="px-5 py-3.5 text-slate-600">
-                      <div>{c.contact_person || '-'}</div>
-                      {c.phone && <div className="text-[10px] text-slate-400 font-mono">{c.phone}</div>}
+                      {Array.isArray(c.contacts) && c.contacts.length > 0 ? (
+                        <div className="space-y-1">
+                          {c.contacts.map((ct, i) => (
+                            <div key={ct.id || i} className="flex items-center gap-1.5 text-[11px]">
+                              <span className={`font-semibold ${ct.is_default ? 'text-emerald-900 font-bold' : 'text-slate-800'}`}>
+                                {ct.contact_name}
+                              </span>
+                              {ct.position && (
+                                <span className="text-[10px] text-slate-500">({ct.position})</span>
+                              )}
+                              {ct.is_default ? (
+                                <span className="text-[9px] bg-emerald-100 text-emerald-800 font-bold px-1.5 py-0.2 rounded border border-emerald-300">
+                                  Default
+                                </span>
+                              ) : null}
+                              {ct.phone && (
+                                <span className="text-[10px] text-slate-400 font-mono">
+                                  • {ct.phone}
+                                </span>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <div>
+                          <div className="font-semibold text-slate-800">{c.contact_person || '-'}</div>
+                          {c.phone && <div className="text-[10px] text-slate-400 font-mono">{c.phone}</div>}
+                        </div>
+                      )}
                     </td>
                     <td className="px-5 py-3.5 text-right">
                       <div className="flex items-center justify-end gap-1.5">

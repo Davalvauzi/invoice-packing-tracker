@@ -35,15 +35,27 @@ const createEmptyItem = (isSample = false) => ({
   is_sample: isSample
 });
 
-const buildBillToWithContact = (customer) => {
+const buildBillToWithContact = (customer, specificContact = null) => {
   if (!customer) return '';
-  let lines = (customer.bill_to || customer.address || '').trim();
+  let raw = (customer.bill_to || customer.address || '').trim();
+  // Strip any existing Tel/Phone or Attn/PIC lines to allow clean swap
+  let lines = raw
+    .split('\n')
+    .map(l => l.trim())
+    .filter(Boolean)
+    .filter(l => !/^(phone|tel|fax|attn|up|pic):/i.test(l))
+    .join('\n');
+
+  // If specific contact selected, use that
+  const contactName = specificContact ? specificContact.contact_name : (customer.contact_person || '');
+  const contactPhone = specificContact ? specificContact.phone : (customer.phone || '');
+
   const contactLines = [];
-  if (customer.phone && !lines.toLowerCase().includes(customer.phone.toLowerCase()) && !/^(tel|phone):/im.test(lines)) {
-    contactLines.push(`Tel: ${customer.phone}`);
+  if (contactPhone) {
+    contactLines.push(`Tel: ${contactPhone}`);
   }
-  if (customer.contact_person && !lines.toLowerCase().includes(customer.contact_person.toLowerCase()) && !/^(attn|pic|up):/im.test(lines)) {
-    contactLines.push(`Attn: ${customer.contact_person}`);
+  if (contactName) {
+    contactLines.push(`Attn: ${contactName}`);
   }
   return contactLines.length > 0 ? (lines ? `${lines}\n${contactLines.join('\n')}` : contactLines.join('\n')) : lines;
 };
@@ -287,16 +299,47 @@ export default function InvoiceModal({ isOpen, onClose, openPrintTab, onSuccess,
     }));
   }, [items]);
 
+  const [selectedContactId, setSelectedContactId] = useState('');
+
+  const currentCustomer = customers.find(c => c.customer_name === formData.customer_name);
+  const currentCustomerContacts = currentCustomer?.contacts || [];
+
   const handleCustomerChange = (e) => {
     const custName = e.target.value;
     const found = customers.find(c => c.customer_name === custName);
+    const contacts = found?.contacts || [];
+    const defContact = contacts.find(c => c.is_default) || contacts[0] || null;
+
+    setSelectedContactId(defContact ? String(defContact.id) : '');
     setFormData(prev => ({
       ...prev,
       customer_name: custName,
       customer_id: found ? (found.customer_id || '') : prev.customer_id,
-      bill_to: found ? buildBillToWithContact(found) : '',
+      bill_to: found ? buildBillToWithContact(found, defContact) : '',
       ship_to: found ? buildShipToWithoutContact(found) : ''
     }));
+  };
+
+  const handleContactSelect = (e) => {
+    const contactId = e.target.value;
+    setSelectedContactId(contactId);
+    if (!currentCustomer) return;
+
+    if (!contactId) {
+      setFormData(prev => ({
+        ...prev,
+        bill_to: buildBillToWithContact(currentCustomer, null)
+      }));
+      return;
+    }
+
+    const chosenContact = currentCustomerContacts.find(c => String(c.id) === String(contactId));
+    if (chosenContact) {
+      setFormData(prev => ({
+        ...prev,
+        bill_to: buildBillToWithContact(currentCustomer, chosenContact)
+      }));
+    }
   };
 
   // Item row operations
@@ -790,9 +833,9 @@ export default function InvoiceModal({ isOpen, onClose, openPrintTab, onSuccess,
                 </div>
               </div>
 
-              {/* Row 2: Customer Name & ID */}
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                <div className="sm:col-span-2">
+              {/* Row 2: Customer Name, Contact Person Picker & Customer ID */}
+              <div className="grid grid-cols-1 sm:grid-cols-12 gap-3">
+                <div className="sm:col-span-5">
                   <label className="block text-[11px] font-bold text-slate-700 uppercase mb-1">
                     CUSTOMER NAME <span className="text-red-500">*</span>
                   </label>
@@ -810,7 +853,37 @@ export default function InvoiceModal({ isOpen, onClose, openPrintTab, onSuccess,
                   </select>
                 </div>
 
-                <div>
+                <div className="sm:col-span-4">
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="block text-[11px] font-bold text-emerald-950 uppercase">
+                      PILIH KONTAK / PIC DOKUMEN
+                    </label>
+                    {currentCustomerContacts.length > 0 && (
+                      <span className="text-[10px] text-emerald-700 font-semibold font-mono">
+                        {currentCustomerContacts.length} Kontak
+                      </span>
+                    )}
+                  </div>
+                  <select
+                    value={selectedContactId}
+                    onChange={handleContactSelect}
+                    disabled={!formData.customer_name}
+                    className={`w-full px-3 py-2 rounded-xl border text-xs cursor-pointer font-medium transition-colors ${
+                      currentCustomerContacts.length > 0
+                        ? 'border-emerald-400 bg-emerald-50/50 text-emerald-950 focus:border-emerald-600'
+                        : 'border-slate-300 bg-white text-slate-500'
+                    }`}
+                  >
+                    <option value="">-- Kontak Default Perusahaan --</option>
+                    {currentCustomerContacts.map((ct) => (
+                      <option key={ct.id} value={ct.id}>
+                        {ct.contact_name} {ct.position ? `(${ct.position})` : ''} {ct.phone ? `- Tel: ${ct.phone}` : ''} {ct.is_default ? '★' : ''}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="sm:col-span-3">
                   <label className="block text-[11px] font-bold text-slate-700 uppercase mb-1">
                     CUSTOMER ID
                   </label>

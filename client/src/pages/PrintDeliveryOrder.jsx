@@ -234,7 +234,7 @@ export default function PrintDeliveryOrder({ id, onBack }) {
     return Number(val).toLocaleString('en-US');
   };
 
-  const htsCode = settings?.hts_code_do || '8504.40.00';
+  const htsCode = deliveryOrder.hts_code || settings?.hts_code_do || '8504.40.00';
   const drawnInFavour = settings?.do_drawn_in_favour || settings?.bank_drawn_in_favour || 'PT. PATCO ELEKTRONIK TEKNOLOGI';
 
   // 6 Signature Columns

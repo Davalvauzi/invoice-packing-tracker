@@ -89,14 +89,27 @@ export default function InvoiceForm({ setActiveView, openPrintTab }) {
     }
   };
 
+  const [selectedContactId, setSelectedContactId] = useState('');
+
+  const currentCustomer = customers.find(c => c.customer_name === formData.customer_name);
+  const currentCustomerContacts = currentCustomer?.contacts || [];
+
   const handleCustomerChange = (e) => {
     const custName = e.target.value;
     const found = customers.find(c => c.customer_name === custName);
+    const contacts = found?.contacts || [];
+    const defContact = contacts.find(c => c.is_default) || contacts[0] || null;
+
+    setSelectedContactId(defContact ? String(defContact.id) : '');
     setFormData(prev => ({
       ...prev,
       customer_name: custName,
       customer_id: found ? (found.customer_id || '') : prev.customer_id
     }));
+  };
+
+  const handleContactSelect = (e) => {
+    setSelectedContactId(e.target.value);
   };
 
   const recalculateFinancials = (boxes, qtyPerB, unitP) => {
@@ -416,9 +429,9 @@ export default function InvoiceForm({ setActiveView, openPrintTab }) {
             </div>
           </div>
 
-          {/* Row 2: Customer Name & Customer ID */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
-            <div className="sm:col-span-2">
+          {/* Row 2: Customer Name, Contact Person Picker & Customer ID */}
+          <div className="grid grid-cols-1 sm:grid-cols-12 gap-6">
+            <div className="sm:col-span-5">
               <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">
                 CUSTOMER NAME <span className="text-red-500">*</span>
               </label>
@@ -441,7 +454,42 @@ export default function InvoiceForm({ setActiveView, openPrintTab }) {
               </div>
             </div>
 
-            <div>
+            <div className="sm:col-span-4">
+              <div className="flex items-center justify-between mb-2">
+                <label className="block text-xs font-bold text-emerald-950 uppercase tracking-wider">
+                  KONTAK / PIC DOKUMEN
+                </label>
+                {currentCustomerContacts.length > 0 && (
+                  <span className="text-[10px] text-emerald-700 font-semibold font-mono">
+                    {currentCustomerContacts.length} Kontak
+                  </span>
+                )}
+              </div>
+              <div className="relative">
+                <select
+                  value={selectedContactId}
+                  onChange={handleContactSelect}
+                  disabled={!formData.customer_name}
+                  className={`w-full px-3.5 py-2.5 rounded-xl border text-sm transition-all appearance-none cursor-pointer ${
+                    currentCustomerContacts.length > 0
+                      ? 'border-emerald-400 bg-emerald-50/50 text-emerald-950 focus:border-emerald-600'
+                      : 'border-slate-300 bg-white text-slate-500'
+                  }`}
+                >
+                  <option value="">-- Kontak Default --</option>
+                  {currentCustomerContacts.map((ct) => (
+                    <option key={ct.id} value={ct.id}>
+                      {ct.contact_name} {ct.position ? `(${ct.position})` : ''} {ct.is_default ? '★' : ''}
+                    </option>
+                  ))}
+                </select>
+                <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-slate-400">
+                  ▼
+                </div>
+              </div>
+            </div>
+
+            <div className="sm:col-span-3">
               <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">
                 CUSTOMER ID
               </label>

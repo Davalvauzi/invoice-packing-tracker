@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { 
   Users, 
   CreditCard, 
@@ -28,6 +28,7 @@ import { useNotification } from '../context/NotificationContext';
 
 export default function MasterData({ setActiveView }) {
   const { showSuccess, showError, showWarning, confirmDialog } = useNotification();
+  const formRef = useRef(null);
   const [activeTab, setActiveTab] = useState(() => {
     return sessionStorage.getItem('docutrack_master_tab') || 'customers';
   }); // 'customers' | 'payment' | 'delivery' | 'parts'
@@ -258,6 +259,13 @@ export default function MasterData({ setActiveView }) {
     });
     setTermForm({ id: null, name: '', description: '' });
     setIsAdding(true);
+    setTimeout(() => {
+      if (formRef.current) {
+        formRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      } else {
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      }
+    }, 60);
   };
 
   // Customer handlers
@@ -281,6 +289,14 @@ export default function MasterData({ setActiveView }) {
       contacts: existingContacts
     });
     setIsAdding(true);
+    showSuccess(`Memuat formulir edit: ${c.customer_name}`);
+    setTimeout(() => {
+      if (formRef.current) {
+        formRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      } else {
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      }
+    }, 60);
   };
 
   const handleAddContactRow = () => {
@@ -580,7 +596,7 @@ export default function MasterData({ setActiveView }) {
 
       {/* Add / Edit Form Container */}
       {isAdding && (
-        <div className="bg-emerald-50/60 border border-emerald-200 rounded-2xl p-5 mb-6 animate-in fade-in slide-in-from-top-2">
+        <div ref={formRef} className="bg-emerald-50/60 border border-emerald-200 rounded-2xl p-5 mb-6 animate-in fade-in slide-in-from-top-2 scroll-mt-6">
           
           {/* CUSTOMER FORM */}
           {activeTab === 'customers' && (
@@ -1026,7 +1042,7 @@ export default function MasterData({ setActiveView }) {
                 </tr>
               ) : (
                 customers.map((c) => (
-                  <tr key={c.id} className="hover:bg-slate-50 transition-colors">
+                  <tr key={c.id} className={`transition-colors ${editingId === c.id ? 'bg-amber-50/80 ring-2 ring-amber-400 font-medium' : 'hover:bg-slate-50'}`}>
                     <td className="px-5 py-3.5 font-mono font-bold text-emerald-800">{c.customer_id || '-'}</td>
                     <td className="px-5 py-3.5 font-bold text-slate-900">{c.customer_name}</td>
                     <td className="px-5 py-3.5 text-slate-600 max-w-xs whitespace-pre-line text-[11px]">
@@ -1069,15 +1085,24 @@ export default function MasterData({ setActiveView }) {
                     <td className="px-5 py-3.5 text-right">
                       <div className="flex items-center justify-end gap-1.5">
                         <button
-                          onClick={() => handleEditCustomer(c)}
-                          className="p-1 text-slate-500 hover:text-emerald-700 transition-colors cursor-pointer"
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleEditCustomer(c);
+                          }}
+                          className={`p-1.5 rounded-lg transition-all cursor-pointer ${
+                            editingId === c.id 
+                              ? 'bg-amber-200 text-amber-900 shadow-xs' 
+                              : 'text-slate-500 hover:text-emerald-700 hover:bg-emerald-50'
+                          }`}
                           title="Edit Customer"
                         >
                           <Edit2 className="w-3.5 h-3.5" />
                         </button>
                         <button
+                          type="button"
                           onClick={() => handleDeleteCustomer(c.id)}
-                          className="p-1 text-slate-400 hover:text-red-600 transition-colors cursor-pointer"
+                          className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors cursor-pointer"
                           title="Hapus Customer"
                         >
                           <Trash2 className="w-3.5 h-3.5" />

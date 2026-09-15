@@ -632,6 +632,17 @@ app.get('/api/customers', async (req, res) => {
       const row = await db.prepare('SELECT * FROM customers WHERE customer_name = ? LIMIT 1').get(name);
       if (row) {
         row.contacts = await db.prepare('SELECT * FROM customer_contacts WHERE customer_id = ? ORDER BY is_default DESC, id ASC').all(row.id);
+        if ((!row.contacts || row.contacts.length === 0) && row.contact_person) {
+          row.contacts = [{
+            id: row.id,
+            customer_id: row.id,
+            contact_name: row.contact_person,
+            phone: row.phone || '',
+            position: '',
+            email: '',
+            is_default: 1
+          }];
+        }
       }
       return res.json(row || null);
     }
@@ -645,6 +656,17 @@ app.get('/api/customers', async (req, res) => {
     }
     for (const row of rows) {
       row.contacts = contactMap[row.id] || [];
+      if (row.contacts.length === 0 && row.contact_person) {
+        row.contacts = [{
+          id: row.id,
+          customer_id: row.id,
+          contact_name: row.contact_person,
+          phone: row.phone || '',
+          position: '',
+          email: '',
+          is_default: 1
+        }];
+      }
     }
     res.json(rows);
   } catch (err) {

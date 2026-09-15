@@ -815,10 +815,11 @@ export default function PackingListModal({ isOpen, onClose, openPrintTab, onSucc
 
                         <div>
                           <label className="block text-[10px] font-bold text-slate-700 uppercase mb-1">
-                            CUST PO NO
+                            CUST PO NO <span className="text-red-500">*</span>
                           </label>
                           <input
                             type="text"
+                            required
                             placeholder="Contoh: PO-AHM-2026-99"
                             value={item.customer_po_no}
                             onChange={(e) => handleItemChange(index, 'customer_po_no', e.target.value)}

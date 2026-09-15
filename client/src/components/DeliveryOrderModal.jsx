@@ -698,10 +698,11 @@ export default function DeliveryOrderModal({ isOpen, onClose, onSuccess, initial
 
                       <div>
                         <label className="block text-[10px] font-bold text-slate-700 uppercase mb-1">
-                          CUSTOMER PO NO
+                          CUSTOMER PO NO <span className="text-red-500">*</span>
                         </label>
                         <input
                           type="text"
+                          required
                           placeholder="Contoh: PO-AHM-9910"
                           value={item.customer_po_no}
                           onChange={(e) => handleItemChange(index, 'customer_po_no', e.target.value)}

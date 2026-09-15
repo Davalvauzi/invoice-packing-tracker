@@ -51,11 +51,11 @@ const buildBillToWithContact = (customer, specificContact = null) => {
   const contactPhone = specificContact ? specificContact.phone : (customer.phone || '');
 
   const contactLines = [];
-  if (contactPhone) {
-    contactLines.push(`Tel: ${contactPhone}`);
-  }
   if (contactName) {
     contactLines.push(`Attn: ${contactName}`);
+  }
+  if (contactPhone) {
+    contactLines.push(`Tel: ${contactPhone}`);
   }
   return contactLines.length > 0 ? (lines ? `${lines}\n${contactLines.join('\n')}` : contactLines.join('\n')) : lines;
 };
@@ -194,15 +194,24 @@ export default function InvoiceModal({ isOpen, onClose, openPrintTab, onSuccess,
   const loadInvoiceData = async (inv) => {
     if (!inv) return;
     try {
+      let fullInv = (typeof inv === 'object' && inv !== null) ? { ...inv } : {};
       // Prioritas resolusi targetId invoice: ref_id dari data_logger, invoice_number, atau ID
       const targetId = (inv.doc_type === 'INVOICE' && inv.ref_id)
         ? inv.ref_id
-        : (inv.invoice_number || inv.ref_id || inv.id || inv);
-      if (typeof targetId === 'number' || typeof targetId === 'string') {
-        const res = await fetch(`/api/invoices/${targetId}`);
+        : (inv.invoice_number || inv.ref_id || inv.id || (typeof inv === 'string' || typeof inv === 'number' ? inv : null));
+
+      if (targetId) {
+        const res = await fetch(`/api/invoices/${encodeURIComponent(targetId)}`);
         if (res.ok) {
-          fullInv = await res.json();
+          const fetched = await res.json();
+          if (fetched && typeof fetched === 'object') {
+            fullInv = fetched;
+          }
         }
+      }
+
+      if (!fullInv || (!fullInv.id && !fullInv.invoice_number)) {
+        throw new Error('Data invoice tidak ditemukan atau tidak valid');
       }
 
       setIsEditMode(true);
@@ -249,6 +258,23 @@ export default function InvoiceModal({ isOpen, onClose, openPrintTab, onSuccess,
       }
 
       setItems(loadedItems);
+
+      // Cocokkan kontak jika ada di customer data
+      const custObj = customers.find(c => c.customer_name === fullInv.customer_name);
+      if (custObj && Array.isArray(custObj.contacts)) {
+        const matchedContact = custObj.contacts.find(c => 
+          c.contact_name && fullInv.bill_to && fullInv.bill_to.includes(c.contact_name)
+        );
+        if (matchedContact) {
+          setSelectedContactId(String(matchedContact.id));
+        } else {
+          const def = custObj.contacts.find(c => c.is_default);
+          if (def) setSelectedContactId(String(def.id));
+          else setSelectedContactId('');
+        }
+      } else {
+        setSelectedContactId('');
+      }
 
       setFormData({
         id: fullInv.id,
@@ -301,13 +327,35 @@ export default function InvoiceModal({ isOpen, onClose, openPrintTab, onSuccess,
 
   const [selectedContactId, setSelectedContactId] = useState('');
 
-  const currentCustomer = customers.find(c => c.customer_name === formData.customer_name);
-  const currentCustomerContacts = currentCustomer?.contacts || [];
+  const currentCustomer = customers.find(c => 
+    c.customer_name === formData.customer_name || 
+    (c.customer_id && formData.customer_id && c.customer_id === formData.customer_id)
+  );
+
+  const getCustomerContacts = (cust) => {
+    if (!cust) return [];
+    if (Array.isArray(cust.contacts) && cust.contacts.length > 0) {
+      return cust.contacts;
+    }
+    if (cust.contact_person || cust.phone) {
+      return [{
+        id: `legacy-${cust.id || 'default'}`,
+        contact_name: cust.contact_person || 'Kontak Utama',
+        phone: cust.phone || '',
+        position: '',
+        email: '',
+        is_default: 1
+      }];
+    }
+    return [];
+  };
+
+  const currentCustomerContacts = getCustomerContacts(currentCustomer);
 
   const handleCustomerChange = (e) => {
     const custName = e.target.value;
     const found = customers.find(c => c.customer_name === custName);
-    const contacts = found?.contacts || [];
+    const contacts = getCustomerContacts(found);
     const defContact = contacts.find(c => c.is_default) || contacts[0] || null;
 
     setSelectedContactId(defContact ? String(defContact.id) : '');
@@ -493,6 +541,7 @@ export default function InvoiceModal({ isOpen, onClose, openPrintTab, onSuccess,
   };
 
   const addItemRow = (isSample = false) => {
+    if (isEditMode) return;
     const lastPo = items[items.length - 1]?.customer_po_no || '';
     const newItem = createEmptyItem(isSample);
     if (lastPo) newItem.customer_po_no = lastPo;
@@ -526,6 +575,10 @@ export default function InvoiceModal({ isOpen, onClose, openPrintTab, onSuccess,
 
     for (let i = 0; i < validItems.length; i++) {
       const it = validItems[i];
+      if (!it.customer_po_no || !it.customer_po_no.trim()) {
+        showWarning(`Mohon isi CUST PO NO untuk produk ke-${i + 1} (${it.part_name})`);
+        return;
+      }
       if (!it.is_sample) {
         if (!it.no_of_box || parseFloat(it.no_of_box) <= 0) {
           showWarning(`Mohon isi No of Box untuk produk ke-${i + 1} (${it.part_name})`);
@@ -599,14 +652,17 @@ export default function InvoiceModal({ isOpen, onClose, openPrintTab, onSuccess,
     setIsEditMode(false);
     setEditingInvoiceId(null);
     setSubmittedDoc(null);
+    const defCust = customers[0];
+    const defContact = defCust?.contacts?.find(c => c.is_default) || defCust?.contacts?.[0] || null;
+    setSelectedContactId(defContact ? String(defContact.id) : '');
     setItems([createEmptyItem()]);
     setFormData({
       invoice_number: '',
       invoice_date: new Date().toISOString().slice(0, 10),
-      customer_name: customers[0]?.customer_name || '',
-      customer_id: customers[0]?.customer_id || '',
-      bill_to: customers[0] ? buildBillToWithContact(customers[0]) : '',
-      ship_to: customers[0] ? buildShipToWithoutContact(customers[0]) : '',
+      customer_name: defCust?.customer_name || '',
+      customer_id: defCust?.customer_id || '',
+      bill_to: defCust ? buildBillToWithContact(defCust, defContact) : '',
+      ship_to: defCust ? buildShipToWithoutContact(defCust) : '',
       payment_term: paymentTerms[0]?.name || '',
       terms_of_delivery: deliveryTerms[0]?.name || '',
       customer_po_no: '',
@@ -969,24 +1025,30 @@ export default function InvoiceModal({ isOpen, onClose, openPrintTab, onSuccess,
                   <Package className="w-4 h-4 text-emerald-700" />
                   Daftar Produk & Part Tagihan ({items.length} Item)
                 </div>
-                <div className="flex items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={() => addItemRow(false)}
-                    className="inline-flex items-center gap-1.5 px-3 py-1 bg-emerald-700 hover:bg-emerald-800 text-white rounded-lg text-[11px] font-bold tracking-wide cursor-pointer transition-colors shadow-xs"
-                  >
-                    <Plus className="w-3.5 h-3.5" />
-                    <span>+ Tambah Produk</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => addItemRow(true)}
-                    className="inline-flex items-center gap-1.5 px-3 py-1 bg-amber-600 hover:bg-amber-700 text-white rounded-lg text-[11px] font-bold tracking-wide cursor-pointer transition-colors shadow-xs"
-                  >
-                    <Sparkles className="w-3.5 h-3.5" />
-                    <span>+ Tambah Product Sample</span>
-                  </button>
-                </div>
+                {!isEditMode ? (
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => addItemRow(false)}
+                      className="inline-flex items-center gap-1.5 px-3 py-1 bg-emerald-700 hover:bg-emerald-800 text-white rounded-lg text-[11px] font-bold tracking-wide cursor-pointer transition-colors shadow-xs"
+                    >
+                      <Plus className="w-3.5 h-3.5" />
+                      <span>+ Tambah Produk</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => addItemRow(true)}
+                      className="inline-flex items-center gap-1.5 px-3 py-1 bg-amber-600 hover:bg-amber-700 text-white rounded-lg text-[11px] font-bold tracking-wide cursor-pointer transition-colors shadow-xs"
+                    >
+                      <Sparkles className="w-3.5 h-3.5" />
+                      <span>+ Tambah Product Sample</span>
+                    </button>
+                  </div>
+                ) : (
+                  <span className="text-[11px] bg-amber-100 text-amber-900 font-semibold px-2.5 py-1 rounded-lg border border-amber-300">
+                    Mode Edit: Item Produk Terkunci
+                  </span>
+                )}
               </div>
 
               {/* Datalist parts catalog shared across rows */}
@@ -1082,10 +1144,11 @@ export default function InvoiceModal({ isOpen, onClose, openPrintTab, onSuccess,
 
                       <div>
                         <label className="block text-[10px] font-bold text-slate-700 uppercase mb-1">
-                          CUST PO NO
+                          CUST PO NO <span className="text-red-500">*</span>
                         </label>
                         <input
                           type="text"
+                          required
                           placeholder="Contoh: 726890 - 1 - 22"
                           value={item.customer_po_no}
                           onChange={(e) => handleItemChange(index, 'customer_po_no', e.target.value)}
@@ -1209,24 +1272,26 @@ export default function InvoiceModal({ isOpen, onClose, openPrintTab, onSuccess,
               </div>
 
               {/* Add Item Action Buttons (Standar vs Sample) */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                <button
-                  type="button"
-                  onClick={() => addItemRow(false)}
-                  className="w-full py-2.5 px-4 rounded-xl border-2 border-dashed border-emerald-300 hover:border-emerald-600 bg-white/70 hover:bg-emerald-50 text-emerald-800 font-bold text-xs flex items-center justify-center gap-2 transition-all cursor-pointer shadow-xs"
-                >
-                  <Plus className="w-4 h-4" />
-                  <span>+ Tambah Produk Ke-{items.length + 1}</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => addItemRow(true)}
-                  className="w-full py-2.5 px-4 rounded-xl border-2 border-dashed border-amber-300 hover:border-amber-600 bg-amber-50/60 hover:bg-amber-100 text-amber-800 font-bold text-xs flex items-center justify-center gap-2 transition-all cursor-pointer shadow-xs"
-                >
-                  <Sparkles className="w-4 h-4 text-amber-600" />
-                  <span>+ Tambah Product Sample (Custom Qty)</span>
-                </button>
-              </div>
+              {!isEditMode && (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                  <button
+                    type="button"
+                    onClick={() => addItemRow(false)}
+                    className="w-full py-2.5 px-4 rounded-xl border-2 border-dashed border-emerald-300 hover:border-emerald-600 bg-white/70 hover:bg-emerald-50 text-emerald-800 font-bold text-xs flex items-center justify-center gap-2 transition-all cursor-pointer shadow-xs"
+                  >
+                    <Plus className="w-4 h-4" />
+                    <span>+ Tambah Produk Ke-{items.length + 1}</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => addItemRow(true)}
+                    className="w-full py-2.5 px-4 rounded-xl border-2 border-dashed border-amber-300 hover:border-amber-600 bg-amber-50/60 hover:bg-amber-100 text-amber-800 font-bold text-xs flex items-center justify-center gap-2 transition-all cursor-pointer shadow-xs"
+                  >
+                    <Sparkles className="w-4 h-4 text-amber-600" />
+                    <span>+ Tambah Product Sample (Custom Qty)</span>
+                  </button>
+                </div>
+              )}
 
               {/* Grand Totals Summary Card */}
               <div className="bg-gradient-to-br from-slate-900 to-emerald-950 text-white p-4 rounded-xl shadow-md grid grid-cols-1 sm:grid-cols-2 gap-4 items-center">

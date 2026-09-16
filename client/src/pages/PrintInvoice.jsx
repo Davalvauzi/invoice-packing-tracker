@@ -187,7 +187,7 @@ export default function PrintInvoice({ id, onBack }) {
   };
 
   return (
-    <div className="min-h-screen bg-slate-300 py-6 px-4 print:p-0 print:bg-white text-black font-['Calibri',sans-serif] selection:bg-slate-300">
+    <div className="min-h-screen bg-slate-300 py-6 px-4 print:p-0 print:bg-white print:min-h-0 text-black font-['Calibri',sans-serif] selection:bg-slate-300">
       
       {/* Floating Action Bar (Hidden when printing) */}
       <div className="no-print max-w-[210mm] mx-auto mb-4 bg-white p-3 rounded-lg shadow border border-slate-300 flex items-center justify-between">
@@ -241,7 +241,7 @@ export default function PrintInvoice({ id, onBack }) {
       </div>
 
       {/* A4 Paper Document Container - Clean, compact, calibrated typography 1:1 */}
-      <div className="print-page max-w-[210mm] mx-auto bg-white shadow-xl px-8 pt-5 pb-5 print:p-0 print:shadow-none min-h-[297mm] text-black text-[7.5pt] leading-[1.2] font-['Calibri',sans-serif]">
+      <div className="print-page max-w-[210mm] mx-auto bg-white shadow-xl px-8 pt-5 pb-5 print:p-0 print:shadow-none min-h-[297mm] print:min-h-0 text-black text-[7.5pt] leading-[1.2] font-['Calibri',sans-serif]">
         
         {/* ========================================================= */}
         {/* 1. HEADER (KOP SURAT RESMI: LOGO BESAR, NAMA & ALAMAT BESAR) */}
@@ -652,7 +652,7 @@ export default function PrintInvoice({ id, onBack }) {
         {/* ========================================================= */}
         {/* 6. SIGNATURES (COC DIVISION & FA DIVISION)                */}
         {/* ========================================================= */}
-        <div className="flex pt-6 text-[7.5pt]">
+        <div className="flex pt-4 print:pt-3 text-[7.5pt] break-inside-avoid print:break-inside-avoid">
           
           {/* Prepared By / COC DIVISION (Left 64%) */}
           <div style={{ width: '64%' }} className="flex flex-col items-start pl-8">

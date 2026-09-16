@@ -273,7 +273,7 @@ export default function PrintPackingList({ id, onBack }) {
   };
 
   return (
-    <div className="min-h-screen bg-slate-300 py-6 px-4 print:p-0 print:bg-white text-black font-['Calibri',sans-serif] selection:bg-slate-300">
+    <div className="min-h-screen bg-slate-300 py-6 px-4 print:p-0 print:bg-white print:min-h-0 text-black font-['Calibri',sans-serif] selection:bg-slate-300">
       
       {/* Floating Action Bar */}
       <div className="no-print max-w-[210mm] mx-auto mb-4 bg-white p-3 rounded-lg shadow border border-slate-300 flex items-center justify-between">
@@ -327,7 +327,7 @@ export default function PrintPackingList({ id, onBack }) {
       </div>
 
       {/* A4 Paper Document Container */}
-      <div className="print-page max-w-[210mm] mx-auto bg-white shadow-xl px-8 pt-5 pb-5 print:p-0 print:shadow-none min-h-[297mm] text-black text-[7.5pt] leading-[1.2] font-['Calibri',sans-serif] flex flex-col">
+      <div className="print-page max-w-[210mm] mx-auto bg-white shadow-xl px-8 pt-5 pb-5 print:p-0 print:shadow-none min-h-[297mm] print:min-h-0 text-black text-[7.5pt] leading-[1.2] font-['Calibri',sans-serif] flex flex-col">
         
         <div>
           {/* ================= 1. HEADER KOP RESMI ================= */}
@@ -620,7 +620,7 @@ export default function PrintPackingList({ id, onBack }) {
         </div>
 
         {/* ================= 6. TANDA TANGAN (Coretan Hijau) & KODE DOKUMEN (Coretan Kuning) ================= */}
-        <div className="pt-16 pb-2 print:break-inside-avoid">
+        <div className="pt-6 print:pt-4 pb-2 print:break-inside-avoid">
           <div className="grid grid-cols-12 gap-4 items-end">
             
             {/* Tanda Tangan Kiri: Prepared By */}

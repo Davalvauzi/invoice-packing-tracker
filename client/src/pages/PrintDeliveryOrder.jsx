@@ -279,7 +279,7 @@ export default function PrintDeliveryOrder({ id, onBack }) {
   ];
 
   return (
-    <div className="min-h-screen bg-slate-300 py-6 px-4 print:p-0 print:bg-white text-black font-['Calibri',sans-serif] selection:bg-slate-300">
+    <div className="min-h-screen bg-slate-300 py-6 px-4 print:p-0 print:bg-white print:min-h-0 text-black font-['Calibri',sans-serif] selection:bg-slate-300">
       
       {/* Floating Action Bar */}
       <div className="no-print max-w-[210mm] mx-auto mb-4 bg-white p-3 rounded-lg shadow border border-slate-300 flex items-center justify-between">
@@ -333,7 +333,7 @@ export default function PrintDeliveryOrder({ id, onBack }) {
       </div>
 
       {/* A4 Paper Document Container */}
-      <div className="print-page max-w-[210mm] mx-auto bg-white shadow-xl px-8 pt-5 pb-5 print:p-0 print:shadow-none min-h-[297mm] text-black text-[7.5pt] leading-[1.2] font-['Calibri',sans-serif] flex flex-col">
+      <div className="print-page max-w-[210mm] mx-auto bg-white shadow-xl px-8 pt-5 pb-5 print:p-0 print:shadow-none min-h-[297mm] print:min-h-0 text-black text-[7.5pt] leading-[1.2] font-['Calibri',sans-serif] flex flex-col">
         
         <div>
           {/* ================= 1. HEADER KOP RESMI ================= */}
@@ -632,7 +632,7 @@ export default function PrintDeliveryOrder({ id, onBack }) {
           <div className="grid grid-cols-6 gap-3 text-center text-[7pt]">
             {signatureCols.map((col, idx) => (
               <div key={idx} className="flex flex-col items-center justify-end">
-                <div className="font-bold mb-16 leading-tight">
+                <div className="font-bold mb-10 leading-tight">
                   {col.title}
                 </div>
                 <div className="border-t border-black w-3/4 mx-auto pt-1">

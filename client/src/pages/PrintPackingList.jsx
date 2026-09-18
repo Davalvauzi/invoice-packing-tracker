@@ -434,7 +434,10 @@ export default function PrintPackingList({ id, onBack }) {
             </div>
 
           {/* ================= 2. TITLE: PACKING LIST ================= */}
-          <div className="text-center pt-3 pb-3">
+          <div 
+            className="text-center pb-3"
+            style={{ paddingTop: !showLetterhead ? 'calc(0.75rem + 24pt)' : '0.75rem' }}
+          >
             <h1 className="text-[12pt] font-bold tracking-wider text-black uppercase leading-tight">
               PACKING LIST
             </h1>

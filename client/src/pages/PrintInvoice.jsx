@@ -358,7 +358,10 @@ export default function PrintInvoice({ id, onBack }) {
         {/* ========================================================= */}
         {/* 2. TITLE: INVOICE (Centered cleanly above metadata)        */}
         {/* ========================================================= */}
-        <div className="text-center pt-2 pb-2">
+        <div 
+          className="text-center pb-2"
+          style={{ paddingTop: !showLetterhead ? 'calc(0.5rem + 24pt)' : '0.5rem' }}
+        >
           <h1 className="text-[12pt] font-bold tracking-wider text-black uppercase leading-tight">
             INVOICE
           </h1>

@@ -4,6 +4,7 @@ const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
 const os = require('os');
+const crypto = require('crypto');
 const db = require('./db');
 const { seedMasterTemplate, generateTransactionsOnly, runProceduralSeeder, SAMPLE_COMPANIES, SAMPLE_PARTS } = require('./seeder');
 
@@ -154,19 +155,67 @@ app.post('/api/upload', upload.single('drawing'), async (req, res) => {
   }
 })();
 
+// ================= CRYPTOGRAPHIC PIN HASHING (scrypt + random salt) ================= //
+function hashPin(pin) {
+  const salt = crypto.randomBytes(16).toString('hex');
+  const hash = crypto.scryptSync(String(pin).trim(), salt, 64).toString('hex');
+  return `scrypt:${salt}:${hash}`;
+}
+
+function verifyPin(inputPin, storedPin) {
+  if (!inputPin || !storedPin) return false;
+  const cleanInput = String(inputPin).trim();
+  const cleanStored = String(storedPin).trim();
+
+  if (cleanStored.startsWith('scrypt:')) {
+    const parts = cleanStored.split(':');
+    if (parts.length !== 3) return false;
+    const [, salt, expectedHash] = parts;
+    const actualHash = crypto.scryptSync(cleanInput, salt, 64).toString('hex');
+    const actualBuf = Buffer.from(actualHash, 'hex');
+    const expectedBuf = Buffer.from(expectedHash, 'hex');
+    if (actualBuf.length !== expectedBuf.length) return false;
+    return crypto.timingSafeEqual(actualBuf, expectedBuf);
+  }
+
+  // Fallback transisi: verifikasi plain text untuk data lama
+  return cleanInput === cleanStored;
+}
+
+// Optimized Part Resolution Helper (mengeliminasi N+1 database queries pada loop item)
+function findMatchingPart(allParts, partNo, partName) {
+  if (!allParts || allParts.length === 0) return null;
+  const cleanNo = (partNo || '').trim().toLowerCase();
+  const cleanName = (partName || '').trim().toLowerCase();
+
+  if (cleanNo) {
+    const byNo = allParts.find(p => p.part_no && p.part_no.toLowerCase() === cleanNo);
+    if (byNo) return byNo;
+  }
+  if (cleanName) {
+    const byExactName = allParts.find(p => p.part_name && p.part_name.toLowerCase() === cleanName);
+    if (byExactName) return byExactName;
+    const bySubName = allParts.find(p => p.part_name && p.part_name.toLowerCase().includes(cleanName));
+    if (bySubName) return bySubName;
+  }
+  return null;
+}
+
 app.get('/api/settings', async (req, res) => {
   try {
     let row = await db.prepare('SELECT * FROM settings WHERE id = 1').get();
     if (!row) {
+      const defaultHashed = hashPin('123');
       await db.prepare(`
-        INSERT INTO settings (id, company_name, show_letterhead, admin_pin) VALUES (1, 'PT. PATCO ELEKTRONIK TEKNOLOGI', 0, '123')
-      `).run();
+        INSERT INTO settings (id, company_name, show_letterhead, admin_pin) VALUES (1, 'PT. PATCO ELEKTRONIK TEKNOLOGI', 0, ?)
+      `).run(defaultHashed);
       row = await db.prepare('SELECT * FROM settings WHERE id = 1').get();
     } else if (!row.admin_pin || String(row.admin_pin).trim() === '') {
-      await db.prepare("UPDATE settings SET admin_pin = '123' WHERE id = 1").run();
-      row.admin_pin = '123';
+      const defaultHashed = hashPin('123');
+      await db.prepare("UPDATE settings SET admin_pin = ? WHERE id = 1").run(defaultHashed);
+      row.admin_pin = defaultHashed;
     }
-    // Sembunyikan plain text admin_pin dari respons publik settings
+    // Sembunyikan hash admin_pin dari respons publik settings
     const { admin_pin, ...safeSettings } = row;
     res.json({ ...safeSettings, has_admin_pin: !!admin_pin });
   } catch (err) {
@@ -207,7 +256,7 @@ app.post('/api/settings/verify-pin', async (req, res) => {
     const row = await db.prepare('SELECT admin_pin FROM settings WHERE id = 1').get();
     const currentPin = row?.admin_pin || '123';
 
-    if (String(pin).trim() !== String(currentPin).trim()) {
+    if (!verifyPin(pin, currentPin)) {
       record.count += 1;
       record.lastAttempt = now;
 
@@ -225,6 +274,11 @@ app.post('/api/settings/verify-pin', async (req, res) => {
       return res.status(401).json({ 
         error: `PIN salah. Sisa kesempatan: ${remainingAttempts} kali.` 
       });
+    }
+
+    // Upgrade otomatis dari plain-text lama ke scrypt hash saat login berhasil
+    if (typeof currentPin === 'string' && !currentPin.startsWith('scrypt:')) {
+      await db.prepare('UPDATE settings SET admin_pin = ? WHERE id = 1').run(hashPin(pin));
     }
 
     // Berhasil: hapus riwayat percobaan
@@ -249,12 +303,13 @@ app.post('/api/settings/change-pin', async (req, res) => {
     const row = await db.prepare('SELECT admin_pin FROM settings WHERE id = 1').get();
     const currentPin = row?.admin_pin || '123';
 
-    if (String(old_pin).trim() !== String(currentPin).trim()) {
+    if (!verifyPin(old_pin, currentPin)) {
       return res.status(401).json({ error: 'PIN lama tidak cocok.' });
     }
 
-    await db.prepare('UPDATE settings SET admin_pin = ? WHERE id = 1').run(String(new_pin).trim());
-    return res.json({ success: true, message: 'PIN Admin berhasil diubah!' });
+    const hashedPin = hashPin(new_pin);
+    await db.prepare('UPDATE settings SET admin_pin = ? WHERE id = 1').run(hashedPin);
+    return res.json({ success: true, message: 'PIN Admin berhasil diubah dan diamankan dengan enkripsi!' });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -548,7 +603,7 @@ app.post('/api/dummy-data/clear', async (req, res) => {
 
     // Otorisasi: periksa kesesuaian PIN atau token otorisasi
     const providedPin = pin || confirm_key || authHeader;
-    const isPinMatch = providedPin && String(providedPin).trim() === String(currentPin).trim();
+    const isPinMatch = providedPin && verifyPin(providedPin, currentPin);
     const isTokenMatch = Boolean(adminKey && String(providedPin).trim() === String(adminKey).trim());
 
     if (!isPinMatch && !isTokenMatch) {
@@ -1741,13 +1796,9 @@ app.get('/api/packing-lists/:id', async (req, res) => {
         if (!extractedNo) extractedNo = matchP[2].trim();
       }
 
-      let partInfo = null;
-      if (extractedNo) {
-        partInfo = await db.prepare('SELECT * FROM parts WHERE part_no = ? LIMIT 1').get(extractedNo);
-      }
-      if (!partInfo && extractedName) {
-        partInfo = await db.prepare('SELECT * FROM parts WHERE part_name LIKE ? LIMIT 1').get(`%${extractedName}%`);
-      }
+      // Pre-fetch parts katalog sekali untuk eliminasi N+1 query
+      const allParts = await db.prepare('SELECT * FROM parts').all();
+      let partInfo = findMatchingPart(allParts, extractedNo, extractedName);
 
       if (partInfo) {
         if (!extractedNo) extractedNo = partInfo.part_no;
@@ -1784,7 +1835,7 @@ app.get('/api/packing-lists/:id', async (req, res) => {
         row.gross_weight = (Number(row.net_weight) * 1.34).toFixed(2);
       }
 
-      // Auto-enrich multi-items array if present
+      // Auto-enrich multi-items array if present (in-memory resolution)
       if (row.items) {
         let parsedMulti = null;
         try {
@@ -1802,13 +1853,7 @@ app.get('/api/packing-lists/:id', async (req, res) => {
               if (!itPartNo) itPartNo = m[2].trim();
             }
             if (!it.qty_per_box || !it.total_qty || !it.length || !it.width || !it.height) {
-              let pMatch = null;
-              if (itPartNo) {
-                pMatch = await db.prepare('SELECT * FROM parts WHERE part_no = ? LIMIT 1').get(itPartNo);
-              }
-              if (!pMatch && itPartName) {
-                pMatch = await db.prepare('SELECT * FROM parts WHERE part_name LIKE ? LIMIT 1').get(`%${itPartName}%`);
-              }
+              const pMatch = findMatchingPart(allParts, itPartNo, itPartName);
               if (pMatch) {
                 if (!it.part_no) it.part_no = pMatch.part_no;
                 if (!it.qty_per_box) it.qty_per_box = pMatch.qty_per_box;
@@ -2298,14 +2343,9 @@ app.get('/api/delivery-orders/:id', async (req, res) => {
         if (!extractedNo) extractedNo = matchP[2].trim();
       }
 
-      // Cari di catalog part
-      let partInfo = null;
-      if (extractedNo) {
-        partInfo = await db.prepare('SELECT * FROM parts WHERE part_no = ? LIMIT 1').get(extractedNo);
-      }
-      if (!partInfo && extractedName) {
-        partInfo = await db.prepare('SELECT * FROM parts WHERE part_name LIKE ? LIMIT 1').get(`%${extractedName}%`);
-      }
+      // Pre-fetch parts katalog sekali untuk eliminasi N+1 query
+      const allParts = await db.prepare('SELECT * FROM parts').all();
+      let partInfo = findMatchingPart(allParts, extractedNo, extractedName);
 
       if (partInfo) {
         if (!extractedNo) extractedNo = partInfo.part_no;
@@ -2331,7 +2371,7 @@ app.get('/api/delivery-orders/:id', async (req, res) => {
       row.qty_per_box = qpb;
       row.total_qty = totQ;
 
-      // Auto-enrich multi-items array if present
+      // Auto-enrich multi-items array if present (in-memory resolution)
       if (row.items) {
         let parsedMulti = null;
         try {
@@ -2349,13 +2389,7 @@ app.get('/api/delivery-orders/:id', async (req, res) => {
               if (!itPartNo) itPartNo = m[2].trim();
             }
             if (!it.qty_per_box || !it.total_qty) {
-              let pMatch = null;
-              if (itPartNo) {
-                pMatch = await db.prepare('SELECT * FROM parts WHERE part_no = ? LIMIT 1').get(itPartNo);
-              }
-              if (!pMatch && itPartName) {
-                pMatch = await db.prepare('SELECT * FROM parts WHERE part_name LIKE ? LIMIT 1').get(`%${itPartName}%`);
-              }
+              const pMatch = findMatchingPart(allParts, itPartNo, itPartName);
               if (pMatch) {
                 if (!it.part_no) it.part_no = pMatch.part_no;
                 if (!it.qty_per_box) it.qty_per_box = pMatch.qty_per_box;

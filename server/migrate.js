@@ -32,6 +32,18 @@ async function createPostgresSchema(client) {
       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     );
 
+    -- 1.1 Customer Contacts
+    CREATE TABLE IF NOT EXISTS customer_contacts (
+      id SERIAL PRIMARY KEY,
+      customer_id INTEGER REFERENCES customers(id) ON DELETE CASCADE,
+      contact_name VARCHAR(255) NOT NULL,
+      phone VARCHAR(100),
+      email VARCHAR(255),
+      position VARCHAR(100),
+      is_default SMALLINT DEFAULT 0,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+
     -- 2. Payment Terms
     CREATE TABLE IF NOT EXISTS payment_terms (
       id SERIAL PRIMARY KEY,
@@ -237,7 +249,7 @@ async function createPostgresSchema(client) {
     CREATE INDEX IF NOT EXISTS idx_do_number ON delivery_orders(do_number);
     CREATE INDEX IF NOT EXISTS idx_do_inv_number ON delivery_orders(invoice_number);
     CREATE INDEX IF NOT EXISTS idx_parts_part_no ON parts(part_no);
-    CREATE INDEX IF NOT EXISTS idx_parts_customer ON parts(customer_id);
+    CREATE INDEX IF NOT EXISTS idx_contacts_customer ON customer_contacts(customer_id);
     CREATE INDEX IF NOT EXISTS idx_price_history_part ON part_price_history(part_id);
 
     -- Ensure incremental schema updates
@@ -302,6 +314,7 @@ async function run() {
     const tablesToMigrate = [
       'settings',
       'customers',
+      'customer_contacts',
       'payment_terms',
       'delivery_terms',
       'parts',

@@ -904,6 +904,7 @@ export default function DataLogger({
                                 onClick={() => handleDelete(inv.id)}
                                 className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
                                 title="Hapus Log"
+                                aria-label="Hapus Log"
                               >
                                 <Trash2 className="w-3.5 h-3.5" />
                               </button>
@@ -949,6 +950,7 @@ export default function DataLogger({
                                   onClick={() => handleOpenEdit(child)}
                                   className="p-1 bg-amber-50 hover:bg-amber-100 text-amber-700 rounded-lg text-xs transition-colors"
                                   title="Edit Data"
+                                  aria-label="Edit Data"
                                 >
                                   <Edit3 className="w-3.5 h-3.5" />
                                 </button>
@@ -956,6 +958,7 @@ export default function DataLogger({
                                   onClick={() => setSelectedLog(child)}
                                   className="p-1 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs transition-colors"
                                   title="Lihat Detail"
+                                  aria-label="Lihat Detail"
                                 >
                                   <Eye className="w-3.5 h-3.5" />
                                 </button>
@@ -963,6 +966,7 @@ export default function DataLogger({
                                   onClick={() => openPrintTab(child.doc_type === 'DELIVERY_ORDER' ? 'print-delivery-order' : 'print-packing-list', child.ref_id || child.id || child.doc_number)}
                                   className={`inline-flex items-center gap-1 px-2 py-0.5 ${child.doc_type === 'DELIVERY_ORDER' ? 'bg-cyan-50 text-cyan-800 hover:bg-cyan-100' : 'bg-teal-50 text-teal-800 hover:bg-teal-100'} rounded-lg text-xs font-bold transition-colors`}
                                   title="Buka / Cetak PDF di Tab Baru"
+                                  aria-label="Buka / Cetak PDF di Tab Baru"
                                 >
                                   <Printer className="w-3 h-3" />
                                   <span>PDF</span>
@@ -971,6 +975,7 @@ export default function DataLogger({
                                   onClick={() => handleDelete(child.id)}
                                   className="p-1 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
                                   title="Hapus Log"
+                                  aria-label="Hapus Log"
                                 >
                                   <Trash2 className="w-3.5 h-3.5" />
                                 </button>
@@ -1033,6 +1038,7 @@ export default function DataLogger({
                                 onClick={() => setSelectedLog(orphan)}
                                 className="p-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs transition-colors"
                                 title="Lihat Detail"
+                                aria-label="Lihat Detail"
                               >
                                 <Eye className="w-3.5 h-3.5" />
                               </button>
@@ -1045,6 +1051,7 @@ export default function DataLogger({
                                 }}
                                 className="inline-flex items-center gap-1 px-2.5 py-1 bg-teal-50 text-teal-800 hover:bg-teal-100 rounded-lg text-xs font-bold transition-colors"
                                 title="Buka / Cetak PDF di Tab Baru"
+                                aria-label="Buka / Cetak PDF di Tab Baru"
                               >
                                 <Printer className="w-3.5 h-3.5" />
                                 <span>PDF</span>
@@ -1053,6 +1060,7 @@ export default function DataLogger({
                                 onClick={() => handleDelete(orphan.id)}
                                 className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
                                 title="Hapus Log"
+                                aria-label="Hapus Log"
                               >
                                 <Trash2 className="w-3.5 h-3.5" />
                               </button>
@@ -1136,6 +1144,7 @@ export default function DataLogger({
                           onClick={() => setSelectedLog(log)}
                           className="p-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs transition-colors"
                           title="Lihat Detail Transaksi"
+                          aria-label="Lihat Detail Transaksi"
                         >
                           <Eye className="w-3.5 h-3.5" />
                         </button>
@@ -1148,6 +1157,7 @@ export default function DataLogger({
                           }}
                           className="inline-flex items-center gap-1 px-2.5 py-1 bg-emerald-50 text-emerald-800 hover:bg-emerald-100 rounded-lg text-xs font-bold transition-colors"
                           title="Buka / Cetak PDF di Tab Baru"
+                          aria-label="Buka / Cetak PDF di Tab Baru"
                         >
                           <Printer className="w-3.5 h-3.5" />
                           <span>PDF</span>
@@ -1156,6 +1166,7 @@ export default function DataLogger({
                           onClick={() => handleDelete(log.id)}
                           className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
                           title="Hapus Log"
+                          aria-label="Hapus Log"
                         >
                           <Trash2 className="w-3.5 h-3.5" />
                         </button>

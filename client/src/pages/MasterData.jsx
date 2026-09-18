@@ -1096,6 +1096,7 @@ export default function MasterData({ setActiveView }) {
                               : 'text-slate-500 hover:text-emerald-700 hover:bg-emerald-50'
                           }`}
                           title="Edit Customer"
+                          aria-label="Edit Customer"
                         >
                           <Edit2 className="w-3.5 h-3.5" />
                         </button>
@@ -1104,6 +1105,7 @@ export default function MasterData({ setActiveView }) {
                           onClick={() => handleDeleteCustomer(c.id)}
                           className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors cursor-pointer"
                           title="Hapus Customer"
+                          aria-label="Hapus Customer"
                         >
                           <Trash2 className="w-3.5 h-3.5" />
                         </button>
@@ -1180,6 +1182,7 @@ export default function MasterData({ setActiveView }) {
                           onClick={() => handleEditPart(pt)}
                           className="p-1 text-slate-500 hover:text-emerald-700 transition-colors cursor-pointer"
                           title="Edit Produk / Harga"
+                          aria-label="Edit Produk / Harga"
                         >
                           <Edit2 className="w-3.5 h-3.5" />
                         </button>
@@ -1187,6 +1190,7 @@ export default function MasterData({ setActiveView }) {
                           onClick={() => handleDeletePart(pt.id)}
                           className="p-1 text-slate-400 hover:text-red-600 transition-colors cursor-pointer"
                           title="Hapus Part"
+                          aria-label="Hapus Part"
                         >
                           <Trash2 className="w-3.5 h-3.5" />
                         </button>

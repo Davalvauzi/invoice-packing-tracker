@@ -230,6 +230,29 @@ function getClientIp(req) {
   return (req.headers['x-forwarded-for'] || req.socket.remoteAddress || '127.0.0.1').toString().split(',')[0].trim();
 }
 
+// Rate limiting khusus operasi DELETE untuk mencegah automated wipe scripts di LAN
+const deleteAttempts = new Map();
+function checkDeleteRateLimit(req, res, next) {
+  const ip = getClientIp(req);
+  const now = Date.now();
+  const record = deleteAttempts.get(ip) || { count: 0, resetAt: now + 60000 };
+
+  if (now > record.resetAt) {
+    record.count = 0;
+    record.resetAt = now + 60000;
+  }
+
+  record.count += 1;
+  deleteAttempts.set(ip, record);
+
+  if (record.count > 30) {
+    return res.status(429).json({ 
+      error: 'Terlalu banyak permintaan penghapusan data dalam waktu singkat. Akses dibatasi demi keamanan.' 
+    });
+  }
+  next();
+}
+
 // Verifikasi PIN Admin untuk buka gembok / akses menu reset
 app.post('/api/settings/verify-pin', async (req, res) => {
   try {
@@ -826,7 +849,7 @@ app.put('/api/customers/:id', async (req, res) => {
   }
 });
 
-app.delete('/api/customers/:id', async (req, res) => {
+app.delete('/api/customers/:id', checkDeleteRateLimit, async (req, res) => {
   try {
     await db.prepare('DELETE FROM customer_contacts WHERE customer_id = ?').run(req.params.id);
     await db.prepare('DELETE FROM customers WHERE id = ?').run(req.params.id);
@@ -884,7 +907,7 @@ app.put('/api/contacts/:id', async (req, res) => {
   }
 });
 
-app.delete('/api/contacts/:id', async (req, res) => {
+app.delete('/api/contacts/:id', checkDeleteRateLimit, async (req, res) => {
   try {
     await db.prepare('DELETE FROM customer_contacts WHERE id = ?').run(req.params.id);
     res.json({ success: true });
@@ -893,10 +916,11 @@ app.delete('/api/contacts/:id', async (req, res) => {
   }
 });
 
-// Payment Terms
+// ================= PAYMENT & DELIVERY TERMS ================= //
+
 app.get('/api/payment-terms', async (req, res) => {
   try {
-    const rows = await db.prepare('SELECT * FROM payment_terms ORDER BY id ASC').all();
+    const rows = await db.prepare('SELECT * FROM payment_terms ORDER BY name ASC').all();
     res.json(rows);
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -1034,7 +1058,7 @@ app.put('/api/parts/:id', async (req, res) => {
   }
 });
 
-app.delete('/api/parts/:id', async (req, res) => {
+app.delete('/api/parts/:id', checkDeleteRateLimit, async (req, res) => {
   try {
     await db.prepare('DELETE FROM parts WHERE id = ?').run(req.params.id);
     res.json({ success: true });
@@ -1164,7 +1188,7 @@ app.put('/api/parts/prices/:priceId', async (req, res) => {
 });
 
 // Delete price entry
-app.delete('/api/parts/prices/:priceId', async (req, res) => {
+app.delete('/api/parts/prices/:priceId', checkDeleteRateLimit, async (req, res) => {
   try {
     const { priceId } = req.params;
     const existing = await db.prepare('SELECT * FROM part_price_history WHERE id = ?').get(priceId);
@@ -1219,17 +1243,43 @@ app.get('/api/parts/:id/price-at-date', async (req, res) => {
 
 app.get('/api/invoices', async (req, res) => {
   try {
-    const { search } = req.query;
+    const { search, page, limit } = req.query;
+    let baseQuery = ' FROM invoices';
+    const params = [];
+
     if (search && search.trim()) {
       const term = `%${search.trim()}%`;
-      const rows = await db.prepare(`
-        SELECT * FROM invoices 
-        WHERE invoice_number LIKE ? OR customer_name LIKE ? OR customer_po_no LIKE ? OR part_name LIKE ? OR notes LIKE ?
-        ORDER BY id DESC
-      `).all(term, term, term, term, term);
-      return res.json(rows);
+      baseQuery += ' WHERE invoice_number LIKE ? OR customer_name LIKE ? OR customer_po_no LIKE ? OR part_name LIKE ? OR notes LIKE ?';
+      params.push(term, term, term, term, term);
     }
-    const rows = await db.prepare('SELECT * FROM invoices ORDER BY id DESC').all();
+
+    const countRow = await db.prepare(`SELECT COUNT(*) AS total ${baseQuery}`).get(...params);
+    const total = countRow ? Number(countRow.total) : 0;
+
+    let dataQuery = `SELECT * ${baseQuery} ORDER BY id DESC`;
+    const queryParams = [...params];
+
+    if (page !== undefined || limit !== undefined) {
+      const pageNum = Math.max(1, parseInt(page) || 1);
+      const pageSize = limit === 'all' ? total : Math.max(1, parseInt(limit) || 50);
+      if (limit !== 'all') {
+        dataQuery += ' LIMIT ? OFFSET ?';
+        queryParams.push(pageSize, (pageNum - 1) * pageSize);
+      }
+      const rows = await db.prepare(dataQuery).all(...queryParams);
+      return res.json({
+        data: rows,
+        pagination: {
+          page: pageNum,
+          limit: pageSize,
+          total,
+          totalPages: limit === 'all' ? 1 : Math.max(1, Math.ceil(total / pageSize))
+        }
+      });
+    }
+
+    // Default: kembalikan seluruh baris (array) untuk kompatibilitas form/modal dropdown
+    const rows = await db.prepare(dataQuery).all(...queryParams);
     res.json(rows);
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -3006,7 +3056,7 @@ app.put('/api/data-logger/:id', async (req, res) => {
   }
 });
 
-app.delete('/api/data-logger/:id', async (req, res) => {
+app.delete('/api/data-logger/:id', checkDeleteRateLimit, async (req, res) => {
   try {
     // Soft delete to protect audit trail and prevent permanent data loss
     await db.prepare('UPDATE data_logger SET is_deleted = 1 WHERE id = ?').run(req.params.id);
